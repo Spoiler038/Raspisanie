@@ -4,12 +4,13 @@
 <meta charset="UTF-8" />
 <title>Расписание</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="tailwind" content="true">
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.css" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/interaction.global.min.js"></script>
-<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.tailwindcss.com/3.4.1"></script>
 
 
 <style>
@@ -653,6 +654,58 @@ body.light #resetPasswordModal input {
   border-color: #2563eb !important;
 }
 
+/* ===== СТИЛИ СКРОЛЛА ДЛЯ СВЕТЛОЙ ТЕМЫ ===== */
+body.light ::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+body.light ::-webkit-scrollbar-track {
+  background: #e2e8f0;  /* Светло-серый фон */
+  border-radius: 4px;
+}
+
+body.light ::-webkit-scrollbar-thumb {
+  background: #94a3b8;  /* Серый ползунок */
+  border-radius: 4px;
+}
+
+body.light ::-webkit-scrollbar-thumb:hover {
+  background: #64748b;  /* Темно-серый при наведении */
+}
+
+/* Для Firefox в светлой теме */
+body.light {
+  scrollbar-width: thin;
+  scrollbar-color: #94a3b8 #e2e8f0;
+}
+
+/* Стили для темной темы (улучшим) */
+body.dark ::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+body.dark ::-webkit-scrollbar-track {
+  background: #1e293b;  /* Темный фон */
+  border-radius: 4px;
+}
+
+body.dark ::-webkit-scrollbar-thumb {
+  background: #475569;  /* Серый ползунок для темной темы */
+  border-radius: 4px;
+}
+
+body.dark ::-webkit-scrollbar-thumb:hover {
+  background: #64748b;  /* Светлее при наведении */
+}
+
+/* Для Firefox в темной теме */
+body.dark {
+  scrollbar-width: thin;
+  scrollbar-color: #475569 #1e293b;
+}
+
 </style>
 </head>
 
@@ -918,6 +971,7 @@ if (typeof supabase !== 'undefined' && supabase.createClient) {
 let notificationInterval = null
 let notifiedLessons = new Set() // ID уроков, о которых уже оповестили
 
+
 // Запуск проверки оповещений
 function startNotificationChecker() {
   if (notificationInterval) clearInterval(notificationInterval)
@@ -1016,6 +1070,7 @@ function getTimeToLesson(lesson) {
 }
 
 
+
 // ===== УПРАВЛЕНИЕ РЕЖИМАМИ ХРАНЕНИЯ =====
 function checkSyncMode() {
   const mode = localStorage.getItem(STORAGE_KEYS.SYNC_MODE)
@@ -1027,6 +1082,61 @@ function checkSyncMode() {
     if (mode === SYNC_MODES.CLOUD) {
       checkCloudAuth()
     }
+  }
+}
+
+// ===== ОБРАБОТКА ПОДТВЕРЖДЕНИЯ EMAIL =====
+async function handleEmailConfirmation() {
+  // Проверяем параметры в URL
+  const hash = window.location.hash
+  const params = new URLSearchParams(window.location.search)
+  
+  console.log('Проверка URL:', { hash, search: window.location.search })
+  
+  // Проверяем, есть ли параметры подтверждения
+  if (hash && hash.includes('access_token')) {
+    console.log('Обнаружен токен подтверждения в hash')
+    showToast('⏳ Подтверждение email...', false)
+    
+    try {
+      // Supabase автоматически обработает токен из URL
+      const { data, error } = await supabaseClient.auth.getSession()
+      
+      if (error) throw error
+      
+      if (data.session) {
+        console.log('Сессия подтверждена:', data.session.user)
+        
+        currentUser = {
+          id: data.session.user.id,
+          email: data.session.user.email
+        }
+        localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(currentUser))
+        
+        // Очищаем URL от токенов
+        window.history.replaceState({}, document.title, window.location.pathname)
+        
+        showToast('✅ Email подтвержден! Выполнен автоматический вход', true)
+        
+        // Показываем кнопку выхода
+        const logoutBtn = document.getElementById('logoutButton')
+        if (logoutBtn) logoutBtn.style.display = 'block'
+        
+        // Если облачный режим, загружаем данные
+        if (currentSyncMode === SYNC_MODES.CLOUD) {
+          setTimeout(() => importCloud(), 1000)
+        }
+      }
+    } catch (error) {
+      console.error('Ошибка подтверждения:', error)
+      showToast('❌ Ошибка подтверждения email', false)
+    }
+  }
+  
+  // Проверяем параметры в query string (альтернативный формат)
+  if (params.has('access_token') || params.has('type') && params.get('type') === 'signup') {
+    console.log('Обнаружены параметры подтверждения в query')
+    // Аналогичная обработка...
   }
 }
 
@@ -1100,82 +1210,215 @@ function closeAuthModal() {
 
 // ===== УПРАВЛЕНИЕ АВТОРИЗАЦИЕЙ =====
 
-// Обновленная функция handleLogin
+// ===== УЛУЧШЕННАЯ ФУНКЦИЯ ВХОДА =====
 async function handleLogin() {
   const email = document.getElementById('authEmail').value
   const password = document.getElementById('authPassword').value
+  const authMessage = document.getElementById('authMessage')
   
+  // Валидация
   if (!email || !password) {
-    showToast('Введите email и пароль', false)
+    showToast('❌ Введите email и пароль', false)
     return
   }
   
-  showToast('Вход в облако...', false)
+  // Показываем индикатор загрузки
+  showToast('⏳ Выполняется вход...', false)
+  
+  // Блокируем кнопку на время запроса
+  const loginBtn = document.querySelector('#authModal .btn-primary')
+  const originalText = loginBtn.textContent
+  loginBtn.textContent = '⏳ Вход...'
+  loginBtn.disabled = true
   
   try {
+    console.log('Попытка входа для:', email)
+    
     const { data, error } = await supabaseClient.auth.signInWithPassword({
-      email,
-      password
+      email: email,
+      password: password
     })
     
-    if (error) throw error
+    if (error) {
+      console.error('Ошибка входа:', error)
+      
+      // Понятные сообщения об ошибках на русском
+      const errorMessages = {
+        'Invalid login credentials': '❌ Неверный email или пароль',
+        'Email not confirmed': '❌ Email не подтвержден. Проверьте почту',
+        'Invalid email': '❌ Неверный формат email',
+        'Password should be at least 6 characters': '❌ Пароль должен быть не менее 6 символов'
+      }
+      
+      const userMessage = errorMessages[error.message] || `❌ Ошибка: ${error.message}`
+      
+      if (authMessage) {
+        authMessage.textContent = userMessage
+        authMessage.style.color = '#ef4444'
+      } else {
+        showToast(userMessage, false)
+      }
+      
+      loginBtn.textContent = originalText
+      loginBtn.disabled = false
+      return
+    }
     
+    // Успешный вход
+    console.log('Вход успешен:', data)
+    
+    // Сохраняем пользователя
     currentUser = {
       id: data.user.id,
-      email: data.user.email
+      email: data.user.email,
+      lastSignIn: new Date().toISOString()
     }
     localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(currentUser))
     
     // Показываем кнопку выхода
-    document.getElementById('logoutButton').style.display = 'block'
+    const logoutBtn = document.getElementById('logoutButton')
+    if (logoutBtn) logoutBtn.style.display = 'block'
     
+    // Очищаем сообщения
+    if (authMessage) authMessage.textContent = ''
+    
+    // Закрываем модальное окно
     closeAuthModal()
-    showToast('Вход выполнен успешно', true)
     
-    // Синхронизируем с облаком
-    syncWithCloud()
-  } catch (error) {
-    document.getElementById('authMessage').textContent = 'Ошибка входа: ' + error.message
+    // Показываем успешный вход
+    showToast(`✅ Вход выполнен: ${data.user.email}`, true)
+    
+    // Разблокируем кнопку
+    loginBtn.textContent = originalText
+    loginBtn.disabled = false
+    
+    // Загружаем данные из облака (с задержкой для стабильности)
+    setTimeout(async () => {
+      try {
+        // Проверяем, есть ли данные в облаке
+        const { data: cloudLessons, error } = await supabaseClient
+          .from('lessons')
+          .select('count', { count: 'exact', head: true })
+          .eq('user_id', currentUser.id)
+        
+        if (!error && cloudLessons) {
+          // Если есть локальные данные, спрашиваем
+          if (lessons.length > 0) {
+            if (confirm('У вас есть локальные данные. Загрузить данные из облака?\nЛокальные данные будут заменены.')) {
+              await importCloud()
+            }
+          } else {
+            // Если локально пусто, загружаем автоматически
+            await importCloud()
+          }
+        }
+      } catch (syncError) {
+        console.log('Ошибка при проверке облака:', syncError)
+      }
+    }, 1000)
+    
+  } catch (unexpectedError) {
+    console.error('Неожиданная ошибка:', unexpectedError)
+    showToast('❌ Произошла ошибка при входе', false)
+    
+    loginBtn.textContent = originalText
+    loginBtn.disabled = false
   }
 }
 
-// Обновленная функция handleRegister
+// Улучшенная функция регистрации
 async function handleRegister() {
   const email = document.getElementById('authEmail').value
   const password = document.getElementById('authPassword').value
+  const authMessage = document.getElementById('authMessage')
   
   if (!email || !password) {
-    showToast('Введите email и пароль', false)
+    showToast('❌ Введите email и пароль', false)
     return
   }
   
   if (password.length < 6) {
-    showToast('Пароль должен быть не менее 6 символов', false)
+    showToast('❌ Пароль должен быть не менее 6 символов', false)
     return
   }
   
-  showToast('Регистрация...', false)
+  showToast('⏳ Регистрация...', false)
+  
+  const registerBtn = document.querySelector('#authModal .btn-secondary')
+  const originalText = registerBtn.textContent
+  registerBtn.textContent = '⏳ Регистрация...'
+  registerBtn.disabled = true
   
   try {
+    // Текущий URL сайта для редиректа
+    const siteUrl = window.location.origin + window.location.pathname
+    
     const { data, error } = await supabaseClient.auth.signUp({
-      email,
-      password,
+      email: email,
+      password: password,
       options: {
-        emailRedirectTo: 'https://spoiler038.github.io/Raspisanie' // Ссылка для подтверждения email
+        emailRedirectTo: siteUrl,
+        data: {
+          registered_at: new Date().toISOString()
+        }
       }
     })
     
-    if (error) throw error
-    
-    if (data.user && data.user.identities && data.user.identities.length === 0) {
-      showToast('Этот email уже зарегистрирован', false)
+    if (error) {
+      console.error('Ошибка регистрации:', error)
+      
+      const errorMessages = {
+        'User already registered': '❌ Пользователь с таким email уже существует',
+        'Password should be at least 6 characters': '❌ Пароль должен быть не менее 6 символов',
+        'Invalid email': '❌ Неверный формат email'
+      }
+      
+      const userMessage = errorMessages[error.message] || `❌ Ошибка: ${error.message}`
+      
+      if (authMessage) {
+        authMessage.textContent = userMessage
+        authMessage.style.color = '#ef4444'
+      } else {
+        showToast(userMessage, false)
+      }
+      
+      registerBtn.textContent = originalText
+      registerBtn.disabled = false
       return
     }
     
-    showToast('Регистрация успешна! Проверьте email для подтверждения', true)
-    closeAuthModal()
-  } catch (error) {
-    document.getElementById('authMessage').textContent = 'Ошибка регистрации: ' + error.message
+    // Проверяем, существует ли уже пользователь
+    if (data.user && data.user.identities && data.user.identities.length === 0) {
+      showToast('❌ Этот email уже зарегистрирован', false)
+      registerBtn.textContent = originalText
+      registerBtn.disabled = false
+      return
+    }
+    
+    console.log('Регистрация успешна:', data)
+    
+    // Успешная регистрация
+    if (authMessage) {
+      authMessage.textContent = '✅ Регистрация успешна! Проверьте email для подтверждения'
+      authMessage.style.color = '#10b981'
+    }
+    
+    showToast('✅ Регистрация успешна! Проверьте почту', true)
+    
+    // Не закрываем модальное окно сразу, даем прочитать сообщение
+    setTimeout(() => {
+      closeAuthModal()
+    }, 3000)
+    
+    registerBtn.textContent = originalText
+    registerBtn.disabled = false
+    
+  } catch (unexpectedError) {
+    console.error('Неожиданная ошибка:', unexpectedError)
+    showToast('❌ Произошла ошибка при регистрации', false)
+    
+    registerBtn.textContent = originalText
+    registerBtn.disabled = false
   }
 }
 
@@ -1332,6 +1575,7 @@ function importLocal() {
   document.getElementById('importFile').click()
 }
 
+// Улучшенная функция exportCloud
 async function exportCloud() {
   if (!currentUser) {
     showToast('Войдите в облако для синхронизации', false)
@@ -1372,7 +1616,7 @@ async function exportCloud() {
         theme: localStorage.getItem('teacher_theme') || 'dark',
         notification_default: localStorage.getItem('teacher_notification') || 'Не оповещать',
         updated_at: new Date().toISOString()
-      })
+      }, { onConflict: 'user_id' })
     
     if (settingsError) throw settingsError
     
@@ -1380,13 +1624,14 @@ async function exportCloud() {
     const lastSync = new Date().toISOString()
     localStorage.setItem(STORAGE_KEYS.LAST_SYNC, lastSync)
     
-    showToast('Данные сохранены в облаке', true)
+    showToast(`✅ Данные сохранены в облаке. Уроков: ${lessons.length}`, true)
   } catch (error) {
     console.log('Ошибка при сохранении в облако:', error)
-    showToast('Ошибка при сохранении в облако', false)
+    showToast('❌ Ошибка при сохранении в облако', false)
   }
 }
 
+// Исправленная функция importCloud
 async function importCloud() {
   if (!currentUser) {
     showToast('Войдите в облако для синхронизации', false)
@@ -1414,17 +1659,6 @@ async function importCloud() {
     
     if (settingsError && settingsError.code !== 'PGRST116') throw settingsError
     
-    // Проверяем время последнего изменения
-    const lastLocalSync = localStorage.getItem(STORAGE_KEYS.LAST_SYNC)
-    const cloudUpdateTime = cloudSettings?.updated_at || '2000-01-01'
-    
-    if (lastLocalSync && cloudUpdateTime > lastLocalSync) {
-      if (!confirm('Облачные данные новее локальных. Загрузить?')) {
-        showToast('Загрузка отменена', false)
-        return
-      }
-    }
-    
     // Обновляем локальные данные
     if (cloudLessons && cloudLessons.length > 0) {
       lessons = cloudLessons.map(l => ({
@@ -1436,6 +1670,17 @@ async function importCloud() {
         notes: l.notes || ''
       }))
       saveLessonsToStorage()
+      
+      // ПРИНУДИТЕЛЬНО обновляем календарь
+      calendar.refetchEvents()
+      
+      // Обновляем высоту ячеек
+      setTimeout(() => {
+        calculateScrollerHeight()
+        if (calendar.view.type === 'dayGridMonth') {
+          normalizeMonthHeights()
+        }
+      }, 100)
     }
     
     if (cloudSettings) {
@@ -1456,13 +1701,13 @@ async function importCloud() {
       calendar.setOption('slotMaxTime', workHours.to)
     }
     
-    calendar.refetchEvents()
-    calculateScrollerHeight()
+    // Сохраняем время синхронизации
+    localStorage.setItem(STORAGE_KEYS.LAST_SYNC, new Date().toISOString())
     
-    showToast(`Данные загружены из облака. Уроков: ${lessons.length}`, true)
+    showToast(`✅ Данные загружены из облака. Уроков: ${lessons.length}`, true)
   } catch (error) {
     console.log('Ошибка при загрузке из облака:', error)
-    showToast('Ошибка при загрузке из облака', false)
+    showToast('❌ Ошибка при загрузке из облака', false)
   }
 }
 
@@ -2352,6 +2597,8 @@ document.addEventListener('DOMContentLoaded', function() {
     setTimeout(calculateScrollerHeight, 200)
   })
 
+  handleEmailConfirmation()
+
   // Запускаем проверку оповещений
   startNotificationChecker()
   
@@ -2366,4 +2613,3 @@ document.addEventListener('DOMContentLoaded', function() {
 
 </body>
 </html>
-
