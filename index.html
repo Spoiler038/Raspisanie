@@ -7,14 +7,16 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="tailwind" content="true">
 
-  
+
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.css" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/interaction.global.min.js"></script>
   <script src="https://cdn.tailwindcss.com/3.4.1?plugins=forms"></script>
-  <script>tailwind.config = { important: true }</script>
+  <script>
+    tailwind.config = { important: true }
+  </script>
 
 
   <style>
@@ -929,11 +931,21 @@
         <button id="deleteProfileButton" class="btn-danger mt-2" onclick="deleteProfile()" style="background: #7f1d1d;">🗑️ Удалить профиль в облаке</button>
       </div>
 
+      <div id="telegramSection" style="display: none;">
+        <hr style="border-color: #334155; margin: 16px 0;">
+        <div class="text-sm mb-1">Telegram уведомления</div>
+        <div style="display: flex; gap: 8px; align-items: center;">
+          <button id="connectTelegramBtn" class="btn-primary" onclick="connectTelegram()" style="flex: 1;">📱 Подключить Telegram</button>
+          <button id="telegramStatusBtn" class="btn-secondary" onclick="checkTelegramStatus()" style="width: 40px;">🔍</button>
+        </div>
+        <div id="telegramStatus" class="text-xs mt-1" style="color: #94a3b8;"></div>
+      </div>
+
       <div>
         <div class="text-sm mb-1">Очистка данных</div>
         <div class="flex gap-2 mb-2">
-          <button class="flex-1 btn-secondary" onclick="clearLocalData()">📱 локально</button>
-          <button id="clearCloudButton" class="flex-1 btn-danger" onclick="clearCloudData()" style="background: #b91c1c;">☁️ в облаке</button>
+          <button class="flex-1 btn-secondary" onclick="clearLocalData()">📱 Локально</button>
+          <button id="clearCloudButton" class="flex-1 btn-danger" onclick="clearCloudData()" style="background: #b91c1c;">☁️ В облаке</button>
         </div>
       </div>
     </div>
@@ -993,16 +1005,16 @@
   </div>
 
   <!-- МОДАЛЬНОЕ ОКНО ПОДТВЕРЖДЕНИЯ -->
-<div id="confirmModal" class="modal-overlay" style="display: none; z-index: 3000;">
-  <div class="modal" style="max-width: 300px;">
-    <div class="modal-title" id="confirmModalTitle">Подтверждение</div>
-    <div class="modal-content" id="confirmModalMessage" style="white-space: pre-line; min-height: 60px;"></div>
-    <div class="modal-buttons" style="display: flex; flex-direction: column; gap: 8px;">
-      <button id="confirmModalOk" class="btn-primary" style="width: 100%;">Подтвердить</button>
-      <button id="confirmModalCancel" class="btn-secondary" style="width: 100%;">Отмена</button>
+  <div id="confirmModal" class="modal-overlay" style="display: none; z-index: 3000;">
+    <div class="modal" style="max-width: 300px;">
+      <div class="modal-title" id="confirmModalTitle">Подтверждение</div>
+      <div class="modal-content" id="confirmModalMessage" style="white-space: pre-line; min-height: 60px;"></div>
+      <div class="modal-buttons" style="display: flex; flex-direction: column; gap: 8px;">
+        <button id="confirmModalOk" class="btn-primary" style="width: 100%;">Подтвердить</button>
+        <button id="confirmModalCancel" class="btn-secondary" style="width: 100%;">Отмена</button>
+      </div>
     </div>
   </div>
-</div>
 
   <script>
     let currentView = 'month'
@@ -2794,8 +2806,14 @@ function updateCloudUI() {
       cloudButton.style.background = '#dc2626'
     }
     if (profileSection) profileSection.style.display = 'block'
-    if (clearCloudButton) clearCloudButton.disabled = false
+    if (clearCloudButton) {
+      clearCloudButton.disabled = false
+      clearCloudButton.style.opacity = '1'
+    }
     if (oldLogoutBtn) oldLogoutBtn.style.display = 'none' // скрываем старую кнопку
+    
+    // Проверяем статус Telegram
+    setTimeout(() => checkTelegramStatus(), 500)
   } else {
     // Только локальный режим
     if (cloudButton) {
@@ -2803,7 +2821,10 @@ function updateCloudUI() {
       cloudButton.style.background = '#2563eb'
     }
     if (profileSection) profileSection.style.display = 'none'
-    if (clearCloudButton) clearCloudButton.disabled = true
+    if (clearCloudButton) {
+      clearCloudButton.disabled = true
+      clearCloudButton.style.opacity = '0.5'
+    }
     if (oldLogoutBtn) oldLogoutBtn.style.display = 'none'
   }
 }
@@ -2831,79 +2852,52 @@ async function deleteProfile() {
           showToast('⏳ Удаление профиля...', false)
           
           try {
-            const { data: { session }, error: sessionError } = await supabaseClient.auth.getSession()
+            // Вызываем SQL функцию через RPC
+            const { error } = await supabaseClient.rpc('delete_my_account')
             
-            if (sessionError || !session) {
-              throw new Error('Нет активной сессии')
+            if (error) {
+              console.error('RPC Error:', error)
+              throw error
             }
             
-            const functionUrl = `${SUPABASE_URL}/functions/v1/delete-user`
-            
-            const response = await fetch(functionUrl, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${session.access_token}`
-              }
-            })
-            
-            const result = await response.json()
-            
-            if (!response.ok) {
-              throw new Error(result.error || `Ошибка HTTP: ${response.status}`)
-            }
-            
-            if (!result.success) {
-              throw new Error(result.error || 'Неизвестная ошибка')
-            }
-            
+            // Выходим из системы
             await supabaseClient.auth.signOut()
             
+            // Очищаем локальные данные пользователя
             currentUser = null
             localStorage.removeItem(STORAGE_KEYS.USER)
             localStorage.removeItem(STORAGE_KEYS.LAST_SYNC)
             localStorage.removeItem(STORAGE_KEYS.PENDING_CHANGES)
             
+            // Переключаем на локальный режим
             currentSyncMode = SYNC_MODES.LOCAL
             localStorage.setItem(STORAGE_KEYS.SYNC_MODE, SYNC_MODES.LOCAL)
             
-            if (confirm('Очистить локальные данные на этом устройстве?')) {
-              lessons = []
-              saveLessonsToStorage()
-              calendar.refetchEvents()
-            }
+            // Очищаем уроки
+            lessons = []
+            saveLessonsToStorage()
+            calendar.refetchEvents()
             
+            // Обновляем UI
             updateCloudUI()
+            
             showToast('✅ Профиль полностью удален', true)
             
+            // Закрываем настройки
             document.getElementById('settingsSheet').classList.remove('active')
             
           } catch (error) {
             console.error('Ошибка удаления профиля:', error)
             
             let errorMessage = error.message
-            if (errorMessage.includes('Failed to fetch')) {
-              errorMessage = 'Не удалось подключиться к серверу. Проверьте интернет.'
-            } else if (errorMessage.includes('401')) {
+            
+            if (errorMessage.includes('permission denied')) {
+              errorMessage = 'Ошибка прав доступа. Проверьте SQL функцию.'
+            } else if (errorMessage.includes('JWT')) {
               errorMessage = 'Ошибка авторизации. Попробуйте войти заново.'
             }
             
-            // Предлагаем альтернативу
-            showConfirmModal(
-              '❌ Ошибка',
-              `${errorMessage}\n\nХотите очистить данные в облаке, но оставить профиль?`,
-              async () => {
-                await clearCloudData()
-                
-                await supabaseClient.auth.signOut()
-                currentUser = null
-                localStorage.removeItem(STORAGE_KEYS.USER)
-                currentSyncMode = SYNC_MODES.LOCAL
-                localStorage.setItem(STORAGE_KEYS.SYNC_MODE, SYNC_MODES.LOCAL)
-                updateCloudUI()
-                showToast('✅ Данные очищены, профиль сохранен', true)
-              }
-            )
+            showToast(`❌ Ошибка: ${errorMessage}`, false)
           }
         }
       )
@@ -3007,6 +3001,172 @@ function clearCloudData() {
 }
 
 
+// ===== TELEGRAM ФУНКЦИИ =====
+
+// Состояние Telegram
+let telegramConnected = false
+let telegramChatId = null
+
+// Проверка статуса Telegram
+async function checkTelegramStatus() {
+  if (!currentUser) {
+    showToast('❌ Сначала войдите в облако', false)
+    return
+  }
+  
+  try {
+    const { data, error } = await supabaseClient
+      .from('telegram_users')
+      .select('*')
+      .eq('user_id', currentUser.id)
+      .maybeSingle()
+    
+    if (error) throw error
+    
+    const statusEl = document.getElementById('telegramStatus')
+    const connectBtn = document.getElementById('connectTelegramBtn')
+    
+    if (data) {
+      telegramConnected = true
+      telegramChatId = data.chat_id
+      
+      const status = data.notifications_enabled ? '✅ Активны' : '❌ Отключены'
+      statusEl.innerHTML = `Статус: ${status}<br>ID: ${data.telegram_id || 'не указан'}`
+      
+      if (connectBtn) {
+        connectBtn.textContent = '🔄 Обновить подключение'
+        connectBtn.style.background = '#2563eb'
+      }
+      
+      // Показываем кнопку отключения в другом месте
+      showTelegramControls(true)
+    } else {
+      telegramConnected = false
+      telegramChatId = null
+      statusEl.textContent = '❌ Telegram не подключен'
+      
+      if (connectBtn) {
+        connectBtn.textContent = '📱 Подключить Telegram'
+        connectBtn.style.background = '#2563eb'
+      }
+      
+      showTelegramControls(false)
+    }
+  } catch (error) {
+    console.error('Ошибка проверки Telegram:', error)
+  }
+}
+
+// Показать/скрыть элементы управления Telegram
+function showTelegramControls(connected) {
+  // Можно добавить дополнительные кнопки
+  const statusEl = document.getElementById('telegramStatus')
+  if (connected) {
+    // Добавляем кнопку отключения, если нужно
+  }
+}
+
+// Подключение Telegram
+async function connectTelegram() {
+  if (!currentUser) {
+    showToast('❌ Сначала войдите в облако', false)
+    return
+  }
+  
+  // Создаем уникальный код для глубинной ссылки
+  const userId = currentUser.id
+  const botUsername = 'YOUR_BOT_USERNAME' // Замените на username вашего бота
+  
+  // Ссылка для перехода в бота
+  const telegramLink = `https://t.me/${botUsername}?start=${userId}`
+  
+  // Показываем модальное окно с инструкцией
+  showConfirmModal(
+    '📱 Подключение Telegram',
+    `1. Нажмите кнопку "Открыть Telegram"\n` +
+    `2. Нажмите /start в чате с ботом\n` +
+    `3. Вернитесь и проверьте статус\n\n` +
+    `Ваш ID для автоматического подключения: ${userId.substring(0, 8)}...`,
+    () => {
+      // Открываем Telegram в новой вкладке
+      window.open(telegramLink, '_blank')
+      
+      // Ждем подключения
+      setTimeout(() => {
+        checkTelegramStatus()
+      }, 5000)
+    }
+  )
+  
+  // Кастомное окно с кнопкой "Открыть Telegram"
+  const modal = document.getElementById('confirmModal')
+  const titleEl = document.getElementById('confirmModalTitle')
+  const messageEl = document.getElementById('confirmModalMessage')
+  const okBtn = document.getElementById('confirmModalOk')
+  const cancelBtn = document.getElementById('confirmModalCancel')
+  
+  titleEl.textContent = '📱 Подключение Telegram'
+  messageEl.innerHTML = 
+    '1. Нажмите "Открыть Telegram"<br>' +
+    '2. Нажмите /start в чате с ботом<br>' +
+    '3. Вернитесь и нажмите "Проверить"<br><br>' +
+    `<span style="color: #94a3b8;">ID: ${userId.substring(0, 8)}...</span>`
+  
+  // Меняем кнопки
+  const newOkBtn = okBtn.cloneNode(true)
+  const newCancelBtn = cancelBtn.cloneNode(true)
+  okBtn.parentNode.replaceChild(newOkBtn, okBtn)
+  cancelBtn.parentNode.replaceChild(newCancelBtn, cancelBtn)
+  
+  newOkBtn.textContent = '📱 Открыть Telegram'
+  newOkBtn.addEventListener('click', () => {
+    modal.style.display = 'none'
+    window.open(telegramLink, '_blank')
+    
+    // Показываем уведомление
+    showToast('✅ После нажатия /start в боте, проверьте статус', true)
+    
+    // Проверяем статус через 5 секунд
+    setTimeout(() => {
+      checkTelegramStatus()
+    }, 5000)
+  })
+  
+  newCancelBtn.textContent = 'Проверить'
+  newCancelBtn.addEventListener('click', () => {
+    modal.style.display = 'none'
+    checkTelegramStatus()
+  })
+  
+  modal.style.display = 'flex'
+}
+
+// Отключение Telegram
+async function disconnectTelegram() {
+  if (!currentUser) return
+  
+  showConfirmModal(
+    '⚠️ Отключить Telegram',
+    'Вы действительно хотите отключить Telegram уведомления?',
+    async () => {
+      try {
+        const { error } = await supabaseClient
+          .from('telegram_users')
+          .update({ notifications_enabled: false })
+          .eq('user_id', currentUser.id)
+        
+        if (error) throw error
+        
+        showToast('✅ Telegram уведомления отключены', true)
+        checkTelegramStatus()
+      } catch (error) {
+        console.error('Ошибка отключения:', error)
+        showToast('❌ Ошибка при отключении', false)
+      }
+    }
+  )
+}
+
 
 // Восстановление при загрузке
 document.addEventListener('DOMContentLoaded', function() {
@@ -3079,6 +3239,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
   // Запускаем проверку оповещений
   startNotificationChecker()
+  const TELEGRAM_BOT_USERNAME = 'RaspisanieUrokovBot'
 
   updateCloudUI()
   // Удаляем старую кнопку выхода
