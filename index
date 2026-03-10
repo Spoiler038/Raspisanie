@@ -1,0 +1,2368 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8" />
+<title>Расписание</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.css" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/interaction.global.min.js"></script>
+<script src="https://cdn.tailwindcss.com"></script>
+
+
+<style>
+html,body{height:100%;overflow:hidden;margin:0;padding:0}
+
+/* ===== THEMES ===== */
+body.dark{background:#0f172a;color:#e5e7eb}
+body.light{background:#f8fafc;color:#020617}
+
+/* ===== FULLCALENDAR ===== */
+.fc{
+  --fc-border-color:#1e293b;
+  --fc-page-bg-color:transparent;
+  --fc-today-bg-color:rgba(59,130,246,.25);
+  --fc-event-bg-color:#2563eb;
+  --fc-event-border-color:transparent;
+  --fc-daygrid-day-bottom:transparent;
+}
+body.light .fc{
+  --fc-border-color:#cbd5e1;
+  --fc-today-bg-color:rgba(37,99,235,.15);
+}
+
+.fc-col-header-cell{
+  background:#020617;
+  color:#e5e7eb;
+}
+body.light .fc-col-header-cell{
+  background:#e5e7eb;
+  color:#020617;
+}
+
+.fc-col-header-cell-cushion{
+  padding:6px 0;
+  font-weight:500;
+}
+
+/* ===== РЕЖИМ МЕСЯЦ: ДИНАМИЧЕСКАЯ ВЫСОТА ЯЧЕЕК ===== */
+.fc-dayGridMonth-view .fc-daygrid-day {
+  min-height: 77px !important;
+  height: auto !important;
+  max-height: 168px !important;
+  position: relative !important;
+  background: #020617 !important;
+}
+
+body.light .fc-dayGridMonth-view .fc-daygrid-day {
+  background: #ffffff !important;
+}
+
+.fc-dayGridMonth-view .fc-daygrid-day-frame {
+  min-height: 75px !important;
+  height: auto !important;
+  max-height: 166px !important;
+  overflow: hidden !important;
+  background: transparent !important;
+  position: relative !important;
+}
+
+/* ФОН ЯЧЕЙКИ - РАСТЯГИВАЕМ НА ВСЮ ВЫСОТУ */
+.fc-dayGridMonth-view .fc-daygrid-day-bg {
+  position: absolute !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  background: inherit !important;
+}
+
+
+
+
+/* Убираем лишний элемент */
+.fc-daygrid-day-bottom {
+  display: none !important;
+}
+
+/* Уменьшаем отступы для событий */
+.fc-dayGridMonth-view .fc-daygrid-day-events {
+  margin-top: 0 !important;
+  margin-bottom: 0 !important;
+  min-height: 0 !important;
+  padding: 1px 0 !important;
+}
+
+/* Уменьшаем отступы внутри ячейки */
+.fc-dayGridMonth-view .fc-daygrid-day-top {
+  padding: 0 !important;
+  margin: 0 !important;
+}
+
+.fc-daygrid-day-number{
+  color:#e5e7eb;
+  margin: 2px 4px !important;
+  padding: 0 !important;
+  text-align: right !important;
+  float: right !important;
+  position: relative !important;
+  z-index: 2 !important;
+}
+body.light .fc-daygrid-day-number{
+  color:#020617;
+}
+
+/* Стили для событий в режиме месяца - ТОЛЬКО ВРЕМЯ */
+.fc-daygrid-event {
+  margin: 1px 2px !important;
+  padding: 1px 3px !important;
+  font-size: 11px !important;
+  line-height: 1.2 !important;
+  border-radius: 3px !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  background-color: var(--fc-event-bg-color) !important;
+  border: none !important;
+  max-height: 16px !important;
+  min-height: 16px !important;
+}
+
+.fc-daygrid-event .fc-event-time {
+  font-weight: bold !important;
+  display: inline !important;
+  margin-right: 3px !important;
+  font-size: 10px !important;
+}
+
+.fc-daygrid-event .fc-event-title {
+  display: inline !important;
+  font-size: 11px !important;
+}
+
+/* Стили для событий в режиме недели и дня */
+.fc-timegrid-event {
+  padding: 2px 4px !important;
+  font-size: 11px !important;
+  line-height: 1.2 !important;
+  background-color: var(--fc-event-bg-color) !important;
+  border: none !important;
+  overflow: hidden !important;
+}
+
+.fc-timegrid-event .fc-event-title {
+  font-weight: 500 !important;
+}
+
+.fc-timegrid-event .fc-event-time {
+  font-weight: bold !important;
+  margin-right: 3px !important;
+  font-size: 10px !important;
+}
+
+
+/* ВАЖНО: Выделение текущего дня */
+.fc-daygrid-day.fc-day-today {
+  background-color: var(--fc-today-bg-color) !important;
+}
+
+/* Для недели */
+.fc-timegrid-col.fc-day-today {
+  background-color: var(--fc-today-bg-color) !important;
+}
+
+/* Убираем выделение в режиме дня */
+.fc-timeGridDay-view .fc-day-today,
+.fc-timeGridDay-view .fc-timegrid-col.fc-day-today {
+  background:transparent !important;
+}
+
+/* убрать all-day */
+.fc-timegrid-allday,
+.fc-timegrid-all-day{
+  display:none!important;
+}
+
+/* ===== SCROLL ===== */
+/* Убираем все горизонтальные скроллы */
+.fc-scroller,
+.fc-scroller-liquid,
+.fc-daygrid-body,
+.fc-timegrid-body,
+.fc-timegrid-cols {
+  overflow-x: hidden !important;
+}
+
+
+/* Единые правила для ВСЕХ скроллеров */
+.fc-timeGridWeek-view .fc-scroller,
+.fc-timeGridDay-view .fc-scroller,
+.fc-dayGridMonth-view .fc-scroller {
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  -webkit-overflow-scrolling: touch !important;
+  max-height: none !important;
+}
+
+/* Убеждаемся что контент полностью виден */
+.fc-timegrid-slots {
+  height: auto !important;
+  min-height: 100% !important;
+}
+
+.fc-timegrid-col-frame {
+  height: auto !important;
+  min-height: 100% !important;
+}
+
+/* Фиксированная высота слотов */
+.fc-timegrid-slot {
+  height: 30px !important;
+  min-height: 30px !important;
+  max-height: 30px !important;
+}
+
+/* ===== INPUTS ===== */
+input,select,textarea{
+  width:100%;
+  padding:14px;
+  border-radius:12px;
+  background:#ffffff;
+  color:#020617!important;
+  border:1px solid #cbd5e1;
+  font-size:16px;
+  box-sizing:border-box;
+}
+input::placeholder,textarea::placeholder{color:#64748b}
+input::-webkit-calendar-picker-indicator{filter:none!important}
+
+/* ===== TOAST УВЕДОМЛЕНИЯ ===== */
+.toast {
+  position: fixed;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #dc2626;
+  color: white;
+  padding: 12px 24px;
+  border-radius: 8px;
+  font-weight: 500;
+  z-index: 9999;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  display: none;
+  max-width: 90%;
+  text-align: center;
+  animation: fadeInOut 3s ease-in-out;
+}
+
+.toast.success {
+  background: #16a34a;
+}
+
+@keyframes fadeInOut {
+  0% { opacity: 0; top: 10px; }
+  15% { opacity: 1; top: 20px; }
+  85% { opacity: 1; top: 20px; }
+  100% { opacity: 0; top: 10px; }
+}
+
+/* ===== LAYOUT ===== */
+.wrapper{
+  max-width:420px;
+  margin:0 auto;
+  height:100vh;
+  display:flex;
+  flex-direction:column;
+  padding-bottom:48px;
+  box-sizing:border-box;
+  overflow:hidden;
+}
+
+header{
+  padding:12px;
+  display:flex;
+  align-items:center;
+  flex-shrink:0;
+}
+.header-center{
+  flex:1;
+  text-align:center;
+  font-weight:600;
+}
+.header-right{width:32px;text-align:right}
+
+/* ===== BOTTOM BAR ===== */
+.bottom-bar{
+  position:fixed;
+  bottom:0;left:0;right:0;
+  background:#020617;
+  border-top:1px solid #1e293b;
+  padding:8px;
+  display:flex;
+  justify-content:space-around;
+  align-items:center;
+  z-index:100;
+  height:48px;
+  box-sizing:border-box;
+  width:100%;
+}
+body.light .bottom-bar{background:#e5e7eb}
+
+.mode{
+  display:flex;
+  align-items:center;
+  gap:0;
+  position:relative;
+  min-width: 100px;
+  justify-content:center;
+}
+.mode span{
+  padding:6px 30px;
+  border-radius:9999px;
+  opacity:.6;
+  cursor:pointer;
+}
+.mode.active span{
+  opacity:1;
+  background:rgba(255,255,255,.15);
+}
+body.light .mode.active span{
+  background:#020617;
+  color:white;
+}
+
+/* Стрелки - ТОЛЬКО в активном режиме */
+.mode button {
+  background:transparent;
+  border:none;
+  color:#e5e7eb;
+  font-size:16px;
+  cursor:pointer;
+  padding:6px 8px;
+  position:absolute;
+  top:50%;
+  transform:translateY(-50%);
+  opacity:0;
+  visibility:hidden;
+}
+.mode button:first-child {
+  left:0;
+}
+.mode button:last-child {
+  right:0;
+}
+.mode.active button {
+  opacity:1;
+  visibility:visible;
+}
+body.light .mode button {
+  color:white;
+}
+
+/* ===== ADD BUTTON ===== */
+.add-btn{
+  width:42px;
+  height:42px;
+  border-radius:50%;
+  background:#2563eb;
+  color:white;
+  font-size:26px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  cursor:pointer;
+  flex-shrink:0;
+}
+
+/* ===== SHEETS ===== */
+.sheet{
+  position:fixed;
+  inset:0;
+  background:rgba(0,0,0,.5);
+  display:none;
+  z-index:1000;
+}
+.sheet.active{display:block}
+.sheet-content{
+  position:absolute;
+  bottom:0;left:0;right:0;
+  background:#020617;
+  border-radius:16px 16px 0 0;
+  padding:16px;
+  max-height:80vh;
+  overflow-y:auto;
+  box-sizing:border-box;
+  z-index:1001;
+}
+body.light .sheet-content{background:#fff}
+
+/* ===== BUTTONS ===== */
+.btn-danger{
+  background:#dc2626;
+  color:white;
+  padding:12px 16px;
+  border-radius:12px;
+  font-weight:500;
+  text-align:center;
+  border:none;
+  width:100%;
+  cursor:pointer;
+}
+
+.btn-secondary{
+  background:#64748b;
+  color:white;
+  padding:12px 16px;
+  border-radius:12px;
+  font-weight:500;
+  text-align:center;
+  border:none;
+  width:100%;
+  cursor:pointer;
+}
+
+.btn-primary{
+  background:#2563eb;
+  color:white;
+  padding:12px 16px;
+  border-radius:12px;
+  font-weight:500;
+  text-align:center;
+  border:none;
+  width:100%;
+  cursor:pointer;
+}
+
+/* ===== CALENDAR CONTAINER ===== */
+#calendar{
+  flex:1;
+  overflow:hidden;
+}
+
+/* Убираем полосы прокрутки в Firefox */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #4b5563 #1f2937;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #1f2937;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #4b5563;
+  border-radius: 3px;
+}
+
+/* ===== УЛУЧШЕНИЯ ДЛЯ РЕЖИМА ДЕНЬ ===== */
+.fc-timeGridDay-view .fc-timegrid-slots {
+  min-height: 100% !important;
+}
+
+.fc-timeGridDay-view .fc-timegrid-slot {
+  height: 30px !important;
+}
+
+/* ===== СПЕЦИАЛЬНО ДЛЯ МЕСЯЦА ===== */
+.fc-dayGridMonth-view .fc-scroller {
+  overflow-x: hidden !important;
+}
+
+.fc-dayGridMonth-view .fc-daygrid-body {
+  width: 100% !important;
+}
+
+@media (max-width: 480px) {
+  .fc-dayGridMonth-view .fc-daygrid-day {
+    min-height: 70px !important;
+  }
+}
+
+/* Классы для flex gap */
+.space-y-3 > * + * { margin-top: 12px; }
+.space-y-4 > * + * { margin-top: 16px; }
+.flex { display: flex; }
+.gap-2 { gap: 8px; }
+.gap-3 { gap: 12px; }
+.mb-1 { margin-bottom: 4px; }
+.mb-2 { margin-bottom: 8px; }
+.mt-1 { margin-top: 4px; }
+.mt-2 { margin-top: 8px; }
+.text-sm { font-size: 14px; }
+.text-xs { font-size: 12px; }
+.font-semibold { font-weight: 600; }
+.text-gray-500 { color: #6b7280; }
+.opacity-70 { opacity: 0.7; }
+
+/* ===== МОДАЛЬНЫЕ ОКНА ===== */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+  padding: 16px;
+}
+
+.modal {
+  background: #020617;
+  border-radius: 20px;
+  padding: 24px;
+  max-width: 320px;
+  width: 100%;
+  border: 1px solid #1e293b;
+}
+
+body.light .modal {
+  background: #ffffff;
+  border-color: #cbd5e1;
+}
+
+.modal-title {
+  font-size: 18px;
+  font-weight: 600;
+  margin-bottom: 16px;
+  color: #e5e7eb;
+}
+
+body.light .modal-title {
+  color: #020617;
+}
+
+.modal-content {
+  font-size: 14px;
+  line-height: 1.5;
+  margin-bottom: 20px;
+  color: #94a3b8;
+}
+
+body.light .modal-content {
+  color: #475569;
+}
+
+.modal-buttons {
+  display: flex;
+  gap: 12px;
+}
+
+/* ===== СТИЛИ ДЛЯ МОДАЛЬНЫХ ОКОН ===== */
+#authModal input,
+#authModal select {
+  background: #1e293b !important;
+  color: white !important;
+  border: 1px solid #334155 !important;
+  padding: 10px !important;
+  border-radius: 8px !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+#authModal input:focus {
+  outline: none !important;
+  border-color: #2563eb !important;
+}
+
+#authModal .btn-primary,
+#authModal .btn-secondary {
+  padding: 12px !important;
+  font-size: 14px !important;
+  border-radius: 8px !important;
+  width: 100% !important;
+  margin: 2px 0 !important;
+}
+
+/* Для светлой темы */
+body.light #authModal input {
+  background: #f1f5f9 !important;
+  color: #020617 !important;
+  border-color: #cbd5e1 !important;
+}
+
+/* ===== ФИКС ВЫДЕЛЕНИЯ ТЕКУЩЕГО ДНЯ ДЛЯ СВЕТЛОЙ ТЕМЫ ===== */
+body.light .fc-day-today {
+  background-color: rgba(37, 99, 235, 0.15) !important;
+}
+
+body.light .fc-day-today .fc-daygrid-day-frame {
+  background-color: rgba(37, 99, 235, 0.15) !important;
+}
+
+body.light .fc-day-today .fc-daygrid-day-bg {
+  background-color: rgba(37, 99, 235, 0.15) !important;
+}
+
+/* Для недели в светлой теме */
+body.light .fc-timegrid-col.fc-day-today {
+  background-color: rgba(37, 99, 235, 0.15) !important;
+}
+
+/* Убеждаемся что в режиме дня выделение убрано */
+body.light .fc-timeGridDay-view .fc-day-today {
+  background: transparent !important;
+}
+
+/* ===== ИСПРАВЛЕНИЕ ВЫДЕЛЕНИЯ ТЕКУЩЕГО ДНЯ В СВЕТЛОЙ ТЕМЕ ===== */
+body.light .fc-dayGridMonth-view .fc-day-today,
+body.light .fc-dayGridMonth-view .fc-day-today .fc-daygrid-day-frame,
+body.light .fc-dayGridMonth-view .fc-day-today .fc-daygrid-day-bg {
+  background-color: rgba(37, 99, 235, 0.15) !important;
+}
+
+/* Для темной темы (уже должно работать, но для надежности) */
+body.dark .fc-dayGridMonth-view .fc-day-today,
+body.dark .fc-dayGridMonth-view .fc-day-today .fc-daygrid-day-frame,
+body.dark .fc-dayGridMonth-view .fc-day-today .fc-daygrid-day-bg {
+  background-color: rgba(59, 130, 246, 0.25) !important;
+}
+
+/* ===== СТИЛИ ДЛЯ МОДАЛЬНЫХ ОКОН ===== */
+#authModal input,
+#resetPasswordModal input {
+  background: #1e293b !important;
+  color: white !important;
+  border: 1px solid #334155 !important;
+  padding: 10px !important;
+  border-radius: 8px !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+body.light #authModal input,
+body.light #resetPasswordModal input {
+  background: #f1f5f9 !important;
+  color: #020617 !important;
+  border-color: #cbd5e1 !important;
+}
+
+#authModal input:focus,
+#resetPasswordModal input:focus {
+  outline: none !important;
+  border-color: #2563eb !important;
+}
+
+</style>
+</head>
+
+<body class="dark">
+
+<!-- Toast для уведомлений -->
+<div id="toast" class="toast"></div>
+
+<div class="wrapper">
+
+<header>
+  <div class="header-center">
+    📅 Расписание <span id="headerDate" class="opacity-70"></span>
+  </div>
+  <div class="header-right">
+    <button onclick="openSettings()">⚙️</button>
+  </div>
+</header>
+
+<div id="calendar" class="flex-1"></div>
+</div>
+
+<div class="bottom-bar">
+  <div id="mode-month" class="mode active">
+    <button onclick="prev()">←</button>
+    <span onclick="setView('month')">Месяц</span>
+    <button onclick="next()">→</button>
+  </div>
+  <div id="mode-week" class="mode">
+    <button onclick="prev()">←</button>
+    <span onclick="setView('week')">Неделя</span>
+    <button onclick="next()">→</button>
+  </div>
+  <div id="mode-day" class="mode">
+    <button onclick="prev()">←</button>
+    <span onclick="setView('day')">День</span>
+    <button onclick="next()">→</button>
+  </div>
+  <div class="add-btn" onclick="openAdd()">+</div>
+</div>
+
+<!-- ADD/EDIT FORM -->
+<div id="sheet" class="sheet" onclick="if(event.target.id==='sheet')sheet.classList.remove('active')">
+  <div class="sheet-content space-y-3">
+    <h2 class="font-semibold" id="formTitle">Новое занятие</h2>
+    <input id="dateInput" type="date">
+    <input id="timeInput" type="time">
+    <input id="studentInput" placeholder="Имя ученика">
+    <input id="durationInput" type="number" value="60" placeholder="Длительность (мин)" min="30" step="30">
+    <textarea id="notesInput" placeholder="Заметки (необязательно)" rows="2"></textarea>
+    <div class="flex gap-2">
+      <button class="flex-1 btn-secondary" onclick="cancelForm()">Отмена</button>
+      <button class="flex-1 btn-primary" onclick="saveLesson()">Сохранить</button>
+    </div>
+    <div id="deleteSection" style="display:none;">
+      <button class="btn-danger mt-2" onclick="deleteLesson()">Удалить занятие</button>
+    </div>
+  </div>
+</div>
+
+<!-- SETTINGS -->
+<div id="settingsSheet" class="sheet" onclick="if(event.target.id==='settingsSheet')settingsSheet.classList.remove('active')">
+  <div class="sheet-content space-y-4">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+      <h2 class="font-semibold" style="margin: 0;">Настройки</h2>
+      <button id="logoutButton" onclick="logoutCloud()" style="background: #dc2626; color: white; border: none; border-radius: 8px; padding: 6px 12px; font-size: 13px; cursor: pointer; display: none;">🚪 Выход</button>
+    </div>
+
+    <div>
+      <div class="text-sm mb-1">Тема</div>
+      <select id="themeSelect">
+        <option value="dark">Тёмная</option>
+        <option value="light">Светлая</option>
+      </select>
+    </div>
+
+    <div>
+      <div class="text-sm mb-1">Режим работы</div>
+      <div class="flex gap-2">
+        <input id="workFrom" type="time" value="09:00">
+        <input id="workTo" type="time" value="18:00">
+      </div>
+    </div>
+
+    <div>
+      <div class="text-sm mb-1">Оповещение</div>
+      <select id="notificationSelect">
+        <option>Не оповещать</option>
+        <option>За 30 минут</option>
+        <option>За 1 час</option>
+        <option>За 6 часов</option>
+        <option>За 12 часов</option>
+        <option>За день</option>
+      </select>
+    </div>
+    
+    <div>
+      <div class="text-sm mb-1">Экспорт/Импорт данных</div>
+      <div class="flex gap-2 mb-2">
+        <button class="flex-1 btn-secondary" onclick="exportLocal()">📁 Локально</button>
+        <button class="flex-1 btn-primary" onclick="exportCloud()">☁️ В облако</button>
+      </div>
+      <div class="flex gap-2">
+        <button class="flex-1 btn-secondary" onclick="importLocal()">📁 Из файла</button>
+        <button class="flex-1 btn-primary" onclick="importCloud()">☁️ Из облака</button>
+      </div>
+      <input type="file" id="importFile" style="display:none;" accept=".json">
+    </div>
+    
+    <div>
+      <button class="btn-danger mt-2" onclick="clearAllData()">🗑️ Очистить все данные</button>
+    </div>
+  </div>
+</div>
+
+<!-- МОДАЛЬНОЕ ОКНО ВЫБОРА РЕЖИМА -->
+<div id="syncModeModal" class="modal-overlay" style="display: none;">
+  <div class="modal">
+    <div class="modal-title">Выбор режима хранения</div>
+    <div class="modal-content">
+      <p class="mb-4">Как вы хотите хранить данные?</p>
+      <div class="flex gap-2 mb-2">
+        <button class="flex-1 btn-secondary" onclick="setSyncMode('local')">📱 Локально</button>
+        <button class="flex-1 btn-primary" onclick="setSyncMode('cloud')">☁️ В облаке</button>
+      </div>
+      <p class="text-xs text-gray-500 mt-2">
+        Локально: данные только на этом устройстве<br>
+        Облако: данные синхронизируются между устройствами
+      </p>
+    </div>
+  </div>
+</div>
+
+<!-- МОДАЛЬНОЕ ОКНО ВХОДА/РЕГИСТРАЦИИ -->
+<div id="authModal" class="modal-overlay" style="display: none;">
+  <div class="modal">
+    <div class="modal-title" id="authModalTitle">Вход в облако</div>
+    <div class="modal-content">
+      <input type="email" id="authEmail" placeholder="Email" class="w-full mb-2 p-2 rounded">
+      <input type="password" id="authPassword" placeholder="Пароль" class="w-full mb-2 p-2 rounded">
+      <div class="text-right mb-2">
+        <button onclick="forgotPassword()" class="text-sm text-blue-500 hover:underline" style="background: none; border: none; padding: 0;">Забыли пароль?</button>
+      </div>
+      <div id="authMessage" class="text-sm text-red-500 mb-2"></div>
+    </div>
+    <div class="modal-buttons" style="display: flex; flex-direction: column; gap: 8px;">
+      <button class="btn-primary" onclick="handleLogin()" style="width: 100%;">Войти</button>
+      <button class="btn-secondary" onclick="handleRegister()" style="width: 100%;">Регистрация</button>
+      <button class="btn-secondary" onclick="closeAuthModal()" style="width: 100%;">Отмена</button>
+    </div>
+  </div>
+</div>
+
+<!-- МОДАЛЬНОЕ ОКНО ВОССТАНОВЛЕНИЯ ПАРОЛЯ -->
+<div id="resetPasswordModal" class="modal-overlay" style="display: none;">
+  <div class="modal">
+    <div class="modal-title">Восстановление пароля</div>
+    <div class="modal-content">
+      <p class="mb-4">Введите email, и мы отправим ссылку для сброса пароля</p>
+      <input type="email" id="resetEmail" placeholder="Email" class="w-full mb-2 p-2 rounded">
+      <div id="resetMessage" class="text-sm mb-2"></div>
+    </div>
+    <div class="modal-buttons" style="display: flex; flex-direction: column; gap: 8px;">
+      <button class="btn-primary" onclick="sendResetPassword()" style="width: 100%;">Отправить</button>
+      <button class="btn-secondary" onclick="closeResetModal()" style="width: 100%;">Отмена</button>
+    </div>
+  </div>
+</div>
+
+<script>
+let currentView = 'month'
+let lastClickInfo = null
+let workHours = {
+  from: "09:00",
+  to: "18:00"
+}
+let editingLessonId = null
+let lessons = []
+
+
+// ===== КОНФИГУРАЦИЯ ХРАНЕНИЯ =====
+const STORAGE_KEYS = {
+  LESSONS: 'teacher_lessons',
+  SETTINGS: 'teacher_settings',
+  USER: 'teacher_user',
+  SYNC_MODE: 'teacher_sync_mode',
+  LAST_SYNC: 'teacher_last_sync',
+  PENDING_CHANGES: 'teacher_pending_changes'
+}
+
+// Режимы синхронизации
+const SYNC_MODES = {
+  LOCAL: 'local',
+  CLOUD: 'cloud'
+}
+
+// Текущий режим (по умолчанию локальный)
+let currentSyncMode = localStorage.getItem(STORAGE_KEYS.SYNC_MODE) || SYNC_MODES.LOCAL
+let currentUser = null
+let pendingChanges = [] // изменения, ожидающие синхронизации
+
+// Загружаем пользователя если есть
+const savedUser = localStorage.getItem(STORAGE_KEYS.USER)
+if (savedUser) {
+  try {
+    currentUser = JSON.parse(savedUser)
+  } catch (e) {
+    console.log('Ошибка загрузки пользователя')
+  }
+}
+
+// Загружаем ожидающие изменения
+const savedPending = localStorage.getItem(STORAGE_KEYS.PENDING_CHANGES)
+if (savedPending) {
+  try {
+    pendingChanges = JSON.parse(savedPending)
+  } catch (e) {
+    console.log('Ошибка загрузки ожидающих изменений')
+  }
+}
+
+
+// ===== SUPABASE КОНФИГУРАЦИЯ =====
+const SUPABASE_URL = 'https://dbhqxfaennimfqephxat.supabase.co'
+const SUPABASE_KEY = 'sb_publishable_t3Q_kfvFl0kbwtoxdswMaw_Y0vdlaTQ'
+
+let supabaseClient = null
+
+// Проверяем, что supabase доступен
+if (typeof supabase !== 'undefined' && supabase.createClient) {
+  supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY)
+  console.log('Supabase client initialized')
+} else {
+  console.log('Supabase client not loaded, using mock')
+  // Создаем заглушку для демо-режима
+  supabaseClient = {
+    auth: {
+      signInWithPassword: async () => ({ 
+        data: { user: { id: 'mock-user-id', email: 'mock@email.com' } }, 
+        error: null 
+      }),
+      signUp: async () => ({ 
+        data: { user: { id: 'mock-user-id', email: 'mock@email.com' } }, 
+        error: null 
+      })
+    },
+    from: () => ({
+      select: () => ({
+        eq: () => ({
+          single: async () => ({ data: null, error: null }),
+          order: () => Promise.resolve({ data: [], error: null })
+        })
+      }),
+      upsert: async () => ({ error: null }),
+      insert: async () => ({ error: null }),
+      update: () => ({ eq: () => ({ eq: async () => ({ error: null }) }) }),
+      delete: () => ({ eq: () => ({ eq: async () => ({ error: null }) }) })
+    })
+  }
+}
+
+// ===== СИСТЕМА ОПОВЕЩЕНИЙ =====
+let notificationInterval = null
+let notifiedLessons = new Set() // ID уроков, о которых уже оповестили
+
+// Запуск проверки оповещений
+function startNotificationChecker() {
+  if (notificationInterval) clearInterval(notificationInterval)
+  
+  // Проверяем каждые 60 секунд
+  notificationInterval = setInterval(checkNotifications, 60000)
+  // Сразу проверяем при запуске
+  setTimeout(checkNotifications, 5000)
+}
+
+// Проверка предстоящих уроков
+function checkNotifications() {
+  const notificationSetting = localStorage.getItem('teacher_notification') || 'Не оповещать'
+  if (notificationSetting === 'Не оповещать') return
+  
+  // Переводим настройку в минуты
+  const minutesMap = {
+    'За 30 минут': 30,
+    'За 1 час': 60,
+    'За 6 часов': 360,
+    'За 12 часов': 720,
+    'За день': 1440
+  }
+  
+  const notifyMinutes = minutesMap[notificationSetting]
+  if (!notifyMinutes) return
+  
+  const now = new Date()
+  
+  lessons.forEach(lesson => {
+    // Если уже оповещали - пропускаем
+    if (notifiedLessons.has(lesson.id)) return
+    
+    const lessonDateTime = new Date(`${lesson.date}T${lesson.time}`)
+    const diffMinutes = Math.floor((lessonDateTime - now) / (1000 * 60))
+    
+    // Если урок в прошлом - помечаем как оповещенный (чтобы больше не проверять)
+    if (diffMinutes < 0) {
+      notifiedLessons.add(lesson.id)
+      return
+    }
+    
+    // Если время урока в пределах окна оповещения
+    if (diffMinutes <= notifyMinutes && diffMinutes > 0) {
+      // Показываем оповещение
+      showNotification(lesson)
+      notifiedLessons.add(lesson.id)
+    }
+  })
+}
+
+// Показ оповещения
+function showNotification(lesson) {
+  // Проверяем поддержку уведомлений
+  if (!("Notification" in window)) {
+    console.log("Браузер не поддерживает уведомления")
+    return
+  }
+  
+  // Запрашиваем разрешение, если еще не дано
+  if (Notification.permission === "granted") {
+    createNotification(lesson)
+  } else if (Notification.permission !== "denied") {
+    Notification.requestPermission().then(permission => {
+      if (permission === "granted") {
+        createNotification(lesson)
+      }
+    })
+  }
+}
+
+function createNotification(lesson) {
+  const timeStr = lesson.time.substring(0, 5)
+  const notification = new Notification("📅 Напоминание о занятии", {
+    body: `${lesson.student} в ${timeStr}`,
+    icon: "🔔",
+    requireInteraction: true
+  })
+  
+  // Показываем тост как дополнительное уведомление
+  showToast(`🔔 Через ${getTimeToLesson(lesson)} занятие с ${lesson.student}`, true)
+  
+  // Закрываем уведомление через 10 секунд
+  setTimeout(() => notification.close(), 10000)
+}
+
+function getTimeToLesson(lesson) {
+  const now = new Date()
+  const lessonTime = new Date(`${lesson.date}T${lesson.time}`)
+  const diffMs = lessonTime - now
+  const diffMin = Math.floor(diffMs / 60000)
+  
+  if (diffMin < 60) return `${diffMin} минут`
+  if (diffMin < 1440) return `${Math.floor(diffMin / 60)} часов`
+  return `${Math.floor(diffMin / 1440)} дней`
+}
+
+
+// ===== УПРАВЛЕНИЕ РЕЖИМАМИ ХРАНЕНИЯ =====
+function checkSyncMode() {
+  const mode = localStorage.getItem(STORAGE_KEYS.SYNC_MODE)
+  if (!mode) {
+    // Первый запуск - показываем выбор режима
+    document.getElementById('syncModeModal').style.display = 'flex'
+  } else {
+    currentSyncMode = mode
+    if (mode === SYNC_MODES.CLOUD) {
+      checkCloudAuth()
+    }
+  }
+}
+
+// Функция для проверки авторизации при загрузке
+async function checkAuthOnLoad() {
+  try {
+    const { data: { session }, error } = await supabaseClient.auth.getSession()
+    
+    if (error) throw error
+    
+    if (session) {
+      // Пользователь уже вошел
+      currentUser = {
+        id: session.user.id,
+        email: session.user.email
+      }
+      localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(currentUser))
+      
+      // Показываем кнопку выхода
+      document.getElementById('logoutButton').style.display = 'block'
+      
+      // Если облачный режим, синхронизируем
+      if (currentSyncMode === SYNC_MODES.CLOUD) {
+        syncWithCloud()
+      }
+      
+      console.log('Автовход выполнен:', session.user.email)
+    } else {
+      // Нет активной сессии, проверяем режим
+      if (currentSyncMode === SYNC_MODES.CLOUD) {
+        // Если облачный режим, но нет сессии - показываем вход
+        setTimeout(() => {
+          showAuthModal()
+        }, 500)
+      }
+    }
+  } catch (error) {
+    console.log('Ошибка проверки сессии:', error)
+  }
+}
+
+// Обновленная функция setSyncMode
+function setSyncMode(mode) {
+  currentSyncMode = mode
+  localStorage.setItem(STORAGE_KEYS.SYNC_MODE, mode)
+  document.getElementById('syncModeModal').style.display = 'none'
+  
+  if (mode === SYNC_MODES.CLOUD) {
+    // Проверяем, есть ли активная сессия
+    checkAuthOnLoad()
+  } else {
+    showToast('Режим локального хранения', true)
+  }
+}
+
+function showAuthModal() {
+  document.getElementById('authModal').style.display = 'flex'
+  document.getElementById('authEmail').value = ''
+  document.getElementById('authPassword').value = ''
+  document.getElementById('authMessage').textContent = ''
+}
+
+function closeAuthModal() {
+  document.getElementById('authModal').style.display = 'none'
+  if (!currentUser) {
+    // Если не вошли, возвращаем локальный режим
+    currentSyncMode = SYNC_MODES.LOCAL
+    localStorage.setItem(STORAGE_KEYS.SYNC_MODE, SYNC_MODES.LOCAL)
+  }
+}
+
+// ===== УПРАВЛЕНИЕ АВТОРИЗАЦИЕЙ =====
+
+// Обновленная функция handleLogin
+async function handleLogin() {
+  const email = document.getElementById('authEmail').value
+  const password = document.getElementById('authPassword').value
+  
+  if (!email || !password) {
+    showToast('Введите email и пароль', false)
+    return
+  }
+  
+  showToast('Вход в облако...', false)
+  
+  try {
+    const { data, error } = await supabaseClient.auth.signInWithPassword({
+      email,
+      password
+    })
+    
+    if (error) throw error
+    
+    currentUser = {
+      id: data.user.id,
+      email: data.user.email
+    }
+    localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(currentUser))
+    
+    // Показываем кнопку выхода
+    document.getElementById('logoutButton').style.display = 'block'
+    
+    closeAuthModal()
+    showToast('Вход выполнен успешно', true)
+    
+    // Синхронизируем с облаком
+    syncWithCloud()
+  } catch (error) {
+    document.getElementById('authMessage').textContent = 'Ошибка входа: ' + error.message
+  }
+}
+
+// Обновленная функция handleRegister
+async function handleRegister() {
+  const email = document.getElementById('authEmail').value
+  const password = document.getElementById('authPassword').value
+  
+  if (!email || !password) {
+    showToast('Введите email и пароль', false)
+    return
+  }
+  
+  if (password.length < 6) {
+    showToast('Пароль должен быть не менее 6 символов', false)
+    return
+  }
+  
+  showToast('Регистрация...', false)
+  
+  try {
+    const { data, error } = await supabaseClient.auth.signUp({
+      email,
+      password,
+      options: {
+        emailRedirectTo: window.location.origin // Ссылка для подтверждения email
+      }
+    })
+    
+    if (error) throw error
+    
+    if (data.user && data.user.identities && data.user.identities.length === 0) {
+      showToast('Этот email уже зарегистрирован', false)
+      return
+    }
+    
+    showToast('Регистрация успешна! Проверьте email для подтверждения', true)
+    closeAuthModal()
+  } catch (error) {
+    document.getElementById('authMessage').textContent = 'Ошибка регистрации: ' + error.message
+  }
+}
+
+// Функция для принудительного показа окна входа
+function showLoginIfNeeded() {
+  // Проверяем, есть ли активная сессия
+  setTimeout(async () => {
+    try {
+      const { data: { session }, error } = await supabaseClient.auth.getSession()
+      
+      if (error) throw error
+      
+      if (!session && currentSyncMode === SYNC_MODES.CLOUD) {
+        // Если нет сессии, но режим облачный - показываем вход
+        showAuthModal()
+      } else if (session) {
+        // Если есть сессия - показываем кнопку выхода
+        document.getElementById('logoutButton').style.display = 'block'
+      }
+    } catch (error) {
+      console.log('Ошибка проверки сессии:', error)
+    }
+  }, 500)
+}
+
+// Обновленная функция logoutCloud
+function logoutCloud() {
+  // Выход из Supabase
+  supabaseClient.auth.signOut()
+  
+  // Очищаем данные пользователя
+  currentUser = null
+  localStorage.removeItem(STORAGE_KEYS.USER)
+  localStorage.removeItem(STORAGE_KEYS.LAST_SYNC)
+  
+  // Скрываем кнопку выхода
+  document.getElementById('logoutButton').style.display = 'none'
+  
+  // Переключаем режим на локальный
+  currentSyncMode = SYNC_MODES.LOCAL
+  localStorage.setItem(STORAGE_KEYS.SYNC_MODE, SYNC_MODES.LOCAL)
+  
+  // Закрываем настройки
+  document.getElementById('settingsSheet').classList.remove('active')
+  
+  // Показываем сообщение
+  showToast('Выход выполнен', true)
+  
+  // ПРИНУДИТЕЛЬНО показываем окно выбора режима при следующей загрузке
+  // Но текущую страницу не перезагружаем, просто сбрасываем состояние
+  console.log('Выход выполнен, режим переключен на локальный')
+}
+
+// Функции для восстановления пароля
+function forgotPassword() {
+  closeAuthModal()
+  document.getElementById('resetPasswordModal').style.display = 'flex'
+  document.getElementById('resetEmail').value = ''
+  document.getElementById('resetMessage').textContent = ''
+  document.getElementById('resetMessage').style.color = ''
+}
+
+function closeResetModal() {
+  document.getElementById('resetPasswordModal').style.display = 'none'
+}
+
+async function sendResetPassword() {
+  const email = document.getElementById('resetEmail').value
+  
+  if (!email) {
+    showToast('Введите email', false)
+    return
+  }
+  
+  showToast('Отправка...', false)
+  
+  try {
+    const { error } = await supabaseClient.auth.resetPasswordForEmail(email, {
+      redirectTo: window.location.origin
+    })
+    
+    if (error) throw error
+    
+    document.getElementById('resetMessage').textContent = 'Ссылка для сброса пароля отправлена на email'
+    document.getElementById('resetMessage').style.color = '#10b981'
+    showToast('Письмо отправлено! Проверьте почту', true)
+    
+    setTimeout(() => {
+      closeResetModal()
+    }, 3000)
+  } catch (error) {
+    document.getElementById('resetMessage').textContent = 'Ошибка: ' + error.message
+    document.getElementById('resetMessage').style.color = '#ef4444'
+  }
+}
+
+// Обработка сброса пароля
+async function handlePasswordReset() {
+  const hash = window.location.hash
+  if (hash && hash.includes('type=recovery')) {
+    const newPassword = prompt('Введите новый пароль:')
+    if (newPassword && newPassword.length >= 6) {
+      const { error } = await supabaseClient.auth.updateUser({
+        password: newPassword
+      })
+      
+      if (error) {
+        alert('Ошибка: ' + error.message)
+      } else {
+        alert('Пароль успешно изменен!')
+        window.location.hash = ''
+      }
+    } else {
+      alert('Пароль должен быть не менее 6 символов')
+    }
+  }
+}
+
+function checkCloudAuth() {
+  const savedUser = localStorage.getItem(STORAGE_KEYS.USER)
+  if (savedUser) {
+    currentUser = JSON.parse(savedUser)
+    syncWithCloud()
+  } else {
+    showAuthModal()
+  }
+}
+
+async function syncWithCloud() {
+  if (currentSyncMode !== SYNC_MODES.CLOUD || !currentUser) return
+  
+  showToast('Синхронизация с облаком...', false)
+  
+  try {
+    // Получаем время последней синхронизации
+    const lastSync = localStorage.getItem(STORAGE_KEYS.LAST_SYNC)
+    
+    // Здесь можно добавить логику синхронизации
+    // Например, загрузить последние изменения
+    
+    showToast('Синхронизация завершена', true)
+  } catch (error) {
+    console.log('Ошибка синхронизации:', error)
+  }
+}
+
+
+// Функции экспорта/импорта
+function exportLocal() {
+  exportData() // используем существующую функцию
+}
+
+function importLocal() {
+  document.getElementById('importFile').click()
+}
+
+async function exportCloud() {
+  if (!currentUser) {
+    showToast('Войдите в облако для синхронизации', false)
+    showAuthModal()
+    return
+  }
+  
+  showToast('Сохранение в облако...', false)
+  
+  try {
+    // Подготавливаем данные для загрузки
+    const lessonsToUpload = lessons.map(lesson => ({
+      user_id: currentUser.id,
+      lesson_id: lesson.id,
+      student: lesson.student,
+      date: lesson.date,
+      time: lesson.time,
+      duration: lesson.duration,
+      notes: lesson.notes || '',
+      notification_time: localStorage.getItem('teacher_notification') || 'Не оповещать',
+      updated_at: new Date().toISOString()
+    }))
+    
+    // Загружаем уроки
+    const { error: lessonsError } = await supabaseClient
+      .from('lessons')
+      .upsert(lessonsToUpload, { onConflict: 'user_id, lesson_id' })
+    
+    if (lessonsError) throw lessonsError
+    
+    // Загружаем настройки
+    const { error: settingsError } = await supabaseClient
+      .from('user_settings')
+      .upsert({
+        user_id: currentUser.id,
+        work_from: workHours.from,
+        work_to: workHours.to,
+        theme: localStorage.getItem('teacher_theme') || 'dark',
+        notification_default: localStorage.getItem('teacher_notification') || 'Не оповещать',
+        updated_at: new Date().toISOString()
+      })
+    
+    if (settingsError) throw settingsError
+    
+    // Сохраняем время последней синхронизации
+    const lastSync = new Date().toISOString()
+    localStorage.setItem(STORAGE_KEYS.LAST_SYNC, lastSync)
+    
+    showToast('Данные сохранены в облаке', true)
+  } catch (error) {
+    console.log('Ошибка при сохранении в облако:', error)
+    showToast('Ошибка при сохранении в облако', false)
+  }
+}
+
+async function importCloud() {
+  if (!currentUser) {
+    showToast('Войдите в облако для синхронизации', false)
+    showAuthModal()
+    return
+  }
+  
+  showToast('Загрузка из облака...', false)
+  
+  try {
+    // Загружаем уроки из облака
+    const { data: cloudLessons, error: lessonsError } = await supabaseClient
+      .from('lessons')
+      .select('*')
+      .eq('user_id', currentUser.id)
+    
+    if (lessonsError) throw lessonsError
+    
+    // Загружаем настройки из облака
+    const { data: cloudSettings, error: settingsError } = await supabaseClient
+      .from('user_settings')
+      .select('*')
+      .eq('user_id', currentUser.id)
+      .single()
+    
+    if (settingsError && settingsError.code !== 'PGRST116') throw settingsError
+    
+    // Проверяем время последнего изменения
+    const lastLocalSync = localStorage.getItem(STORAGE_KEYS.LAST_SYNC)
+    const cloudUpdateTime = cloudSettings?.updated_at || '2000-01-01'
+    
+    if (lastLocalSync && cloudUpdateTime > lastLocalSync) {
+      if (!confirm('Облачные данные новее локальных. Загрузить?')) {
+        showToast('Загрузка отменена', false)
+        return
+      }
+    }
+    
+    // Обновляем локальные данные
+    if (cloudLessons && cloudLessons.length > 0) {
+      lessons = cloudLessons.map(l => ({
+        id: l.lesson_id,
+        date: l.date,
+        time: l.time,
+        student: l.student,
+        duration: l.duration,
+        notes: l.notes || ''
+      }))
+      saveLessonsToStorage()
+    }
+    
+    if (cloudSettings) {
+      workHours = {
+        from: cloudSettings.work_from || '09:00',
+        to: cloudSettings.work_to || '18:00'
+      }
+      saveSettingsToStorage()
+      
+      // Применяем настройки
+      document.body.className = cloudSettings.theme || 'dark'
+      if (themeSelect) themeSelect.value = cloudSettings.theme || 'dark'
+      if (notificationSelect) notificationSelect.value = cloudSettings.notification_default || 'Не оповещать'
+      localStorage.setItem('teacher_theme', cloudSettings.theme || 'dark')
+      localStorage.setItem('teacher_notification', cloudSettings.notification_default || 'Не оповещать')
+      
+      calendar.setOption('slotMinTime', workHours.from)
+      calendar.setOption('slotMaxTime', workHours.to)
+    }
+    
+    calendar.refetchEvents()
+    calculateScrollerHeight()
+    
+    showToast(`Данные загружены из облака. Уроков: ${lessons.length}`, true)
+  } catch (error) {
+    console.log('Ошибка при загрузке из облака:', error)
+    showToast('Ошибка при загрузке из облака', false)
+  }
+}
+
+
+// Функция для показа toast уведомлений
+function showToast(message, isSuccess = false) {
+  const toast = document.getElementById('toast')
+  if (!toast) return
+  
+  toast.textContent = message
+  toast.className = 'toast'
+  if (isSuccess) {
+    toast.classList.add('success')
+  }
+  
+  toast.style.display = 'block'
+  
+  setTimeout(() => {
+    toast.style.display = 'none'
+  }, 3000)
+}
+
+// Проверка валидности времени работы
+function validateWorkHours(fromTime, toTime) {
+  if (!fromTime || !toTime) {
+    showToast('Введите время начала и окончания работы')
+    return false
+  }
+  
+  const fromDate = new Date(`2000-01-01T${fromTime}`)
+  const toDate = new Date(`2000-01-01T${toTime}`)
+  
+  if (fromDate >= toDate) {
+    showToast('Время окончания работы должно быть позже времени начала')
+    return false
+  }
+  
+  return true
+}
+
+// Инициализация базы данных
+function initStorage() {
+  try {
+    const savedLessons = localStorage.getItem('teacher_lessons')
+    if (savedLessons) {
+      lessons = JSON.parse(savedLessons)
+    }
+    
+    const savedSettings = localStorage.getItem('teacher_settings')
+    if (savedSettings) {
+      const settings = JSON.parse(savedSettings)
+      workHours = settings.workHours || workHours
+    }
+    
+    // Проверяем время последней синхронизации
+    const lastSync = localStorage.getItem('lastCloudSync')
+    if (lastSync) {
+      console.log('Последняя синхронизация с облаком:', new Date(lastSync).toLocaleString())
+    }
+  } catch (e) {
+    console.log('Ошибка загрузки данных:', e)
+    lessons = []
+  }
+}
+
+function saveLessonsToStorage() {
+  try {
+    localStorage.setItem('teacher_lessons', JSON.stringify(lessons))
+    // Обновляем время последнего изменения
+    localStorage.setItem('lastLocalUpdate', new Date().toISOString())
+  } catch (e) {
+    console.log('Ошибка сохранения уроков:', e)
+  }
+}
+
+function saveSettingsToStorage() {
+  try {
+    const settings = {
+      workHours: workHours
+    }
+    localStorage.setItem('teacher_settings', JSON.stringify(settings))
+  } catch (e) {
+    console.log('Ошибка сохранения настроек:', e)
+  }
+}
+
+function generateId() {
+  return Date.now().toString(36) + Math.random().toString(36).substr(2)
+}
+
+function roundTo30(d) {
+  const m = d.getMinutes()
+  d.setMinutes(m < 30 ? 0 : 30, 0, 0)
+  return d
+}
+
+function getCurrentTime() {
+  const now = new Date()
+  const hours = String(now.getHours()).padStart(2, '0')
+  const minutes = String(now.getMinutes()).padStart(2, '0')
+  return `${hours}:${minutes}`
+}
+
+// Форматирование длительности
+function formatDuration(minutes) {
+  const hours = Math.floor(minutes / 60)
+  const mins = minutes % 60
+  
+  if (hours > 0 && mins > 0) {
+    return `${hours}ч ${mins}м`
+  } else if (hours > 0) {
+    return `${hours}ч`
+  } else {
+    return `${mins}м`
+  }
+}
+
+// Конвертация уроков в события FullCalendar
+function lessonsToEvents() {
+  return lessons.map(lesson => {
+    const start = new Date(lesson.date + 'T' + lesson.time)
+    const end = new Date(start.getTime() + lesson.duration * 60000)
+    
+    const timeStr = lesson.time.substring(0, 5)
+    const endTimeStr = end.toTimeString().substring(0, 5)
+    const durationStr = formatDuration(lesson.duration)
+    
+    return {
+      id: lesson.id,
+      title: '',
+      start: start.toISOString(),
+      end: end.toISOString(),
+      extendedProps: {
+        student: lesson.student,
+        duration: lesson.duration,
+        notes: lesson.notes,
+        time: timeStr,
+        endTime: endTimeStr,
+        durationStr: durationStr
+      },
+      backgroundColor: '#2563eb',
+      borderColor: '#1d4ed8',
+      textColor: '#ffffff'
+    }
+  })
+}
+
+/// Функция для нормализации высоты ячеек в режиме месяца
+function normalizeMonthHeights() {
+  if (calendar.view.type !== 'dayGridMonth') return
+  
+  // Отменяем предыдущие таймеры
+  if (window.monthHeightTimer) clearTimeout(window.monthHeightTimer)
+  
+  window.monthHeightTimer = setTimeout(() => {
+    const rows = document.querySelectorAll('.fc-dayGridMonth-view .fc-daygrid-week')
+    let needsUpdate = false
+    
+    rows.forEach(row => {
+      const cells = Array.from(row.querySelectorAll('.fc-daygrid-day'))
+      let maxHeight = 77
+      
+      cells.forEach(cell => {
+        const contentHeight = cell.scrollHeight
+        if (contentHeight > maxHeight) {
+          maxHeight = Math.min(contentHeight, 168)
+        }
+      })
+      
+      cells.forEach(cell => {
+        // Проверяем, нужно ли обновлять
+        if (parseInt(cell.style.height) !== maxHeight) {
+          needsUpdate = true
+          cell.style.height = maxHeight + 'px'
+          cell.style.minHeight = maxHeight + 'px'
+          
+          const frame = cell.querySelector('.fc-daygrid-day-frame')
+          if (frame) {
+            frame.style.height = (maxHeight - 2) + 'px'
+            frame.style.minHeight = (maxHeight - 2) + 'px'
+          }
+          
+          const bg = cell.querySelector('.fc-daygrid-day-bg')
+          if (bg) {
+            bg.style.height = maxHeight + 'px'
+            bg.style.minHeight = maxHeight + 'px'
+          }
+        }
+      })
+    })
+    
+    // Применяем фон для текущего дня ТОЛЬКО если были изменения
+    if (needsUpdate) {
+      setTimeout(() => {
+        const todayCells = document.querySelectorAll('.fc-dayGridMonth-view .fc-day-today')
+        const isLight = document.body.classList.contains('light')
+        
+        todayCells.forEach(cell => {
+          const cellHeight = cell.offsetHeight
+          const todayColor = isLight ? 'rgba(37, 99, 235, 0.15)' : 'rgba(59, 130, 246, 0.25)'
+          
+          cell.style.setProperty('background-color', todayColor, 'important')
+          
+          const frame = cell.querySelector('.fc-daygrid-day-frame')
+          if (frame) {
+            frame.style.setProperty('background-color', todayColor, 'important')
+          }
+          
+          const bg = cell.querySelector('.fc-daygrid-day-bg')
+          if (bg) {
+            bg.style.setProperty('background-color', todayColor, 'important')
+          }
+        })
+      }, 50)
+    }
+  }, 30) // Уменьшил задержку
+}
+
+// Функция для расчета высоты скроллера
+function calculateScrollerHeight() {
+  const header = document.querySelector('header')
+  const bottomBar = document.querySelector('.bottom-bar')
+  const calendarEl = document.getElementById('calendar')
+  
+  if (!header || !bottomBar || !calendarEl) return
+  
+  const headerHeight = header.offsetHeight
+  const bottomBarHeight = bottomBar.offsetHeight
+  const viewportHeight = window.innerHeight
+  
+  const availableHeight = viewportHeight - headerHeight - bottomBarHeight - 5
+  
+  calendarEl.style.setProperty('height', availableHeight + 'px', 'important')
+  
+  // Отменяем предыдущий таймер
+  if (window.scrollerTimer) clearTimeout(window.scrollerTimer)
+  
+  window.scrollerTimer = setTimeout(() => {
+    const dayHeader = document.querySelector('.fc-col-header')
+    const dayHeaderHeight = dayHeader ? dayHeader.offsetHeight : 40
+    
+    const scrollers = document.querySelectorAll(
+      '.fc-timeGridWeek-view .fc-scroller, ' +
+      '.fc-timeGridDay-view .fc-scroller, ' +
+      '.fc-dayGridMonth-view .fc-scroller'
+    )
+    
+    scrollers.forEach(scroller => {
+      if (scroller.closest('.fc-timeGridWeek-view') || scroller.closest('.fc-timeGridDay-view')) {
+        const scrollHeight = availableHeight - dayHeaderHeight - 5
+        scroller.style.setProperty('max-height', scrollHeight + 'px', 'important')
+      } else {
+        scroller.style.setProperty('max-height', availableHeight + 'px', 'important')
+      }
+      scroller.style.setProperty('overflow-y', 'auto', 'important')
+      scroller.style.setProperty('overflow-x', 'hidden', 'important')
+    })
+    
+    if (calendar.view.type === 'dayGridMonth') {
+      normalizeMonthHeights()
+    }
+  }, 50) // Уменьшил задержку
+}
+// Создаем календарь
+const calendar = new FullCalendar.Calendar(document.getElementById('calendar'), {
+  locale: 'ru',
+  firstDay: 1,
+  initialView: 'dayGridMonth',
+  headerToolbar: false,
+  height: 'auto',
+  contentHeight: 'auto',
+  allDaySlot: false,
+  slotDuration: '00:30:00',
+  selectable: true,
+  selectMinDistance: 5,
+  nowIndicator: false,
+  
+  slotMinTime: workHours.from,
+  slotMaxTime: workHours.to,
+  
+  views: {
+    timeGridDay: {
+      dayHeaderContent: function(arg) {
+        const date = arg.date
+        const weekday = date.toLocaleDateString('ru', { weekday: 'long' })
+        const day = String(date.getDate()).padStart(2, '0')
+        const month = String(date.getMonth() + 1).padStart(2, '0')
+        return `${weekday} ${day}.${month}`
+      },
+      slotLabelFormat: {
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false
+      },
+      eventContent: function(arg) {
+        const time = arg.event.extendedProps.time
+        const endTime = arg.event.extendedProps.endTime
+        const student = arg.event.extendedProps.student
+        const durationStr = arg.event.extendedProps.durationStr
+        
+        return {
+          html: `<div style="font-size:11px; padding:2px 4px; line-height:1.2;">
+                  <div style="font-weight:bold; margin-bottom:1px;">${time} - ${endTime}</div>
+                  <div>${student} (${durationStr})</div>
+                </div>`
+        }
+      }
+    },
+    timeGridWeek: {
+      slotLabelFormat: {
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false
+      },
+      eventContent: function(arg) {
+        const time = arg.event.extendedProps.time
+        const student = arg.event.extendedProps.student
+        
+        return {
+          html: `<div style="font-size:11px; padding:1px 3px; line-height:1.2; white-space:normal;">
+                  ${time} ${student}
+                </div>`
+        }
+      }
+    },
+    dayGridMonth: {
+      fixedWeekCount: false,
+      dayMaxEvents: false,
+      eventContent: function(arg) {
+        const time = arg.event.extendedProps.time
+        const student = arg.event.extendedProps.student
+        
+        return {
+          html: `<div style="font-size:11px; line-height:1.2; margin:1px 0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; padding:1px 3px; background:#2563eb; color:white; border-radius:3px;">
+                  ${time} ${student}
+                </div>`
+        }
+      }
+    }
+  },
+  
+  dateClick: function(info) {
+    lastClickInfo = info
+    if (calendar.view.type === 'dayGridMonth') {
+      calendar.changeView('timeGridDay', info.date)
+      setView('day')
+    } else {
+      const roundedDate = roundTo30(new Date(info.date))
+      openFormWithDate(roundedDate)
+    }
+  },
+  
+  select: function(info) {
+    lastClickInfo = info
+    if (calendar.view.type !== 'dayGridMonth') {
+      const startDate = roundTo30(new Date(info.start))
+      openFormWithDate(startDate)
+    }
+  },
+  
+  eventClick: function(info) {
+    const lessonId = info.event.id
+    const lesson = lessons.find(l => l.id === lessonId)
+    if (lesson) {
+      openEditForm(lesson)
+    }
+  },
+  
+  events: function(fetchInfo, successCallback, failureCallback) {
+    const events = lessonsToEvents()
+    successCallback(events)
+  }
+})
+
+// Инициализация
+initStorage()
+calendar.render()
+updateHeader()
+calculateScrollerHeight()
+
+// ПРИНУДИТЕЛЬНО загружаем события сразу после рендера
+calendar.refetchEvents()
+// Добавляем обработчик для гарантии загрузки
+setTimeout(() => {
+  calendar.refetchEvents()
+  calculateScrollerHeight()
+}, 200)
+
+calendar.on('eventsSet', function() {
+  calculateScrollerHeight()
+})
+
+calendar.on('datesSet', function() {
+  calculateScrollerHeight()
+})
+
+calendar.on('windowResize', function() {
+  calculateScrollerHeight()
+})
+
+function setView(v) {
+  currentView = v
+  calendar.changeView(
+    v === 'month' ? 'dayGridMonth' :
+    v === 'week' ? 'timeGridWeek' : 'timeGridDay'
+  )
+  updateModes()
+  updateHeader()
+  
+  setTimeout(() => {
+    calendar.refetchEvents()
+    calculateScrollerHeight()
+    
+    const scroller = document.querySelector('.fc-timeGridDay-view .fc-scroller, .fc-timeGridWeek-view .fc-scroller')
+    if (scroller) scroller.scrollTop = 0
+  }, 150)
+}
+
+function updateModes() {
+  ['month', 'week', 'day'].forEach(v => {
+    const element = document.getElementById('mode-' + v)
+    if (element) {
+      element.classList.toggle('active', v === currentView)
+    }
+  })
+}
+
+function prev() { 
+  calendar.prev()
+  updateHeader()
+  setTimeout(calculateScrollerHeight, 100)
+}
+
+function next() { 
+  calendar.next()
+  updateHeader()
+  setTimeout(calculateScrollerHeight, 100)
+}
+
+function updateHeader() {
+  const d = calendar.getDate()
+  const headerDateEl = document.getElementById('headerDate')
+  if (headerDateEl) {
+    const month = d.toLocaleDateString('ru', { month: 'long' })
+    const year = d.getFullYear()
+    headerDateEl.textContent = month + ' ' + year
+  }
+}
+
+function openFormWithDate(date) {
+  editingLessonId = null
+  document.getElementById('formTitle').textContent = 'Новое занятие'
+  document.getElementById('deleteSection').style.display = 'none'
+  
+  const dateInput = document.getElementById('dateInput')
+  const timeInput = document.getElementById('timeInput')
+  const studentInput = document.getElementById('studentInput')
+  const durationInput = document.getElementById('durationInput')
+  const notesInput = document.getElementById('notesInput')
+  const sheet = document.getElementById('sheet')
+  
+  if (dateInput && timeInput && sheet) {
+    dateInput.value = date.toISOString().slice(0, 10)
+    timeInput.value = date.toTimeString().slice(0, 5)
+    studentInput.value = ''
+    durationInput.value = '60'
+    notesInput.value = ''
+    sheet.classList.add('active')
+  }
+}
+
+function openEditForm(lesson) {
+  editingLessonId = lesson.id
+  document.getElementById('formTitle').textContent = 'Редактировать занятие'
+  document.getElementById('deleteSection').style.display = 'block'
+  
+  const dateInput = document.getElementById('dateInput')
+  const timeInput = document.getElementById('timeInput')
+  const studentInput = document.getElementById('studentInput')
+  const durationInput = document.getElementById('durationInput')
+  const notesInput = document.getElementById('notesInput')
+  const sheet = document.getElementById('sheet')
+  
+  if (dateInput && timeInput && sheet) {
+    dateInput.value = lesson.date
+    timeInput.value = lesson.time
+    studentInput.value = lesson.student
+    durationInput.value = lesson.duration
+    notesInput.value = lesson.notes || ''
+    sheet.classList.add('active')
+  }
+}
+
+function openAdd() {
+  editingLessonId = null
+  document.getElementById('formTitle').textContent = 'Новое занятие'
+  document.getElementById('deleteSection').style.display = 'none'
+  
+  const now = new Date()
+  const dateInput = document.getElementById('dateInput')
+  const timeInput = document.getElementById('timeInput')
+  const studentInput = document.getElementById('studentInput')
+  const durationInput = document.getElementById('durationInput')
+  const notesInput = document.getElementById('notesInput')
+  const sheet = document.getElementById('sheet')
+  
+  if (dateInput && timeInput && sheet) {
+    dateInput.value = now.toISOString().slice(0, 10)
+    timeInput.value = getCurrentTime()
+    studentInput.value = ''
+    durationInput.value = '60'
+    notesInput.value = ''
+    sheet.classList.add('active')
+  }
+}
+
+function cancelForm() {
+  const sheet = document.getElementById('sheet')
+  if (sheet) {
+    sheet.classList.remove('active')
+  }
+}
+
+async function saveLesson() {
+  const dateInput = document.getElementById('dateInput')
+  const timeInput = document.getElementById('timeInput')
+  const studentInput = document.getElementById('studentInput')
+  const durationInput = document.getElementById('durationInput')
+  const notesInput = document.getElementById('notesInput')
+  
+  if (!dateInput.value || !timeInput.value || !studentInput.value.trim()) {
+    showToast('Пожалуйста, заполните все обязательные поля')
+    return
+  }
+  
+  const duration = parseInt(durationInput.value)
+  if (isNaN(duration) || duration < 30) {
+    showToast('Длительность должна быть не менее 30 минут')
+    return
+  }
+  
+  const lesson = {
+    id: editingLessonId || generateId(),
+    date: dateInput.value,
+    time: timeInput.value,
+    student: studentInput.value.trim(),
+    duration: duration,
+    notes: notesInput.value.trim(),
+    notification_time: localStorage.getItem('teacher_notification') || 'Не оповещать'
+  }
+  
+  if (editingLessonId) {
+    const index = lessons.findIndex(l => l.id === editingLessonId)
+    if (index !== -1) {
+      lessons[index] = lesson
+    }
+  } else {
+    lessons.push(lesson)
+  }
+  
+  // Сохраняем локально
+  saveLessonsToStorage()
+  
+  // Если есть пользователь и облачный режим - сохраняем в Supabase
+  if (currentUser && currentSyncMode === SYNC_MODES.CLOUD) {
+    await syncLessonToCloud(lesson, editingLessonId ? 'update' : 'insert')
+  }
+  
+  calendar.refetchEvents()
+  
+  const sheet = document.getElementById('sheet')
+  if (sheet) {
+    sheet.classList.remove('active')
+  }
+  
+  editingLessonId = null
+  showToast('Занятие сохранено', true)
+}
+
+async function syncLessonToCloud(lesson, action) {
+  try {
+    const lessonData = {
+      user_id: currentUser.id,
+      lesson_id: lesson.id,
+      student: lesson.student,
+      date: lesson.date,
+      time: lesson.time,
+      duration: lesson.duration,
+      notes: lesson.notes,
+      notification_time: lesson.notification_time,
+      updated_at: new Date().toISOString()
+    }
+    
+    if (action === 'insert') {
+      const { error } = await supabaseClient
+        .from('lessons')
+        .insert([lessonData])
+      
+      if (error) throw error
+    } else {
+      const { error } = await supabaseClient
+        .from('lessons')
+        .update(lessonData)
+        .eq('user_id', currentUser.id)
+        .eq('lesson_id', lesson.id)
+      
+      if (error) throw error
+    }
+    
+    console.log('Урок синхронизирован с облаком')
+  } catch (error) {
+    console.log('Ошибка синхронизации урока:', error)
+    // Добавляем в очередь на повторную синхронизацию
+    pendingChanges.push({
+      action,
+      lesson,
+      timestamp: new Date().toISOString()
+    })
+    localStorage.setItem(STORAGE_KEYS.PENDING_CHANGES, JSON.stringify(pendingChanges))
+  }
+}
+
+async function deleteLesson() {
+  if (editingLessonId && confirm('Вы уверены, что хотите удалить это занятие?')) {
+    const deletedLesson = lessons.find(l => l.id === editingLessonId)
+    lessons = lessons.filter(l => l.id !== editingLessonId)
+    saveLessonsToStorage()
+    
+    // Если есть пользователь и облачный режим - удаляем из Supabase
+    if (currentUser && currentSyncMode === SYNC_MODES.CLOUD && deletedLesson) {
+      try {
+        const { error } = await supabaseClient
+          .from('lessons')
+          .delete()
+          .eq('user_id', currentUser.id)
+          .eq('lesson_id', editingLessonId)
+        
+        if (error) throw error
+      } catch (error) {
+        console.log('Ошибка удаления из облака:', error)
+        pendingChanges.push({
+          action: 'delete',
+          lesson_id: editingLessonId,
+          timestamp: new Date().toISOString()
+        })
+        localStorage.setItem(STORAGE_KEYS.PENDING_CHANGES, JSON.stringify(pendingChanges))
+      }
+    }
+    
+    calendar.refetchEvents()
+    
+    const sheet = document.getElementById('sheet')
+    if (sheet) {
+      sheet.classList.remove('active')
+    }
+    
+    editingLessonId = null
+    showToast('Занятие удалено', true)
+  }
+}
+
+function openSettings() {
+  const settingsSheet = document.getElementById('settingsSheet')
+  const workFrom = document.getElementById('workFrom')
+  const workTo = document.getElementById('workTo')
+  
+  if (settingsSheet && workFrom && workTo) {
+    workFrom.value = workHours.from
+    workTo.value = workHours.to
+    settingsSheet.classList.add('active')
+  }
+}
+
+// Сохранение темы
+const themeSelect = document.getElementById('themeSelect')
+if (themeSelect) {
+  themeSelect.onchange = function() {
+    document.body.className = this.value
+    localStorage.setItem('teacher_theme', this.value)
+    showToast('Тема изменена', true)
+  }
+}
+
+// Сохранение режима работы с валидацией
+function saveWorkHours() {
+  const workFrom = document.getElementById('workFrom')
+  const workTo = document.getElementById('workTo')
+  
+  if (workFrom && workTo) {
+    if (!validateWorkHours(workFrom.value, workTo.value)) {
+      workFrom.value = workHours.from
+      workTo.value = workHours.to
+      return
+    }
+    
+    workHours = {
+      from: workFrom.value,
+      to: workTo.value
+    }
+    saveSettingsToStorage()
+    
+    calendar.setOption('slotMinTime', workHours.from)
+    calendar.setOption('slotMaxTime', workHours.to)
+    calendar.render()
+    
+    showToast('Время работы успешно сохранено', true)
+  }
+}
+
+const workFromEl = document.getElementById('workFrom')
+const workToEl = document.getElementById('workTo')
+if (workFromEl) workFromEl.addEventListener('change', saveWorkHours)
+if (workToEl) workToEl.addEventListener('change', saveWorkHours)
+
+// Сохранение настроек оповещений
+const notificationSelect = document.getElementById('notificationSelect')
+if (notificationSelect) {
+  notificationSelect.onchange = function() {
+    localStorage.setItem('teacher_notification', this.value)
+    showToast('Настройки оповещений сохранены', true)
+  }
+}
+
+// Экспорт данных
+function exportData() {
+  const data = {
+    lessons: lessons,
+    settings: {
+      workHours: workHours,
+      theme: localStorage.getItem('teacher_theme') || 'dark',
+      notification: localStorage.getItem('teacher_notification') || 'Не оповещать'
+    },
+    exportDate: new Date().toISOString()
+  }
+  
+  const dataStr = JSON.stringify(data, null, 2)
+  const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr)
+  
+  const exportFileDefaultName = `расписание_${new Date().toISOString().slice(0,10)}.json`
+  
+  const linkElement = document.createElement('a')
+  linkElement.setAttribute('href', dataUri)
+  linkElement.setAttribute('download', exportFileDefaultName)
+  linkElement.click()
+  
+  showToast('Данные экспортированы', true)
+}
+
+// Импорт данных
+function importData() {
+  document.getElementById('importFile').click()
+}
+
+document.getElementById('importFile').addEventListener('change', function(e) {
+  const file = e.target.files[0]
+  if (!file) return
+  
+  const reader = new FileReader()
+  reader.onload = function(e) {
+    try {
+      const data = JSON.parse(e.target.result)
+      
+      if (confirm('Загрузить данные? Существующие данные будут заменены.')) {
+        if (data.lessons && Array.isArray(data.lessons)) {
+          lessons = data.lessons
+          saveLessonsToStorage()
+        }
+        
+        if (data.settings) {
+          if (data.settings.workHours) {
+            if (validateWorkHours(data.settings.workHours.from, data.settings.workHours.to)) {
+              workHours = data.settings.workHours
+            }
+          }
+          if (data.settings.theme) {
+            localStorage.setItem('teacher_theme', data.settings.theme)
+            document.body.className = data.settings.theme
+            themeSelect.value = data.settings.theme
+          }
+          if (data.settings.notification) {
+            localStorage.setItem('teacher_notification', data.settings.notification)
+            notificationSelect.value = data.settings.notification
+          }
+          saveSettingsToStorage()
+        }
+        
+        calendar.setOption('slotMinTime', workHours.from)
+        calendar.setOption('slotMaxTime', workHours.to)
+        calendar.refetchEvents()
+        calendar.render()
+        calculateScrollerHeight()
+        
+        showToast(`Данные успешно загружены! Уроков: ${lessons.length}`, true)
+      }
+    } catch (error) {
+      alert('Ошибка при загрузке файла. Проверьте формат файла.')
+    }
+  }
+  reader.readAsText(file)
+  
+  e.target.value = ''
+})
+
+// Очистка всех данных
+function clearAllData() {
+  if (confirm('ВНИМАНИЕ! Вы уверены, что хотите удалить ВСЕ данные? Это действие нельзя отменить.')) {
+    lessons = []
+    localStorage.removeItem('teacher_lessons')
+    localStorage.removeItem('teacher_settings')
+    localStorage.removeItem('teacher_theme')
+    localStorage.removeItem('teacher_notification')
+    
+    document.body.className = 'dark'
+    themeSelect.value = 'dark'
+    workHours = { from: "09:00", to: "18:00" }
+    
+    calendar.refetchEvents()
+    calculateScrollerHeight()
+    showToast('Все данные удалены', true)
+  }
+}
+
+// Восстановление при загрузке
+document.addEventListener('DOMContentLoaded', function() {
+  try {
+    const savedTheme = localStorage.getItem('teacher_theme') || 'dark'
+    document.body.className = savedTheme
+    if (themeSelect) {
+      themeSelect.value = savedTheme
+    }
+  } catch (e) {
+    document.body.className = 'dark'
+  }
+  
+  try {
+    const savedSettings = localStorage.getItem('teacher_settings')
+    if (savedSettings) {
+      const settings = JSON.parse(savedSettings)
+      if (settings.workHours) {
+        if (validateWorkHours(settings.workHours.from, settings.workHours.to)) {
+          workHours = settings.workHours
+        }
+        calendar.setOption('slotMinTime', workHours.from)
+        calendar.setOption('slotMaxTime', workHours.to)
+        
+        if (workFromEl) workFromEl.value = workHours.from
+        if (workToEl) workToEl.value = workHours.to
+      }
+    }
+  } catch (e) {
+    console.log('Ошибка загрузки настроек работы')
+  }
+  
+  try {
+    const savedNotification = localStorage.getItem('teacher_notification') || 'Не оповещать'
+    if (notificationSelect) {
+      notificationSelect.value = savedNotification
+    }
+  } catch (e) {
+    console.log('Ошибка загрузки настроек оповещений')
+  }
+  
+  if (calendar) {
+    calendar.render()
+    updateHeader()
+    updateModes()
+    setTimeout(calculateScrollerHeight, 300)
+  }
+
+  // Сначала проверяем режим хранения
+  checkSyncMode()
+  
+  // Затем проверяем авторизацию
+  setTimeout(checkAuthOnLoad, 100)
+  
+  // Проверяем, нужно ли показать окно входа
+  setTimeout(showLoginIfNeeded, 600)
+  
+  // Проверяем, не возвращаются ли пользователи после сброса пароля
+  handlePasswordReset()
+  
+  window.addEventListener('resize', function() {
+    setTimeout(calculateScrollerHeight, 100)
+  })
+  
+  window.addEventListener('orientationchange', function() {
+    setTimeout(calculateScrollerHeight, 200)
+  })
+
+  // Запускаем проверку оповещений
+  startNotificationChecker()
+  
+  // Запрашиваем разрешение на уведомления
+  if (Notification.permission === "default") {
+    Notification.requestPermission()
+  }
+})
+
+
+</script>
+
+</body>
+</html>
