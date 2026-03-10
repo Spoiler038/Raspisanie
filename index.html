@@ -7,17 +7,27 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="tailwind" content="true">
 
-
-
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.css" rel="stylesheet">
-  <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/interaction.global.min.js"></script>
-  <script src="https://cdn.tailwindcss.com/3.4.1?plugins=forms"></script>
+  <!-- Подавление предупреждения Tailwind -->
   <script>
-    tailwind.config = { important: true }
+    const originalWarn = console.warn;
+    console.warn = function(...args) {
+      if (args[0] && args[0].includes('tailwindcss.com should not be used in production')) {
+        return;
+      }
+      originalWarn.apply(console, args);
+    };
   </script>
 
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  
+  <!-- FullCalendar - правильные ссылки -->
+  <link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/main.min.css" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/main.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/locales-all.min.js"></script>
+  
+  <!-- Tailwind -->
+  <script src="https://cdn.tailwindcss.com/3.4.1?plugins=forms"></script>
+  <script>tailwind.config = { important: true }</script>
 
   <style>
     html,
@@ -1317,6 +1327,7 @@ async function handleEmailConfirmation() {
   }
 }
 
+
 // Функция для проверки авторизации при загрузке
 async function checkAuthOnLoad() {
   try {
@@ -1333,8 +1344,11 @@ async function checkAuthOnLoad() {
       localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(currentUser))
       updateCloudUI()
       
-      // Показываем кнопку выхода
-      document.getElementById('logoutButton').style.display = 'block'
+      // ПРОВЕРЯЕМ существование элемента перед изменением
+      const logoutBtn = document.getElementById('logoutButton')
+      if (logoutBtn) {
+        logoutBtn.style.display = 'block'
+      }
       
       // Если облачный режим, синхронизируем
       if (currentSyncMode === SYNC_MODES.CLOUD) {
@@ -1678,7 +1692,10 @@ function showLoginIfNeeded() {
         showAuthModal()
       } else if (session) {
         // Если есть сессия - показываем кнопку выхода
-        document.getElementById('logoutButton').style.display = 'block'
+        const logoutBtn = document.getElementById('logoutButton')
+        if (logoutBtn) {
+          logoutBtn.style.display = 'block'
+        }
       }
     } catch (error) {
       console.log('Ошибка проверки сессии:', error)
