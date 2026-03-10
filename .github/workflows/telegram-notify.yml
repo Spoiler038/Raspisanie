@@ -1,0 +1,24 @@
+name: Telegram Lesson Notifications
+
+on:
+  schedule:
+    # Запуск каждые 15 минут
+    - cron: '*/15 * * * *'
+  # Возможность ручного запуска
+  workflow_dispatch:
+
+jobs:
+  notify:
+    name: Send Telegram Notifications
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Call Supabase Edge Function
+        run: |
+          curl -X POST \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" \
+            -H "Content-Type: application/json" \
+            https://dbhqxfaennimfqephxat.supabase.co/functions/v1/telegram-notifier
+      
+      - name: Log execution
+        run: echo "Notifications checked at $(date)"
