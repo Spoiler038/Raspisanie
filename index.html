@@ -1,798 +1,903 @@
 <!DOCTYPE html>
 <html lang="ru">
+
 <head>
-<meta charset="UTF-8" />
-<title>Расписание</title>
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="tailwind" content="true">
+  <meta charset="UTF-8" />
+  <title>Расписание</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="tailwind" content="true">
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.css" rel="stylesheet">
-<script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/interaction.global.min.js"></script>
-<script src="https://cdn.tailwindcss.com/3.4.1"></script>
-
-
-<style>
-html,body{height:100%;overflow:hidden;margin:0;padding:0}
-
-/* ===== THEMES ===== */
-body.dark{background:#0f172a;color:#e5e7eb}
-body.light{background:#f8fafc;color:#020617}
-
-/* ===== FULLCALENDAR ===== */
-.fc{
-  --fc-border-color:#1e293b;
-  --fc-page-bg-color:transparent;
-  --fc-today-bg-color:rgba(59,130,246,.25);
-  --fc-event-bg-color:#2563eb;
-  --fc-event-border-color:transparent;
-  --fc-daygrid-day-bottom:transparent;
-}
-body.light .fc{
-  --fc-border-color:#cbd5e1;
-  --fc-today-bg-color:rgba(37,99,235,.15);
-}
-
-.fc-col-header-cell{
-  background:#020617;
-  color:#e5e7eb;
-}
-body.light .fc-col-header-cell{
-  background:#e5e7eb;
-  color:#020617;
-}
-
-.fc-col-header-cell-cushion{
-  padding:6px 0;
-  font-weight:500;
-}
-
-/* ===== РЕЖИМ МЕСЯЦ: ДИНАМИЧЕСКАЯ ВЫСОТА ЯЧЕЕК ===== */
-.fc-dayGridMonth-view .fc-daygrid-day {
-  min-height: 77px !important;
-  height: auto !important;
-  max-height: 168px !important;
-  position: relative !important;
-  background: #020617 !important;
-}
-
-body.light .fc-dayGridMonth-view .fc-daygrid-day {
-  background: #ffffff !important;
-}
-
-.fc-dayGridMonth-view .fc-daygrid-day-frame {
-  min-height: 75px !important;
-  height: auto !important;
-  max-height: 166px !important;
-  overflow: hidden !important;
-  background: transparent !important;
-  position: relative !important;
-}
-
-/* ФОН ЯЧЕЙКИ - РАСТЯГИВАЕМ НА ВСЮ ВЫСОТУ */
-.fc-dayGridMonth-view .fc-daygrid-day-bg {
-  position: absolute !important;
-  top: 0 !important;
-  left: 0 !important;
-  right: 0 !important;
-  bottom: 0 !important;
-  width: 100% !important;
-  height: 100% !important;
-  background: inherit !important;
-}
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.css" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/interaction.global.min.js"></script>
+ <script src="https://cdn.tailwindcss.com/3.4.1?plugins=forms"></script>
 
 
+  <style>
+    html,
+    body {
+      height: 100%;
+      overflow: hidden;
+      margin: 0;
+      padding: 0
+    }
+
+    /* ===== THEMES ===== */
+    body.dark {
+      background: #0f172a;
+      color: #e5e7eb
+    }
+
+    body.light {
+      background: #f8fafc;
+      color: #020617
+    }
+
+    /* ===== FULLCALENDAR ===== */
+    .fc {
+      --fc-border-color: #1e293b;
+      --fc-page-bg-color: transparent;
+      --fc-today-bg-color: rgba(59, 130, 246, .25);
+      --fc-event-bg-color: #2563eb;
+      --fc-event-border-color: transparent;
+      --fc-daygrid-day-bottom: transparent;
+    }
+
+    body.light .fc {
+      --fc-border-color: #cbd5e1;
+      --fc-today-bg-color: rgba(37, 99, 235, .15);
+    }
+
+    .fc-col-header-cell {
+      background: #020617;
+      color: #e5e7eb;
+    }
+
+    body.light .fc-col-header-cell {
+      background: #e5e7eb;
+      color: #020617;
+    }
+
+    .fc-col-header-cell-cushion {
+      padding: 6px 0;
+      font-weight: 500;
+    }
+
+    /* ===== РЕЖИМ МЕСЯЦ: ДИНАМИЧЕСКАЯ ВЫСОТА ЯЧЕЕК ===== */
+    .fc-dayGridMonth-view .fc-daygrid-day {
+      min-height: 77px !important;
+      height: auto !important;
+      max-height: 168px !important;
+      position: relative !important;
+      background: #020617 !important;
+    }
+
+    body.light .fc-dayGridMonth-view .fc-daygrid-day {
+      background: #ffffff !important;
+    }
+
+    .fc-dayGridMonth-view .fc-daygrid-day-frame {
+      min-height: 75px !important;
+      height: auto !important;
+      max-height: 166px !important;
+      overflow: hidden !important;
+      background: transparent !important;
+      position: relative !important;
+    }
+
+    /* ФОН ЯЧЕЙКИ - РАСТЯГИВАЕМ НА ВСЮ ВЫСОТУ */
+    .fc-dayGridMonth-view .fc-daygrid-day-bg {
+      position: absolute !important;
+      top: 0 !important;
+      left: 0 !important;
+      right: 0 !important;
+      bottom: 0 !important;
+      width: 100% !important;
+      height: 100% !important;
+      background: inherit !important;
+    }
 
 
-/* Убираем лишний элемент */
-.fc-daygrid-day-bottom {
-  display: none !important;
-}
-
-/* Уменьшаем отступы для событий */
-.fc-dayGridMonth-view .fc-daygrid-day-events {
-  margin-top: 0 !important;
-  margin-bottom: 0 !important;
-  min-height: 0 !important;
-  padding: 1px 0 !important;
-}
-
-/* Уменьшаем отступы внутри ячейки */
-.fc-dayGridMonth-view .fc-daygrid-day-top {
-  padding: 0 !important;
-  margin: 0 !important;
-}
-
-.fc-daygrid-day-number{
-  color:#e5e7eb;
-  margin: 2px 4px !important;
-  padding: 0 !important;
-  text-align: right !important;
-  float: right !important;
-  position: relative !important;
-  z-index: 2 !important;
-}
-body.light .fc-daygrid-day-number{
-  color:#020617;
-}
-
-/* Стили для событий в режиме месяца - ТОЛЬКО ВРЕМЯ */
-.fc-daygrid-event {
-  margin: 1px 2px !important;
-  padding: 1px 3px !important;
-  font-size: 11px !important;
-  line-height: 1.2 !important;
-  border-radius: 3px !important;
-  white-space: nowrap !important;
-  overflow: hidden !important;
-  text-overflow: ellipsis !important;
-  background-color: var(--fc-event-bg-color) !important;
-  border: none !important;
-  max-height: 16px !important;
-  min-height: 16px !important;
-}
-
-.fc-daygrid-event .fc-event-time {
-  font-weight: bold !important;
-  display: inline !important;
-  margin-right: 3px !important;
-  font-size: 10px !important;
-}
-
-.fc-daygrid-event .fc-event-title {
-  display: inline !important;
-  font-size: 11px !important;
-}
-
-/* Стили для событий в режиме недели и дня */
-.fc-timegrid-event {
-  padding: 2px 4px !important;
-  font-size: 11px !important;
-  line-height: 1.2 !important;
-  background-color: var(--fc-event-bg-color) !important;
-  border: none !important;
-  overflow: hidden !important;
-}
-
-.fc-timegrid-event .fc-event-title {
-  font-weight: 500 !important;
-}
-
-.fc-timegrid-event .fc-event-time {
-  font-weight: bold !important;
-  margin-right: 3px !important;
-  font-size: 10px !important;
-}
 
 
-/* ВАЖНО: Выделение текущего дня */
-.fc-daygrid-day.fc-day-today {
-  background-color: var(--fc-today-bg-color) !important;
-}
+    /* Убираем лишний элемент */
+    .fc-daygrid-day-bottom {
+      display: none !important;
+    }
 
-/* Для недели */
-.fc-timegrid-col.fc-day-today {
-  background-color: var(--fc-today-bg-color) !important;
-}
+    /* Уменьшаем отступы для событий */
+    .fc-dayGridMonth-view .fc-daygrid-day-events {
+      margin-top: 0 !important;
+      margin-bottom: 0 !important;
+      min-height: 0 !important;
+      padding: 1px 0 !important;
+    }
 
-/* Убираем выделение в режиме дня */
-.fc-timeGridDay-view .fc-day-today,
-.fc-timeGridDay-view .fc-timegrid-col.fc-day-today {
-  background:transparent !important;
-}
+    /* Уменьшаем отступы внутри ячейки */
+    .fc-dayGridMonth-view .fc-daygrid-day-top {
+      padding: 0 !important;
+      margin: 0 !important;
+    }
 
-/* убрать all-day */
-.fc-timegrid-allday,
-.fc-timegrid-all-day{
-  display:none!important;
-}
+    .fc-daygrid-day-number {
+      color: #e5e7eb;
+      margin: 2px 4px !important;
+      padding: 0 !important;
+      text-align: right !important;
+      float: right !important;
+      position: relative !important;
+      z-index: 2 !important;
+    }
 
-/* ===== SCROLL ===== */
-/* Убираем все горизонтальные скроллы */
-.fc-scroller,
-.fc-scroller-liquid,
-.fc-daygrid-body,
-.fc-timegrid-body,
-.fc-timegrid-cols {
-  overflow-x: hidden !important;
-}
+    body.light .fc-daygrid-day-number {
+      color: #020617;
+    }
+
+    /* Стили для событий в режиме месяца - ТОЛЬКО ВРЕМЯ */
+    .fc-daygrid-event {
+      margin: 1px 2px !important;
+      padding: 1px 3px !important;
+      font-size: 11px !important;
+      line-height: 1.2 !important;
+      border-radius: 3px !important;
+      white-space: nowrap !important;
+      overflow: hidden !important;
+      text-overflow: ellipsis !important;
+      background-color: var(--fc-event-bg-color) !important;
+      border: none !important;
+      max-height: 16px !important;
+      min-height: 16px !important;
+    }
+
+    .fc-daygrid-event .fc-event-time {
+      font-weight: bold !important;
+      display: inline !important;
+      margin-right: 3px !important;
+      font-size: 10px !important;
+    }
+
+    .fc-daygrid-event .fc-event-title {
+      display: inline !important;
+      font-size: 11px !important;
+    }
+
+    /* Стили для событий в режиме недели и дня */
+    .fc-timegrid-event {
+      padding: 2px 4px !important;
+      font-size: 11px !important;
+      line-height: 1.2 !important;
+      background-color: var(--fc-event-bg-color) !important;
+      border: none !important;
+      overflow: hidden !important;
+    }
+
+    .fc-timegrid-event .fc-event-title {
+      font-weight: 500 !important;
+    }
+
+    .fc-timegrid-event .fc-event-time {
+      font-weight: bold !important;
+      margin-right: 3px !important;
+      font-size: 10px !important;
+    }
 
 
-/* Единые правила для ВСЕХ скроллеров */
-.fc-timeGridWeek-view .fc-scroller,
-.fc-timeGridDay-view .fc-scroller,
-.fc-dayGridMonth-view .fc-scroller {
-  overflow-y: auto !important;
-  overflow-x: hidden !important;
-  -webkit-overflow-scrolling: touch !important;
-  max-height: none !important;
-}
+    /* ВАЖНО: Выделение текущего дня */
+    .fc-daygrid-day.fc-day-today {
+      background-color: var(--fc-today-bg-color) !important;
+    }
 
-/* Убеждаемся что контент полностью виден */
-.fc-timegrid-slots {
-  height: auto !important;
-  min-height: 100% !important;
-}
+    /* Для недели */
+    .fc-timegrid-col.fc-day-today {
+      background-color: var(--fc-today-bg-color) !important;
+    }
 
-.fc-timegrid-col-frame {
-  height: auto !important;
-  min-height: 100% !important;
-}
+    /* Убираем выделение в режиме дня */
+    .fc-timeGridDay-view .fc-day-today,
+    .fc-timeGridDay-view .fc-timegrid-col.fc-day-today {
+      background: transparent !important;
+    }
 
-/* Фиксированная высота слотов */
-.fc-timegrid-slot {
-  height: 30px !important;
-  min-height: 30px !important;
-  max-height: 30px !important;
-}
+    /* убрать all-day */
+    .fc-timegrid-allday,
+    .fc-timegrid-all-day {
+      display: none !important;
+    }
 
-/* ===== INPUTS ===== */
-input,select,textarea{
-  width:100%;
-  padding:14px;
-  border-radius:12px;
-  background:#ffffff;
-  color:#020617!important;
-  border:1px solid #cbd5e1;
-  font-size:16px;
-  box-sizing:border-box;
-}
-input::placeholder,textarea::placeholder{color:#64748b}
-input::-webkit-calendar-picker-indicator{filter:none!important}
+    /* ===== SCROLL ===== */
+    /* Убираем все горизонтальные скроллы */
+    .fc-scroller,
+    .fc-scroller-liquid,
+    .fc-daygrid-body,
+    .fc-timegrid-body,
+    .fc-timegrid-cols {
+      overflow-x: hidden !important;
+    }
 
-/* ===== TOAST УВЕДОМЛЕНИЯ ===== */
-.toast {
-  position: fixed;
-  top: 20px;
-  left: 50%;
-  transform: translateX(-50%);
-  background: #dc2626;
-  color: white;
-  padding: 12px 24px;
-  border-radius: 8px;
-  font-weight: 500;
-  z-index: 9999;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-  display: none;
-  max-width: 90%;
-  text-align: center;
-  animation: fadeInOut 3s ease-in-out;
-}
 
-.toast.success {
-  background: #16a34a;
-}
+    /* Единые правила для ВСЕХ скроллеров */
+    .fc-timeGridWeek-view .fc-scroller,
+    .fc-timeGridDay-view .fc-scroller,
+    .fc-dayGridMonth-view .fc-scroller {
+      overflow-y: auto !important;
+      overflow-x: hidden !important;
+      -webkit-overflow-scrolling: touch !important;
+      max-height: none !important;
+    }
 
-@keyframes fadeInOut {
-  0% { opacity: 0; top: 10px; }
-  15% { opacity: 1; top: 20px; }
-  85% { opacity: 1; top: 20px; }
-  100% { opacity: 0; top: 10px; }
-}
+    /* Убеждаемся что контент полностью виден */
+    .fc-timegrid-slots {
+      height: auto !important;
+      min-height: 100% !important;
+    }
 
-/* ===== LAYOUT ===== */
-.wrapper{
-  max-width:420px;
-  margin:0 auto;
-  height:100vh;
-  display:flex;
-  flex-direction:column;
-  padding-bottom:48px;
-  box-sizing:border-box;
-  overflow:hidden;
-}
+    .fc-timegrid-col-frame {
+      height: auto !important;
+      min-height: 100% !important;
+    }
 
-header{
-  padding:12px;
-  display:flex;
-  align-items:center;
-  flex-shrink:0;
-}
-.header-center{
-  flex:1;
-  text-align:center;
-  font-weight:600;
-}
-.header-right{width:32px;text-align:right}
+    /* Фиксированная высота слотов */
+    .fc-timegrid-slot {
+      height: 30px !important;
+      min-height: 30px !important;
+      max-height: 30px !important;
+    }
 
-/* ===== BOTTOM BAR ===== */
-.bottom-bar{
-  position:fixed;
-  bottom:0;left:0;right:0;
-  background:#020617;
-  border-top:1px solid #1e293b;
-  padding:8px;
-  display:flex;
-  justify-content:space-around;
-  align-items:center;
-  z-index:100;
-  height:48px;
-  box-sizing:border-box;
-  width:100%;
-}
-body.light .bottom-bar{background:#e5e7eb}
+    /* ===== INPUTS ===== */
+    input,
+    select,
+    textarea {
+      width: 100%;
+      padding: 14px;
+      border-radius: 12px;
+      background: #ffffff;
+      color: #020617 !important;
+      border: 1px solid #cbd5e1;
+      font-size: 16px;
+      box-sizing: border-box;
+    }
 
-.mode{
-  display:flex;
-  align-items:center;
-  gap:0;
-  position:relative;
-  min-width: 100px;
-  justify-content:center;
-}
-.mode span{
-  padding:6px 30px;
-  border-radius:9999px;
-  opacity:.6;
-  cursor:pointer;
-}
-.mode.active span{
-  opacity:1;
-  background:rgba(255,255,255,.15);
-}
-body.light .mode.active span{
-  background:#020617;
-  color:white;
-}
+    input::placeholder,
+    textarea::placeholder {
+      color: #64748b
+    }
 
-/* Стрелки - ТОЛЬКО в активном режиме */
-.mode button {
-  background:transparent;
-  border:none;
-  color:#e5e7eb;
-  font-size:16px;
-  cursor:pointer;
-  padding:6px 8px;
-  position:absolute;
-  top:50%;
-  transform:translateY(-50%);
-  opacity:0;
-  visibility:hidden;
-}
-.mode button:first-child {
-  left:0;
-}
-.mode button:last-child {
-  right:0;
-}
-.mode.active button {
-  opacity:1;
-  visibility:visible;
-}
-body.light .mode button {
-  color:white;
-}
+    input::-webkit-calendar-picker-indicator {
+      filter: none !important
+    }
 
-/* ===== ADD BUTTON ===== */
-.add-btn{
-  width:42px;
-  height:42px;
-  border-radius:50%;
-  background:#2563eb;
-  color:white;
-  font-size:26px;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  cursor:pointer;
-  flex-shrink:0;
-}
+    /* ===== TOAST УВЕДОМЛЕНИЯ ===== */
+    .toast {
+      position: fixed;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #dc2626;
+      color: white;
+      padding: 12px 24px;
+      border-radius: 8px;
+      font-weight: 500;
+      z-index: 9999;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+      display: none;
+      max-width: 90%;
+      text-align: center;
+      animation: fadeInOut 3s ease-in-out;
+    }
 
-/* ===== SHEETS ===== */
-.sheet{
-  position:fixed;
-  inset:0;
-  background:rgba(0,0,0,.5);
-  display:none;
-  z-index:1000;
-}
-.sheet.active{display:block}
-.sheet-content{
-  position:absolute;
-  bottom:0;left:0;right:0;
-  background:#020617;
-  border-radius:16px 16px 0 0;
-  padding:16px;
-  max-height:80vh;
-  overflow-y:auto;
-  box-sizing:border-box;
-  z-index:1001;
-}
-body.light .sheet-content{background:#fff}
+    .toast.success {
+      background: #16a34a;
+    }
 
-/* ===== BUTTONS ===== */
-.btn-danger{
-  background:#dc2626;
-  color:white;
-  padding:12px 16px;
-  border-radius:12px;
-  font-weight:500;
-  text-align:center;
-  border:none;
-  width:100%;
-  cursor:pointer;
-}
+    @keyframes fadeInOut {
+      0% {
+        opacity: 0;
+        top: 10px;
+      }
 
-.btn-secondary{
-  background:#64748b;
-  color:white;
-  padding:12px 16px;
-  border-radius:12px;
-  font-weight:500;
-  text-align:center;
-  border:none;
-  width:100%;
-  cursor:pointer;
-}
+      15% {
+        opacity: 1;
+        top: 20px;
+      }
 
-.btn-primary{
-  background:#2563eb;
-  color:white;
-  padding:12px 16px;
-  border-radius:12px;
-  font-weight:500;
-  text-align:center;
-  border:none;
-  width:100%;
-  cursor:pointer;
-}
+      85% {
+        opacity: 1;
+        top: 20px;
+      }
 
-/* ===== CALENDAR CONTAINER ===== */
-#calendar{
-  flex:1;
-  overflow:hidden;
-}
+      100% {
+        opacity: 0;
+        top: 10px;
+      }
+    }
 
-/* Убираем полосы прокрутки в Firefox */
-* {
-  scrollbar-width: thin;
-  scrollbar-color: #4b5563 #1f2937;
-}
+    /* ===== LAYOUT ===== */
+    .wrapper {
+      max-width: 420px;
+      margin: 0 auto;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      padding-bottom: 48px;
+      box-sizing: border-box;
+      overflow: hidden;
+    }
 
+    header {
+      padding: 12px;
+      display: flex;
+      align-items: center;
+      flex-shrink: 0;
+    }
+
+    .header-center {
+      flex: 1;
+      text-align: center;
+      font-weight: 600;
+    }
+
+    .header-right {
+      width: 32px;
+      text-align: right
+    }
+
+    /* ===== BOTTOM BAR ===== */
+    .bottom-bar {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: #020617;
+      border-top: 1px solid #1e293b;
+      padding: 8px;
+      display: flex;
+      justify-content: space-around;
+      align-items: center;
+      z-index: 100;
+      height: 48px;
+      box-sizing: border-box;
+      width: 100%;
+    }
+
+    body.light .bottom-bar {
+      background: #e5e7eb
+    }
+
+    .mode {
+      display: flex;
+      align-items: center;
+      gap: 0;
+      position: relative;
+      min-width: 100px;
+      justify-content: center;
+    }
+
+    .mode span {
+      padding: 6px 30px;
+      border-radius: 9999px;
+      opacity: .6;
+      cursor: pointer;
+    }
+
+    .mode.active span {
+      opacity: 1;
+      background: rgba(255, 255, 255, .15);
+    }
+
+    body.light .mode.active span {
+      background: #020617;
+      color: white;
+    }
+
+    /* Стрелки - ТОЛЬКО в активном режиме */
+    .mode button {
+      background: transparent;
+      border: none;
+      color: #e5e7eb;
+      font-size: 16px;
+      cursor: pointer;
+      padding: 6px 8px;
+      position: absolute;
+      top: 50%;
+      transform: translateY(-50%);
+      opacity: 0;
+      visibility: hidden;
+    }
+
+    .mode button:first-child {
+      left: 0;
+    }
+
+    .mode button:last-child {
+      right: 0;
+    }
+
+    .mode.active button {
+      opacity: 1;
+      visibility: visible;
+    }
+
+    body.light .mode button {
+      color: white;
+    }
+
+    /* ===== ADD BUTTON ===== */
+    .add-btn {
+      width: 42px;
+      height: 42px;
+      border-radius: 50%;
+      background: #2563eb;
+      color: white;
+      font-size: 26px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+
+    /* ===== SHEETS ===== */
+    .sheet {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, .5);
+      display: none;
+      z-index: 1000;
+    }
+
+    .sheet.active {
+      display: block
+    }
+
+    .sheet-content {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: #020617;
+      border-radius: 16px 16px 0 0;
+      padding: 16px;
+      max-height: 80vh;
+      overflow-y: auto;
+      box-sizing: border-box;
+      z-index: 1001;
+    }
+
+    body.light .sheet-content {
+      background: #fff
+    }
+
+    /* ===== BUTTONS ===== */
+    .btn-danger {
+      background: #dc2626;
+      color: white;
+      padding: 12px 16px;
+      border-radius: 12px;
+      font-weight: 500;
+      text-align: center;
+      border: none;
+      width: 100%;
+      cursor: pointer;
+    }
+
+    .btn-secondary {
+      background: #64748b;
+      color: white;
+      padding: 12px 16px;
+      border-radius: 12px;
+      font-weight: 500;
+      text-align: center;
+      border: none;
+      width: 100%;
+      cursor: pointer;
+    }
+
+    .btn-primary {
+      background: #2563eb;
+      color: white;
+      padding: 12px 16px;
+      border-radius: 12px;
+      font-weight: 500;
+      text-align: center;
+      border: none;
+      width: 100%;
+      cursor: pointer;
+    }
+
+    /* ===== CALENDAR CONTAINER ===== */
+    #calendar {
+      flex: 1;
+      overflow: hidden;
+    }
+
+    /* Убираем полосы прокрутки в Firefox */
+    * {
+      scrollbar-width: thin;
+      scrollbar-color: #4b5563 #1f2937;
+    }
+
+    ::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: #1f2937;
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: #4b5563;
+      border-radius: 3px;
+    }
+
+    /* ===== УЛУЧШЕНИЯ ДЛЯ РЕЖИМА ДЕНЬ ===== */
+    .fc-timeGridDay-view .fc-timegrid-slots {
+      min-height: 100% !important;
+    }
+
+    .fc-timeGridDay-view .fc-timegrid-slot {
+      height: 30px !important;
+    }
+
+    /* ===== СПЕЦИАЛЬНО ДЛЯ МЕСЯЦА ===== */
+    .fc-dayGridMonth-view .fc-scroller {
+      overflow-x: hidden !important;
+    }
+
+    .fc-dayGridMonth-view .fc-daygrid-body {
+      width: 100% !important;
+    }
+
+    @media (max-width: 480px) {
+      .fc-dayGridMonth-view .fc-daygrid-day {
+        min-height: 70px !important;
+      }
+    }
+
+    /* Классы для flex gap */
+    .space-y-3>*+* {
+      margin-top: 12px;
+    }
+
+    .space-y-4>*+* {
+      margin-top: 16px;
+    }
+
+    .flex {
+      display: flex;
+    }
+
+    .gap-2 {
+      gap: 8px;
+    }
+
+    .gap-3 {
+      gap: 12px;
+    }
+
+    .mb-1 {
+      margin-bottom: 4px;
+    }
+
+    .mb-2 {
+      margin-bottom: 8px;
+    }
+
+    .mt-1 {
+      margin-top: 4px;
+    }
+
+    .mt-2 {
+      margin-top: 8px;
+    }
+
+    .text-sm {
+      font-size: 14px;
+    }
+
+    .text-xs {
+      font-size: 12px;
+    }
+
+    .font-semibold {
+      font-weight: 600;
+    }
+
+    .text-gray-500 {
+      color: #6b7280;
+    }
+
+    .opacity-70 {
+      opacity: 0.7;
+    }
+
+    /* ===== МОДАЛЬНЫЕ ОКНА ===== */
+    .modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.7);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 2000;
+      padding: 16px;
+    }
+
+    .modal {
+      background: #020617;
+      border-radius: 20px;
+      padding: 24px;
+      max-width: 320px;
+      width: 100%;
+      border: 1px solid #1e293b;
+    }
+
+    body.light .modal {
+      background: #ffffff;
+      border-color: #cbd5e1;
+    }
+
+    .modal-title {
+      font-size: 18px;
+      font-weight: 600;
+      margin-bottom: 16px;
+      color: #e5e7eb;
+    }
+
+    body.light .modal-title {
+      color: #020617;
+    }
+
+    .modal-content {
+      font-size: 14px;
+      line-height: 1.5;
+      margin-bottom: 20px;
+      color: #94a3b8;
+    }
+
+    body.light .modal-content {
+      color: #475569;
+    }
+
+    .modal-buttons {
+      display: flex;
+      gap: 12px;
+    }
+
+    /* ===== СТИЛИ ДЛЯ МОДАЛЬНЫХ ОКОН ===== */
+    #authModal input,
+    #authModal select {
+      background: #1e293b !important;
+      color: white !important;
+      border: 1px solid #334155 !important;
+      padding: 10px !important;
+      border-radius: 8px !important;
+      width: 100% !important;
+      box-sizing: border-box !important;
+    }
+
+    #authModal input:focus {
+      outline: none !important;
+      border-color: #2563eb !important;
+    }
+
+    #authModal .btn-primary,
+    #authModal .btn-secondary {
+      padding: 12px !important;
+      font-size: 14px !important;
+      border-radius: 8px !important;
+      width: 100% !important;
+      margin: 2px 0 !important;
+    }
+
+    /* Для светлой темы */
+    body.light #authModal input {
+      background: #f1f5f9 !important;
+      color: #020617 !important;
+      border-color: #cbd5e1 !important;
+    }
+
+    /* ===== ФИКС ВЫДЕЛЕНИЯ ТЕКУЩЕГО ДНЯ ДЛЯ СВЕТЛОЙ ТЕМЫ ===== */
+    body.light .fc-day-today {
+      background-color: rgba(37, 99, 235, 0.15) !important;
+    }
+
+    body.light .fc-day-today .fc-daygrid-day-frame {
+      background-color: rgba(37, 99, 235, 0.15) !important;
+    }
+
+    body.light .fc-day-today .fc-daygrid-day-bg {
+      background-color: rgba(37, 99, 235, 0.15) !important;
+    }
+
+    /* Для недели в светлой теме */
+    body.light .fc-timegrid-col.fc-day-today {
+      background-color: rgba(37, 99, 235, 0.15) !important;
+    }
+
+    /* Убеждаемся что в режиме дня выделение убрано */
+    body.light .fc-timeGridDay-view .fc-day-today {
+      background: transparent !important;
+    }
+
+    /* ===== ИСПРАВЛЕНИЕ ВЫДЕЛЕНИЯ ТЕКУЩЕГО ДНЯ В СВЕТЛОЙ ТЕМЕ ===== */
+    body.light .fc-dayGridMonth-view .fc-day-today,
+    body.light .fc-dayGridMonth-view .fc-day-today .fc-daygrid-day-frame,
+    body.light .fc-dayGridMonth-view .fc-day-today .fc-daygrid-day-bg {
+      background-color: rgba(37, 99, 235, 0.15) !important;
+    }
+
+    /* Для темной темы (уже должно работать, но для надежности) */
+    body.dark .fc-dayGridMonth-view .fc-day-today,
+    body.dark .fc-dayGridMonth-view .fc-day-today .fc-daygrid-day-frame,
+    body.dark .fc-dayGridMonth-view .fc-day-today .fc-daygrid-day-bg {
+      background-color: rgba(59, 130, 246, 0.25) !important;
+    }
+
+    /* ===== СТИЛИ ДЛЯ МОДАЛЬНЫХ ОКОН ===== */
+    #authModal input,
+    #resetPasswordModal input {
+      background: #1e293b !important;
+      color: white !important;
+      border: 1px solid #334155 !important;
+      padding: 10px !important;
+      border-radius: 8px !important;
+      width: 100% !important;
+      box-sizing: border-box !important;
+    }
+
+    body.light #authModal input,
+    body.light #resetPasswordModal input {
+      background: #f1f5f9 !important;
+      color: #020617 !important;
+      border-color: #cbd5e1 !important;
+    }
+
+    #authModal input:focus,
+    #resetPasswordModal input:focus {
+      outline: none !important;
+      border-color: #2563eb !important;
+    }
+
+    /* ===== СТИЛИ СКРОЛЛА ===== */
+/* Базовые стили для всех */
 ::-webkit-scrollbar {
-  width: 6px;
+  width: 8px;
+  height: 8px;
 }
 
+/* Темная тема (по умолчанию) */
 ::-webkit-scrollbar-track {
-  background: #1f2937;
+  background: #1e293b;
+  border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #4b5563;
-  border-radius: 3px;
+  background: #475569;
+  border-radius: 4px;
 }
 
-/* ===== УЛУЧШЕНИЯ ДЛЯ РЕЖИМА ДЕНЬ ===== */
-.fc-timeGridDay-view .fc-timegrid-slots {
-  min-height: 100% !important;
+::-webkit-scrollbar-thumb:hover {
+  background: #64748b;
 }
 
-.fc-timeGridDay-view .fc-timegrid-slot {
-  height: 30px !important;
-}
-
-/* ===== СПЕЦИАЛЬНО ДЛЯ МЕСЯЦА ===== */
-.fc-dayGridMonth-view .fc-scroller {
-  overflow-x: hidden !important;
-}
-
-.fc-dayGridMonth-view .fc-daygrid-body {
-  width: 100% !important;
-}
-
-@media (max-width: 480px) {
-  .fc-dayGridMonth-view .fc-daygrid-day {
-    min-height: 70px !important;
-  }
-}
-
-/* Классы для flex gap */
-.space-y-3 > * + * { margin-top: 12px; }
-.space-y-4 > * + * { margin-top: 16px; }
-.flex { display: flex; }
-.gap-2 { gap: 8px; }
-.gap-3 { gap: 12px; }
-.mb-1 { margin-bottom: 4px; }
-.mb-2 { margin-bottom: 8px; }
-.mt-1 { margin-top: 4px; }
-.mt-2 { margin-top: 8px; }
-.text-sm { font-size: 14px; }
-.text-xs { font-size: 12px; }
-.font-semibold { font-weight: 600; }
-.text-gray-500 { color: #6b7280; }
-.opacity-70 { opacity: 0.7; }
-
-/* ===== МОДАЛЬНЫЕ ОКНА ===== */
-.modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.7);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 2000;
-  padding: 16px;
-}
-
-.modal {
-  background: #020617;
-  border-radius: 20px;
-  padding: 24px;
-  max-width: 320px;
-  width: 100%;
-  border: 1px solid #1e293b;
-}
-
-body.light .modal {
-  background: #ffffff;
-  border-color: #cbd5e1;
-}
-
-.modal-title {
-  font-size: 18px;
-  font-weight: 600;
-  margin-bottom: 16px;
-  color: #e5e7eb;
-}
-
-body.light .modal-title {
-  color: #020617;
-}
-
-.modal-content {
-  font-size: 14px;
-  line-height: 1.5;
-  margin-bottom: 20px;
-  color: #94a3b8;
-}
-
-body.light .modal-content {
-  color: #475569;
-}
-
-.modal-buttons {
-  display: flex;
-  gap: 12px;
-}
-
-/* ===== СТИЛИ ДЛЯ МОДАЛЬНЫХ ОКОН ===== */
-#authModal input,
-#authModal select {
-  background: #1e293b !important;
-  color: white !important;
-  border: 1px solid #334155 !important;
-  padding: 10px !important;
-  border-radius: 8px !important;
-  width: 100% !important;
-  box-sizing: border-box !important;
-}
-
-#authModal input:focus {
-  outline: none !important;
-  border-color: #2563eb !important;
-}
-
-#authModal .btn-primary,
-#authModal .btn-secondary {
-  padding: 12px !important;
-  font-size: 14px !important;
-  border-radius: 8px !important;
-  width: 100% !important;
-  margin: 2px 0 !important;
-}
-
-/* Для светлой темы */
-body.light #authModal input {
-  background: #f1f5f9 !important;
-  color: #020617 !important;
-  border-color: #cbd5e1 !important;
-}
-
-/* ===== ФИКС ВЫДЕЛЕНИЯ ТЕКУЩЕГО ДНЯ ДЛЯ СВЕТЛОЙ ТЕМЫ ===== */
-body.light .fc-day-today {
-  background-color: rgba(37, 99, 235, 0.15) !important;
-}
-
-body.light .fc-day-today .fc-daygrid-day-frame {
-  background-color: rgba(37, 99, 235, 0.15) !important;
-}
-
-body.light .fc-day-today .fc-daygrid-day-bg {
-  background-color: rgba(37, 99, 235, 0.15) !important;
-}
-
-/* Для недели в светлой теме */
-body.light .fc-timegrid-col.fc-day-today {
-  background-color: rgba(37, 99, 235, 0.15) !important;
-}
-
-/* Убеждаемся что в режиме дня выделение убрано */
-body.light .fc-timeGridDay-view .fc-day-today {
-  background: transparent !important;
-}
-
-/* ===== ИСПРАВЛЕНИЕ ВЫДЕЛЕНИЯ ТЕКУЩЕГО ДНЯ В СВЕТЛОЙ ТЕМЕ ===== */
-body.light .fc-dayGridMonth-view .fc-day-today,
-body.light .fc-dayGridMonth-view .fc-day-today .fc-daygrid-day-frame,
-body.light .fc-dayGridMonth-view .fc-day-today .fc-daygrid-day-bg {
-  background-color: rgba(37, 99, 235, 0.15) !important;
-}
-
-/* Для темной темы (уже должно работать, но для надежности) */
-body.dark .fc-dayGridMonth-view .fc-day-today,
-body.dark .fc-dayGridMonth-view .fc-day-today .fc-daygrid-day-frame,
-body.dark .fc-dayGridMonth-view .fc-day-today .fc-daygrid-day-bg {
-  background-color: rgba(59, 130, 246, 0.25) !important;
-}
-
-/* ===== СТИЛИ ДЛЯ МОДАЛЬНЫХ ОКОН ===== */
-#authModal input,
-#resetPasswordModal input {
-  background: #1e293b !important;
-  color: white !important;
-  border: 1px solid #334155 !important;
-  padding: 10px !important;
-  border-radius: 8px !important;
-  width: 100% !important;
-  box-sizing: border-box !important;
-}
-
-body.light #authModal input,
-body.light #resetPasswordModal input {
-  background: #f1f5f9 !important;
-  color: #020617 !important;
-  border-color: #cbd5e1 !important;
-}
-
-#authModal input:focus,
-#resetPasswordModal input:focus {
-  outline: none !important;
-  border-color: #2563eb !important;
-}
-
-/* ===== СТИЛИ СКРОЛЛА ДЛЯ СВЕТЛОЙ ТЕМЫ ===== */
-body.light ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-}
-
+/* Светлая тема - с повышенной специфичностью */
+body.light::-webkit-scrollbar-track,
 body.light ::-webkit-scrollbar-track {
-  background: #e2e8f0;  /* Светло-серый фон */
-  border-radius: 4px;
+  background: #e2e8f0 !important;
 }
 
+body.light::-webkit-scrollbar-thumb,
 body.light ::-webkit-scrollbar-thumb {
-  background: #94a3b8;  /* Серый ползунок */
-  border-radius: 4px;
+  background: #94a3b8 !important;
 }
 
+body.light::-webkit-scrollbar-thumb:hover,
 body.light ::-webkit-scrollbar-thumb:hover {
-  background: #64748b;  /* Темно-серый при наведении */
+  background: #64748b !important;
 }
 
-/* Для Firefox в светлой теме */
+/* Для Firefox */
 body.light {
-  scrollbar-width: thin;
-  scrollbar-color: #94a3b8 #e2e8f0;
+  scrollbar-width: thin !important;
+  scrollbar-color: #94a3b8 #e2e8f0 !important;
 }
 
-/* Стили для темной темы (улучшим) */
-body.dark ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-}
-
-body.dark ::-webkit-scrollbar-track {
-  background: #1e293b;  /* Темный фон */
-  border-radius: 4px;
-}
-
-body.dark ::-webkit-scrollbar-thumb {
-  background: #475569;  /* Серый ползунок для темной темы */
-  border-radius: 4px;
-}
-
-body.dark ::-webkit-scrollbar-thumb:hover {
-  background: #64748b;  /* Светлее при наведении */
-}
-
-/* Для Firefox в темной теме */
 body.dark {
   scrollbar-width: thin;
   scrollbar-color: #475569 #1e293b;
 }
-
-</style>
+  </style>
 </head>
 
 <body class="dark">
 
-<!-- Toast для уведомлений -->
-<div id="toast" class="toast"></div>
+  <!-- Toast для уведомлений -->
+  <div id="toast" class="toast"></div>
 
-<div class="wrapper">
+  <div class="wrapper">
 
-<header>
-  <div class="header-center">
-    📅 Расписание <span id="headerDate" class="opacity-70"></span>
-  </div>
-  <div class="header-right">
-    <button onclick="openSettings()">⚙️</button>
-  </div>
-</header>
+    <header>
+      <div class="header-center">
+        📅 Расписание <span id="headerDate" class="opacity-70"></span>
+      </div>
+      <div class="header-right">
+        <button onclick="openSettings()">⚙️</button>
+      </div>
+    </header>
 
-<div id="calendar" class="flex-1"></div>
-</div>
+    <div id="calendar" class="flex-1"></div>
+  </div>
 
-<div class="bottom-bar">
-  <div id="mode-month" class="mode active">
-    <button onclick="prev()">←</button>
-    <span onclick="setView('month')">Месяц</span>
-    <button onclick="next()">→</button>
-  </div>
-  <div id="mode-week" class="mode">
-    <button onclick="prev()">←</button>
-    <span onclick="setView('week')">Неделя</span>
-    <button onclick="next()">→</button>
-  </div>
-  <div id="mode-day" class="mode">
-    <button onclick="prev()">←</button>
-    <span onclick="setView('day')">День</span>
-    <button onclick="next()">→</button>
-  </div>
-  <div class="add-btn" onclick="openAdd()">+</div>
-</div>
-
-<!-- ADD/EDIT FORM -->
-<div id="sheet" class="sheet" onclick="if(event.target.id==='sheet')sheet.classList.remove('active')">
-  <div class="sheet-content space-y-3">
-    <h2 class="font-semibold" id="formTitle">Новое занятие</h2>
-    <input id="dateInput" type="date">
-    <input id="timeInput" type="time">
-    <input id="studentInput" placeholder="Имя ученика">
-    <input id="durationInput" type="number" value="60" placeholder="Длительность (мин)" min="30" step="30">
-    <textarea id="notesInput" placeholder="Заметки (необязательно)" rows="2"></textarea>
-    <div class="flex gap-2">
-      <button class="flex-1 btn-secondary" onclick="cancelForm()">Отмена</button>
-      <button class="flex-1 btn-primary" onclick="saveLesson()">Сохранить</button>
+  <div class="bottom-bar">
+    <div id="mode-month" class="mode active">
+      <button onclick="prev()">←</button>
+      <span onclick="setView('month')">Месяц</span>
+      <button onclick="next()">→</button>
     </div>
-    <div id="deleteSection" style="display:none;">
-      <button class="btn-danger mt-2" onclick="deleteLesson()">Удалить занятие</button>
+    <div id="mode-week" class="mode">
+      <button onclick="prev()">←</button>
+      <span onclick="setView('week')">Неделя</span>
+      <button onclick="next()">→</button>
+    </div>
+    <div id="mode-day" class="mode">
+      <button onclick="prev()">←</button>
+      <span onclick="setView('day')">День</span>
+      <button onclick="next()">→</button>
+    </div>
+    <div class="add-btn" onclick="openAdd()">+</div>
+  </div>
+
+  <!-- ADD/EDIT FORM -->
+  <div id="sheet" class="sheet" onclick="if(event.target.id==='sheet')sheet.classList.remove('active')">
+    <div class="sheet-content space-y-3">
+      <h2 class="font-semibold" id="formTitle">Новое занятие</h2>
+      <input id="dateInput" type="date">
+      <input id="timeInput" type="time">
+      <input id="studentInput" placeholder="Имя ученика">
+      <input id="durationInput" type="number" value="60" placeholder="Длительность (мин)" min="30" step="30">
+      <textarea id="notesInput" placeholder="Заметки (необязательно)" rows="2"></textarea>
+      <div class="flex gap-2">
+        <button class="flex-1 btn-secondary" onclick="cancelForm()">Отмена</button>
+        <button class="flex-1 btn-primary" onclick="saveLesson()">Сохранить</button>
+      </div>
+      <div id="deleteSection" style="display:none;">
+        <button class="btn-danger mt-2" onclick="deleteLesson()">Удалить занятие</button>
+      </div>
     </div>
   </div>
-</div>
 
-<!-- SETTINGS -->
-<div id="settingsSheet" class="sheet" onclick="if(event.target.id==='settingsSheet')settingsSheet.classList.remove('active')">
-  <div class="sheet-content space-y-4">
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
-      <h2 class="font-semibold" style="margin: 0;">Настройки</h2>
-      <button id="logoutButton" onclick="logoutCloud()" style="background: #dc2626; color: white; border: none; border-radius: 8px; padding: 6px 12px; font-size: 13px; cursor: pointer; display: none;">🚪 Выход</button>
-    </div>
+  <!-- SETTINGS -->
+  <div id="settingsSheet" class="sheet"
+    onclick="if(event.target.id==='settingsSheet')settingsSheet.classList.remove('active')">
+    <div class="sheet-content space-y-4">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+        <h2 class="font-semibold" style="margin: 0;">Настройки</h2>
+        <button id="cloudActionButton" onclick="handleCloudAction()" style="background: #2563eb; color: white; border: none; border-radius: 8px; padding: 6px 12px; font-size: 13px; cursor: pointer;">☁️ Подключить облако</button>
+      </div>
 
-    <div>
-      <div class="text-sm mb-1">Тема</div>
-      <select id="themeSelect">
+      <div>
+        <div class="text-sm mb-1">Тема</div>
+        <select id="themeSelect">
         <option value="dark">Тёмная</option>
         <option value="light">Светлая</option>
       </select>
-    </div>
-
-    <div>
-      <div class="text-sm mb-1">Режим работы</div>
-      <div class="flex gap-2">
-        <input id="workFrom" type="time" value="09:00">
-        <input id="workTo" type="time" value="18:00">
       </div>
-    </div>
 
-    <div>
-      <div class="text-sm mb-1">Оповещение</div>
-      <select id="notificationSelect">
+      <div>
+        <div class="text-sm mb-1">Режим работы</div>
+        <div class="flex gap-2">
+          <input id="workFrom" type="time" value="09:00">
+          <input id="workTo" type="time" value="18:00">
+        </div>
+      </div>
+
+      <div>
+        <div class="text-sm mb-1">Оповещение</div>
+        <select id="notificationSelect">
         <option>Не оповещать</option>
         <option>За 30 минут</option>
         <option>За 1 час</option>
@@ -800,83 +905,94 @@ body.dark {
         <option>За 12 часов</option>
         <option>За день</option>
       </select>
-    </div>
-    
-    <div>
-      <div class="text-sm mb-1">Экспорт/Импорт данных</div>
-      <div class="flex gap-2 mb-2">
-        <button class="flex-1 btn-secondary" onclick="exportLocal()">📁 Локально</button>
-        <button class="flex-1 btn-primary" onclick="exportCloud()">☁️ В облако</button>
       </div>
-      <div class="flex gap-2">
-        <button class="flex-1 btn-secondary" onclick="importLocal()">📁 Из файла</button>
-        <button class="flex-1 btn-primary" onclick="importCloud()">☁️ Из облака</button>
+
+      <div>
+        <div class="text-sm mb-1">Экспорт/Импорт данных</div>
+        <div class="flex gap-2 mb-2">
+          <button class="flex-1 btn-secondary" onclick="exportLocal()">📁 Локально</button>
+          <button class="flex-1 btn-primary" onclick="exportCloud()">☁️ В облако</button>
+        </div>
+        <div class="flex gap-2">
+          <button class="flex-1 btn-secondary" onclick="importLocal()">📁 Из файла</button>
+          <button class="flex-1 btn-primary" onclick="importCloud()">☁️ Из облака</button>
+        </div>
+        <input type="file" id="importFile" style="display:none;" accept=".json">
       </div>
-      <input type="file" id="importFile" style="display:none;" accept=".json">
-    </div>
-    
-    <div>
-      <button class="btn-danger mt-2" onclick="clearAllData()">🗑️ Очистить все данные</button>
+
+      <div id="profileSection" style="display: none;">
+        <hr style="border-color: #334155; margin: 16px 0;">
+        <div class="text-sm mb-1">Управление профилем</div>
+        <button id="deleteProfileButton" class="btn-danger mt-2" onclick="deleteProfile()" style="background: #7f1d1d;">🗑️ Удалить профиль в облаке</button>
+      </div>
+
+      <div>
+        <hr style="border-color: #334155; margin: 16px 0;">
+        <div class="text-sm mb-1">Очистка данных</div>
+        <div class="flex gap-2 mb-2">
+          <button class="flex-1 btn-secondary" onclick="clearLocalData()">📱 Очистить локально</button>
+          <button id="clearCloudButton" class="flex-1 btn-danger" onclick="clearCloudData()" style="background: #b91c1c;">☁️ Очистить в облаке</button>
+        </div>
+      </div>
     </div>
   </div>
-</div>
 
-<!-- МОДАЛЬНОЕ ОКНО ВЫБОРА РЕЖИМА -->
-<div id="syncModeModal" class="modal-overlay" style="display: none;">
-  <div class="modal">
-    <div class="modal-title">Выбор режима хранения</div>
-    <div class="modal-content">
-      <p class="mb-4">Как вы хотите хранить данные?</p>
-      <div class="flex gap-2 mb-2">
-        <button class="flex-1 btn-secondary" onclick="setSyncMode('local')">📱 Локально</button>
-        <button class="flex-1 btn-primary" onclick="setSyncMode('cloud')">☁️ В облаке</button>
-      </div>
-      <p class="text-xs text-gray-500 mt-2">
-        Локально: данные только на этом устройстве<br>
+  <!-- МОДАЛЬНОЕ ОКНО ВЫБОРА РЕЖИМА -->
+  <div id="syncModeModal" class="modal-overlay" style="display: none;">
+    <div class="modal">
+      <div class="modal-title">Выбор режима хранения</div>
+      <div class="modal-content">
+        <p class="mb-4">Как вы хотите хранить данные?</p>
+        <div class="flex gap-2 mb-2">
+          <button class="flex-1 btn-secondary" onclick="setSyncMode('local')">📱 Локально</button>
+          <button class="flex-1 btn-primary" onclick="setSyncMode('cloud')">☁️ В облаке</button>
+        </div>
+        <p class="text-xs text-gray-500 mt-2">
+          Локально: данные только на этом устройстве<br>
         Облако: данные синхронизируются между устройствами
-      </p>
-    </div>
-  </div>
-</div>
-
-<!-- МОДАЛЬНОЕ ОКНО ВХОДА/РЕГИСТРАЦИИ -->
-<div id="authModal" class="modal-overlay" style="display: none;">
-  <div class="modal">
-    <div class="modal-title" id="authModalTitle">Вход в облако</div>
-    <div class="modal-content">
-      <input type="email" id="authEmail" placeholder="Email" class="w-full mb-2 p-2 rounded">
-      <input type="password" id="authPassword" placeholder="Пароль" class="w-full mb-2 p-2 rounded">
-      <div class="text-right mb-2">
-        <button onclick="forgotPassword()" class="text-sm text-blue-500 hover:underline" style="background: none; border: none; padding: 0;">Забыли пароль?</button>
+        </p>
       </div>
-      <div id="authMessage" class="text-sm text-red-500 mb-2"></div>
-    </div>
-    <div class="modal-buttons" style="display: flex; flex-direction: column; gap: 8px;">
-      <button class="btn-primary" onclick="handleLogin()" style="width: 100%;">Войти</button>
-      <button class="btn-secondary" onclick="handleRegister()" style="width: 100%;">Регистрация</button>
-      <button class="btn-secondary" onclick="closeAuthModal()" style="width: 100%;">Отмена</button>
     </div>
   </div>
-</div>
 
-<!-- МОДАЛЬНОЕ ОКНО ВОССТАНОВЛЕНИЯ ПАРОЛЯ -->
-<div id="resetPasswordModal" class="modal-overlay" style="display: none;">
-  <div class="modal">
-    <div class="modal-title">Восстановление пароля</div>
-    <div class="modal-content">
-      <p class="mb-4">Введите email, и мы отправим ссылку для сброса пароля</p>
-      <input type="email" id="resetEmail" placeholder="Email" class="w-full mb-2 p-2 rounded">
-      <div id="resetMessage" class="text-sm mb-2"></div>
-    </div>
-    <div class="modal-buttons" style="display: flex; flex-direction: column; gap: 8px;">
-      <button class="btn-primary" onclick="sendResetPassword()" style="width: 100%;">Отправить</button>
-      <button class="btn-secondary" onclick="closeResetModal()" style="width: 100%;">Отмена</button>
+  <!-- МОДАЛЬНОЕ ОКНО ВХОДА/РЕГИСТРАЦИИ -->
+  <div id="authModal" class="modal-overlay" style="display: none;">
+    <div class="modal">
+      <div class="modal-title" id="authModalTitle">Вход в облако</div>
+      <div class="modal-content">
+        <input type="email" id="authEmail" placeholder="Email" class="w-full mb-2 p-2 rounded">
+        <input type="password" id="authPassword" placeholder="Пароль" class="w-full mb-2 p-2 rounded">
+        <div class="text-right mb-2">
+          <button onclick="forgotPassword()" class="text-sm text-blue-500 hover:underline" style="background: none; border: none; padding: 0;">Забыли пароль?</button>
+        </div>
+        <div id="authMessage" class="text-sm text-red-500 mb-2"></div>
+      </div>
+      <div class="modal-buttons" style="display: flex; flex-direction: column; gap: 8px;">
+        <button class="btn-primary" onclick="handleLogin()" style="width: 100%;">Войти</button>
+        <button class="btn-secondary" onclick="handleRegister()" style="width: 100%;">Регистрация</button>
+        <button class="btn-secondary" onclick="closeAuthModal()" style="width: 100%;">Отмена</button>
+      </div>
     </div>
   </div>
-</div>
 
-<script>
-let currentView = 'month'
+  <!-- МОДАЛЬНОЕ ОКНО ВОССТАНОВЛЕНИЯ ПАРОЛЯ -->
+  <div id="resetPasswordModal" class="modal-overlay" style="display: none;">
+    <div class="modal">
+      <div class="modal-title">Восстановление пароля</div>
+      <div class="modal-content">
+        <p class="mb-4">Введите email, и мы отправим ссылку для сброса пароля</p>
+        <input type="email" id="resetEmail" placeholder="Email" class="w-full mb-2 p-2 rounded">
+        <div id="resetMessage" class="text-sm mb-2"></div>
+      </div>
+      <div class="modal-buttons" style="display: flex; flex-direction: column; gap: 8px;">
+        <button class="btn-primary" onclick="sendResetPassword()" style="width: 100%;">Отправить</button>
+        <button class="btn-secondary" onclick="closeResetModal()" style="width: 100%;">Отмена</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let currentView = 'month'
 let lastClickInfo = null
 let workHours = {
   from: "09:00",
@@ -1154,6 +1270,7 @@ async function checkAuthOnLoad() {
         email: session.user.email
       }
       localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(currentUser))
+      updateCloudUI()
       
       // Показываем кнопку выхода
       document.getElementById('logoutButton').style.display = 'block'
@@ -1284,7 +1401,7 @@ async function handleLogin() {
     
     // Закрываем модальное окно
     closeAuthModal()
-    
+    updateCloudUI()
     // Показываем успешный вход
     showToast(`✅ Вход выполнен: ${data.user.email}`, true)
     
@@ -1326,12 +1443,13 @@ async function handleLogin() {
   }
 }
 
-// Улучшенная функция регистрации
+// ===== ПОЛНОСТЬЮ ИСПРАВЛЕННАЯ ФУНКЦИЯ РЕГИСТРАЦИИ =====
 async function handleRegister() {
   const email = document.getElementById('authEmail').value
   const password = document.getElementById('authPassword').value
   const authMessage = document.getElementById('authMessage')
   
+  // Валидация
   if (!email || !password) {
     showToast('❌ Введите email и пароль', false)
     return
@@ -1342,16 +1460,31 @@ async function handleRegister() {
     return
   }
   
+  // Проверка формата email
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+  if (!emailRegex.test(email)) {
+    showToast('❌ Неверный формат email', false)
+    return
+  }
+  
   showToast('⏳ Регистрация...', false)
   
+  // Блокируем кнопку регистрации
   const registerBtn = document.querySelector('#authModal .btn-secondary')
   const originalText = registerBtn.textContent
   registerBtn.textContent = '⏳ Регистрация...'
   registerBtn.disabled = true
   
+  // Также блокируем кнопку входа на время
+  const loginBtn = document.querySelector('#authModal .btn-primary')
+  loginBtn.disabled = true
+  
   try {
-    // Текущий URL сайта для редиректа
+    // Текущий URL сайта для редиректа (ВАЖНО: точный адрес)
     const siteUrl = window.location.origin + window.location.pathname
+    
+    console.log('Попытка регистрации для:', email)
+    console.log('Redirect URL:', siteUrl)
     
     const { data, error } = await supabaseClient.auth.signUp({
       email: email,
@@ -1359,7 +1492,8 @@ async function handleRegister() {
       options: {
         emailRedirectTo: siteUrl,
         data: {
-          registered_at: new Date().toISOString()
+          registered_at: new Date().toISOString(),
+          registered_from: window.navigator.userAgent
         }
       }
     })
@@ -1367,10 +1501,13 @@ async function handleRegister() {
     if (error) {
       console.error('Ошибка регистрации:', error)
       
+      // Понятные сообщения об ошибках на русском
       const errorMessages = {
         'User already registered': '❌ Пользователь с таким email уже существует',
         'Password should be at least 6 characters': '❌ Пароль должен быть не менее 6 символов',
-        'Invalid email': '❌ Неверный формат email'
+        'Invalid email': '❌ Неверный формат email',
+        'Email rate limit exceeded': '❌ Слишком много попыток. Попробуйте позже',
+        'Signup requires a valid password': '❌ Введите корректный пароль'
       }
       
       const userMessage = errorMessages[error.message] || `❌ Ошибка: ${error.message}`
@@ -1382,16 +1519,24 @@ async function handleRegister() {
         showToast(userMessage, false)
       }
       
+      // Разблокируем кнопки
       registerBtn.textContent = originalText
       registerBtn.disabled = false
+      loginBtn.disabled = false
       return
     }
     
-    // Проверяем, существует ли уже пользователь
+    // Проверяем, существует ли уже пользователь (identities пустой - значит уже был)
     if (data.user && data.user.identities && data.user.identities.length === 0) {
       showToast('❌ Этот email уже зарегистрирован', false)
+      if (authMessage) {
+        authMessage.textContent = '❌ Этот email уже зарегистрирован'
+        authMessage.style.color = '#ef4444'
+      }
+      
       registerBtn.textContent = originalText
       registerBtn.disabled = false
+      loginBtn.disabled = false
       return
     }
     
@@ -1405,20 +1550,49 @@ async function handleRegister() {
     
     showToast('✅ Регистрация успешна! Проверьте почту', true)
     
+    // Если есть автоматический вход (зависит от настроек Supabase)
+    if (data.session) {
+      console.log('Автоматический вход после регистрации')
+      
+      currentUser = {
+        id: data.session.user.id,
+        email: data.session.user.email,
+        lastSignIn: new Date().toISOString()
+      }
+      localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(currentUser))
+      
+      // Обновляем UI
+      updateCloudUI()
+      
+      // Показываем сообщение об автоматическом входе
+      setTimeout(() => {
+        showToast(`✅ Автоматический вход выполнен: ${data.session.user.email}`, true)
+      }, 1000)
+    }
+    
     // Не закрываем модальное окно сразу, даем прочитать сообщение
     setTimeout(() => {
       closeAuthModal()
     }, 3000)
     
+    // Разблокируем кнопки
     registerBtn.textContent = originalText
     registerBtn.disabled = false
+    loginBtn.disabled = false
     
   } catch (unexpectedError) {
     console.error('Неожиданная ошибка:', unexpectedError)
     showToast('❌ Произошла ошибка при регистрации', false)
     
+    if (authMessage) {
+      authMessage.textContent = '❌ Произошла ошибка. Попробуйте позже'
+      authMessage.style.color = '#ef4444'
+    }
+    
+    // Разблокируем кнопки
     registerBtn.textContent = originalText
     registerBtn.disabled = false
+    loginBtn.disabled = false
   }
 }
 
@@ -2511,9 +2685,189 @@ document.getElementById('importFile').addEventListener('change', function(e) {
   e.target.value = ''
 })
 
-// Очистка всех данных
-function clearAllData() {
-  if (confirm('ВНИМАНИЕ! Вы уверены, что хотите удалить ВСЕ данные? Это действие нельзя отменить.')) {
+// ===== УПРАВЛЕНИЕ ОБЛАКОМ =====
+function handleCloudAction() {
+  if (currentUser) {
+    // Если пользователь вошел - показываем подтверждение отключения
+    if (confirm('Вы действительно хотите отключить облако? Данные останутся в облаке, но режим переключится на локальный.')) {
+      logoutCloud()
+    }
+  } else {
+    // Если не вошел - показываем вход
+    showAuthModal()
+  }
+}
+
+// Обновленная функция logoutCloud
+function logoutCloud() {
+  // Выход из Supabase
+  supabaseClient.auth.signOut()
+  
+  // Очищаем данные пользователя
+  currentUser = null
+  localStorage.removeItem(STORAGE_KEYS.USER)
+  localStorage.removeItem(STORAGE_KEYS.LAST_SYNC)
+  
+  // Переключаем режим на локальный
+  currentSyncMode = SYNC_MODES.LOCAL
+  localStorage.setItem(STORAGE_KEYS.SYNC_MODE, SYNC_MODES.LOCAL)
+  
+  // Обновляем кнопки
+  updateCloudUI()
+  
+  // Закрываем настройки
+  document.getElementById('settingsSheet').classList.remove('active')
+  
+  // Показываем сообщение
+  showToast('✅ Облако отключено, режим локальный', true)
+  
+  console.log('Выход выполнен, режим переключен на локальный')
+}
+
+// Функция обновления UI в зависимости от статуса
+function updateCloudUI() {
+  const cloudButton = document.getElementById('cloudActionButton')
+  const profileSection = document.getElementById('profileSection')
+  const clearCloudButton = document.getElementById('clearCloudButton')
+  const oldLogoutBtn = document.getElementById('logoutButton')
+  
+  if (currentUser) {
+    // Пользователь в облаке
+    if (cloudButton) {
+      cloudButton.textContent = '🔌 Отключить облако'
+      cloudButton.style.background = '#dc2626'
+    }
+    if (profileSection) profileSection.style.display = 'block'
+    if (clearCloudButton) clearCloudButton.disabled = false
+    if (oldLogoutBtn) oldLogoutBtn.style.display = 'none' // скрываем старую кнопку
+  } else {
+    // Только локальный режим
+    if (cloudButton) {
+      cloudButton.textContent = '☁️ Подключить облако'
+      cloudButton.style.background = '#2563eb'
+    }
+    if (profileSection) profileSection.style.display = 'none'
+    if (clearCloudButton) clearCloudButton.disabled = true
+    if (oldLogoutBtn) oldLogoutBtn.style.display = 'none'
+  }
+}
+
+// ПОЛНОСТЬЮ ИСПРАВЛЕННАЯ ФУНКЦИЯ УДАЛЕНИЯ ПРОФИЛЯ
+async function deleteProfile() {
+  if (!currentUser) {
+    showToast('❌ Нет активного профиля', false)
+    return
+  }
+  
+  // Двойное подтверждение для безопасности
+  if (!confirm('⚠️ ВНИМАНИЕ! Вы действительно хотите ПОЛНОСТЬЮ УДАЛИТЬ свой профиль?\n\n' +
+      'Это действие:' +
+      '\n• Удалит ваш email из системы' +
+      '\n• Удалит все данные в облаке' +
+      '\n• Отключит облачный режим' +
+      '\n\nЭто действие НЕЛЬЗЯ отменить!')) {
+    return
+  }
+  
+  if (!confirm('Последнее предупреждение! Вы уверены, что хотите удалить профиль навсегда?')) {
+    return
+  }
+  
+  showToast('⏳ Удаление профиля...', false)
+  
+  try {
+    // Получаем текущую сессию для токена
+    const { data: { session }, error: sessionError } = await supabaseClient.auth.getSession()
+    
+    if (sessionError || !session) {
+      throw new Error('Нет активной сессии')
+    }
+    
+    console.log('Удаление пользователя:', currentUser.id, currentUser.email)
+    
+    // URL вашей Edge Function
+    const functionUrl = `${SUPABASE_URL}/functions/v1/delete-user`
+    
+    // Вызов Edge Function
+    const response = await fetch(functionUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${session.access_token}`
+      }
+    })
+    
+    const result = await response.json()
+    
+    if (!response.ok) {
+      throw new Error(result.error || `Ошибка HTTP: ${response.status}`)
+    }
+    
+    if (!result.success) {
+      throw new Error(result.error || 'Неизвестная ошибка')
+    }
+    
+    console.log('Профиль удален:', result)
+    
+    // Выходим из системы (на всякий случай)
+    await supabaseClient.auth.signOut()
+    
+    // Очищаем локальные данные пользователя
+    currentUser = null
+    localStorage.removeItem(STORAGE_KEYS.USER)
+    localStorage.removeItem(STORAGE_KEYS.LAST_SYNC)
+    localStorage.removeItem(STORAGE_KEYS.PENDING_CHANGES)
+    
+    // Переключаем на локальный режим
+    currentSyncMode = SYNC_MODES.LOCAL
+    localStorage.setItem(STORAGE_KEYS.SYNC_MODE, SYNC_MODES.LOCAL)
+    
+    // Очищаем локальные уроки (если пользователь хочет)
+    if (confirm('Очистить локальные данные на этом устройстве?')) {
+      lessons = []
+      saveLessonsToStorage()
+      calendar.refetchEvents()
+    }
+    
+    // Обновляем UI
+    updateCloudUI()
+    
+    showToast('✅ Профиль полностью удален', true)
+    
+    // Закрываем настройки
+    document.getElementById('settingsSheet').classList.remove('active')
+    
+  } catch (error) {
+    console.error('Ошибка удаления профиля:', error)
+    
+    let errorMessage = error.message
+    
+    // Понятные сообщения об ошибках
+    if (errorMessage.includes('Failed to fetch')) {
+      errorMessage = 'Не удалось подключиться к серверу. Проверьте интернет.'
+    } else if (errorMessage.includes('401')) {
+      errorMessage = 'Ошибка авторизации. Попробуйте войти заново.'
+    }
+    
+    if (confirm(`❌ ${errorMessage}\n\nХотите очистить данные в облаке, но оставить профиль?`)) {
+      await clearCloudData()
+      
+      // Выходим
+      await supabaseClient.auth.signOut()
+      currentUser = null
+      localStorage.removeItem(STORAGE_KEYS.USER)
+      currentSyncMode = SYNC_MODES.LOCAL
+      localStorage.setItem(STORAGE_KEYS.SYNC_MODE, SYNC_MODES.LOCAL)
+      updateCloudUI()
+      showToast('✅ Данные очищены, профиль сохранен', true)
+    } else {
+      showToast('❌ Ошибка удаления профиля', false)
+    }
+  }
+}
+// Очистка локальных данных (для кнопки "Очистить локально")
+function clearLocalData() {
+  if (confirm('⚠️ Очистить все ЛОКАЛЬНЫЕ данные на этом устройстве?\n\nДанные в облаке останутся нетронутыми.')) {
     lessons = []
     localStorage.removeItem('teacher_lessons')
     localStorage.removeItem('teacher_settings')
@@ -2521,14 +2875,65 @@ function clearAllData() {
     localStorage.removeItem('teacher_notification')
     
     document.body.className = 'dark'
-    themeSelect.value = 'dark'
+    if (themeSelect) themeSelect.value = 'dark'
     workHours = { from: "09:00", to: "18:00" }
     
+    calendar.setOption('slotMinTime', workHours.from)
+    calendar.setOption('slotMaxTime', workHours.to)
     calendar.refetchEvents()
     calculateScrollerHeight()
-    showToast('Все данные удалены', true)
+    
+    showToast('✅ Локальные данные очищены', true)
   }
 }
+
+
+// Очистка данных в облаке (НО профиль остается)
+async function clearCloudData() {
+  if (!currentUser) {
+    showToast('❌ Нет подключения к облаку', false)
+    return
+  }
+  
+  if (!confirm('⚠️ Удалить ВСЕ данные в облаке?\n\nУроки и настройки будут удалены.\nПрофиль (email) останется.')) {
+    return
+  }
+  
+  showToast('⏳ Очистка облака...', false)
+  
+  try {
+    // Удаляем все уроки пользователя
+    const { error: lessonsError } = await supabaseClient
+      .from('lessons')
+      .delete()
+      .eq('user_id', currentUser.id)
+    
+    if (lessonsError) throw lessonsError
+    
+    // Удаляем настройки пользователя
+    const { error: settingsError } = await supabaseClient
+      .from('user_settings')
+      .delete()
+      .eq('user_id', currentUser.id)
+    
+    if (settingsError && settingsError.code !== 'PGRST116') throw settingsError
+    
+    // Очищаем локальные уроки, если пользователь хочет
+    if (confirm('Очистить также локальные данные?')) {
+      lessons = []
+      saveLessonsToStorage()
+    }
+    
+    calendar.refetchEvents()
+    
+    showToast('✅ Данные в облаке очищены', true)
+  } catch (error) {
+    console.error('Ошибка очистки облака:', error)
+    showToast('❌ Ошибка при очистке облака', false)
+  }
+}
+
+
 
 // Восстановление при загрузке
 document.addEventListener('DOMContentLoaded', function() {
@@ -2601,6 +3006,12 @@ document.addEventListener('DOMContentLoaded', function() {
 
   // Запускаем проверку оповещений
   startNotificationChecker()
+
+  updateCloudUI()
+  // Удаляем старую кнопку выхода
+const oldLogoutBtn = document.getElementById('logoutButton')
+if (oldLogoutBtn) oldLogoutBtn.style.display = 'none'
+
   
   // Запрашиваем разрешение на уведомления
   if (Notification.permission === "default") {
@@ -2609,7 +3020,8 @@ document.addEventListener('DOMContentLoaded', function() {
 })
 
 
-</script>
+  </script>
 
 </body>
+
 </html>
