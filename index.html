@@ -7,11 +7,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="tailwind" content="true">
 
+  
+
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.css" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/interaction.global.min.js"></script>
- <script src="https://cdn.tailwindcss.com/3.4.1?plugins=forms"></script>
+  <script src="https://cdn.tailwindcss.com/3.4.1?plugins=forms"></script>
+  <script>tailwind.config = { important: true }</script>
 
 
   <style>
@@ -763,53 +766,53 @@
     }
 
     /* ===== СТИЛИ СКРОЛЛА ===== */
-/* Базовые стили для всех */
-::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-}
+    /* Базовые стили для всех */
+    ::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
 
-/* Темная тема (по умолчанию) */
-::-webkit-scrollbar-track {
-  background: #1e293b;
-  border-radius: 4px;
-}
+    /* Темная тема (по умолчанию) */
+    ::-webkit-scrollbar-track {
+      background: #1e293b;
+      border-radius: 4px;
+    }
 
-::-webkit-scrollbar-thumb {
-  background: #475569;
-  border-radius: 4px;
-}
+    ::-webkit-scrollbar-thumb {
+      background: #475569;
+      border-radius: 4px;
+    }
 
-::-webkit-scrollbar-thumb:hover {
-  background: #64748b;
-}
+    ::-webkit-scrollbar-thumb:hover {
+      background: #64748b;
+    }
 
-/* Светлая тема - с повышенной специфичностью */
-body.light::-webkit-scrollbar-track,
-body.light ::-webkit-scrollbar-track {
-  background: #e2e8f0 !important;
-}
+    /* Светлая тема - с повышенной специфичностью */
+    body.light::-webkit-scrollbar-track,
+    body.light ::-webkit-scrollbar-track {
+      background: #e2e8f0 !important;
+    }
 
-body.light::-webkit-scrollbar-thumb,
-body.light ::-webkit-scrollbar-thumb {
-  background: #94a3b8 !important;
-}
+    body.light::-webkit-scrollbar-thumb,
+    body.light ::-webkit-scrollbar-thumb {
+      background: #94a3b8 !important;
+    }
 
-body.light::-webkit-scrollbar-thumb:hover,
-body.light ::-webkit-scrollbar-thumb:hover {
-  background: #64748b !important;
-}
+    body.light::-webkit-scrollbar-thumb:hover,
+    body.light ::-webkit-scrollbar-thumb:hover {
+      background: #64748b !important;
+    }
 
-/* Для Firefox */
-body.light {
-  scrollbar-width: thin !important;
-  scrollbar-color: #94a3b8 #e2e8f0 !important;
-}
+    /* Для Firefox */
+    body.light {
+      scrollbar-width: thin !important;
+      scrollbar-color: #94a3b8 #e2e8f0 !important;
+    }
 
-body.dark {
-  scrollbar-width: thin;
-  scrollbar-color: #475569 #1e293b;
-}
+    body.dark {
+      scrollbar-width: thin;
+      scrollbar-color: #475569 #1e293b;
+    }
   </style>
 </head>
 
@@ -879,12 +882,25 @@ body.dark {
         <button id="cloudActionButton" onclick="handleCloudAction()" style="background: #2563eb; color: white; border: none; border-radius: 8px; padding: 6px 12px; font-size: 13px; cursor: pointer;">☁️ Подключить облако</button>
       </div>
 
-      <div>
-        <div class="text-sm mb-1">Тема</div>
-        <select id="themeSelect">
-        <option value="dark">Тёмная</option>
-        <option value="light">Светлая</option>
-      </select>
+      <div style="display: flex; gap: 12px; margin-bottom: 16px;">
+        <div style="flex: 1;">
+          <div class="text-sm mb-1">Тема</div>
+          <select id="themeSelect">
+      <option value="dark">Тёмная</option>
+      <option value="light">Светлая</option>
+    </select>
+        </div>
+        <div style="flex: 1;">
+          <div class="text-sm mb-1">Оповещение</div>
+          <select id="notificationSelect">
+      <option>Не оповещать</option>
+      <option>За 30 минут</option>
+      <option>За 1 час</option>
+      <option>За 6 часов</option>
+      <option>За 12 часов</option>
+      <option>За день</option>
+    </select>
+        </div>
       </div>
 
       <div>
@@ -956,8 +972,8 @@ body.dark {
   </div>
 
   <!-- МОДАЛЬНОЕ ОКНО ВХОДА/РЕГИСТРАЦИИ -->
-  <div id="authModal" class="modal-overlay" style="display: none;">
-    <div class="modal">
+  <div id="authModal" class="modal-overlay" onclick="closeAuthModalOnClick(event)" style="display: none;">
+    <div class="modal" onclick="event.stopPropagation()">
       <div class="modal-title" id="authModalTitle">Вход в облако</div>
       <div class="modal-content">
         <input type="email" id="authEmail" placeholder="Email" class="w-full mb-2 p-2 rounded">
@@ -970,7 +986,6 @@ body.dark {
       <div class="modal-buttons" style="display: flex; flex-direction: column; gap: 8px;">
         <button class="btn-primary" onclick="handleLogin()" style="width: 100%;">Войти</button>
         <button class="btn-secondary" onclick="handleRegister()" style="width: 100%;">Регистрация</button>
-        <button class="btn-secondary" onclick="closeAuthModal()" style="width: 100%;">Отмена</button>
       </div>
     </div>
   </div>
@@ -990,6 +1005,18 @@ body.dark {
       </div>
     </div>
   </div>
+
+  <!-- МОДАЛЬНОЕ ОКНО ПОДТВЕРЖДЕНИЯ -->
+<div id="confirmModal" class="modal-overlay" style="display: none; z-index: 3000;">
+  <div class="modal" style="max-width: 300px;">
+    <div class="modal-title" id="confirmModalTitle">Подтверждение</div>
+    <div class="modal-content" id="confirmModalMessage" style="white-space: pre-line; min-height: 60px;"></div>
+    <div class="modal-buttons" style="display: flex; flex-direction: column; gap: 8px;">
+      <button id="confirmModalOk" class="btn-primary" style="width: 100%;">Подтвердить</button>
+      <button id="confirmModalCancel" class="btn-secondary" style="width: 100%;">Отмена</button>
+    </div>
+  </div>
+</div>
 
   <script>
     let currentView = 'month'
@@ -1183,6 +1210,42 @@ function getTimeToLesson(lesson) {
   if (diffMin < 60) return `${diffMin} минут`
   if (diffMin < 1440) return `${Math.floor(diffMin / 60)} часов`
   return `${Math.floor(diffMin / 1440)} дней`
+}
+
+// Универсальная функция подтверждения
+function showConfirmModal(title, message, onConfirm) {
+  const modal = document.getElementById('confirmModal')
+  const titleEl = document.getElementById('confirmModalTitle')
+  const messageEl = document.getElementById('confirmModalMessage')
+  const okBtn = document.getElementById('confirmModalOk')
+  const cancelBtn = document.getElementById('confirmModalCancel')
+  
+  titleEl.textContent = title
+  messageEl.textContent = message
+  
+  // Убираем предыдущие обработчики
+  const newOkBtn = okBtn.cloneNode(true)
+  const newCancelBtn = cancelBtn.cloneNode(true)
+  okBtn.parentNode.replaceChild(newOkBtn, okBtn)
+  cancelBtn.parentNode.replaceChild(newCancelBtn, cancelBtn)
+  
+  newOkBtn.addEventListener('click', () => {
+    modal.style.display = 'none'
+    onConfirm()
+  })
+  
+  newCancelBtn.addEventListener('click', () => {
+    modal.style.display = 'none'
+  })
+  
+  // Закрытие по клику вне
+  modal.onclick = function(e) {
+    if (e.target === modal) {
+      modal.style.display = 'none'
+    }
+  }
+  
+  modal.style.display = 'flex'
 }
 
 
@@ -1440,6 +1503,13 @@ async function handleLogin() {
     
     loginBtn.textContent = originalText
     loginBtn.disabled = false
+  }
+}
+
+// Функция для закрытия по клику вне модального окна
+function closeAuthModalOnClick(event) {
+  if (event.target.id === 'authModal') {
+    closeAuthModal()
   }
 }
 
@@ -2688,12 +2758,12 @@ document.getElementById('importFile').addEventListener('change', function(e) {
 // ===== УПРАВЛЕНИЕ ОБЛАКОМ =====
 function handleCloudAction() {
   if (currentUser) {
-    // Если пользователь вошел - показываем подтверждение отключения
-    if (confirm('Вы действительно хотите отключить облако? Данные останутся в облаке, но режим переключится на локальный.')) {
-      logoutCloud()
-    }
+    showConfirmModal(
+      '⚠️ Отключить облако',
+      'Вы действительно хотите отключить облако?\n\nДанные останутся в облаке, но режим переключится на локальный.',
+      logoutCloud
+    )
   } else {
-    // Если не вошел - показываем вход
     showAuthModal()
   }
 }
@@ -2753,184 +2823,201 @@ function updateCloudUI() {
 }
 
 // ПОЛНОСТЬЮ ИСПРАВЛЕННАЯ ФУНКЦИЯ УДАЛЕНИЯ ПРОФИЛЯ
+
 async function deleteProfile() {
   if (!currentUser) {
     showToast('❌ Нет активного профиля', false)
     return
   }
   
-  // Двойное подтверждение для безопасности
-  if (!confirm('⚠️ ВНИМАНИЕ! Вы действительно хотите ПОЛНОСТЬЮ УДАЛИТЬ свой профиль?\n\n' +
-      'Это действие:' +
-      '\n• Удалит ваш email из системы' +
-      '\n• Удалит все данные в облаке' +
-      '\n• Отключит облачный режим' +
-      '\n\nЭто действие НЕЛЬЗЯ отменить!')) {
-    return
-  }
-  
-  if (!confirm('Последнее предупреждение! Вы уверены, что хотите удалить профиль навсегда?')) {
-    return
-  }
-  
-  showToast('⏳ Удаление профиля...', false)
-  
-  try {
-    // Получаем текущую сессию для токена
-    const { data: { session }, error: sessionError } = await supabaseClient.auth.getSession()
-    
-    if (sessionError || !session) {
-      throw new Error('Нет активной сессии')
+  showConfirmModal(
+    '⚠️ ПОЛНОСТЬЮ УДАЛИТЬ ПРОФИЛЬ',
+    'Вы действительно хотите ПОЛНОСТЬЮ УДАЛИТЬ свой профиль?\n\n' +
+    '• Удалит ваш email из системы\n' +
+    '• Удалит все данные в облаке\n' +
+    '• Отключит облачный режим\n\n' +
+    'Это действие НЕЛЬЗЯ отменить!',
+    async () => {
+      showConfirmModal(
+        '⚠️ ПОСЛЕДНЕЕ ПРЕДУПРЕЖДЕНИЕ',
+        'Вы уверены, что хотите удалить профиль навсегда?',
+        async () => {
+          showToast('⏳ Удаление профиля...', false)
+          
+          try {
+            const { data: { session }, error: sessionError } = await supabaseClient.auth.getSession()
+            
+            if (sessionError || !session) {
+              throw new Error('Нет активной сессии')
+            }
+            
+            const functionUrl = `${SUPABASE_URL}/functions/v1/delete-user`
+            
+            const response = await fetch(functionUrl, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${session.access_token}`
+              }
+            })
+            
+            const result = await response.json()
+            
+            if (!response.ok) {
+              throw new Error(result.error || `Ошибка HTTP: ${response.status}`)
+            }
+            
+            if (!result.success) {
+              throw new Error(result.error || 'Неизвестная ошибка')
+            }
+            
+            await supabaseClient.auth.signOut()
+            
+            currentUser = null
+            localStorage.removeItem(STORAGE_KEYS.USER)
+            localStorage.removeItem(STORAGE_KEYS.LAST_SYNC)
+            localStorage.removeItem(STORAGE_KEYS.PENDING_CHANGES)
+            
+            currentSyncMode = SYNC_MODES.LOCAL
+            localStorage.setItem(STORAGE_KEYS.SYNC_MODE, SYNC_MODES.LOCAL)
+            
+            if (confirm('Очистить локальные данные на этом устройстве?')) {
+              lessons = []
+              saveLessonsToStorage()
+              calendar.refetchEvents()
+            }
+            
+            updateCloudUI()
+            showToast('✅ Профиль полностью удален', true)
+            
+            document.getElementById('settingsSheet').classList.remove('active')
+            
+          } catch (error) {
+            console.error('Ошибка удаления профиля:', error)
+            
+            let errorMessage = error.message
+            if (errorMessage.includes('Failed to fetch')) {
+              errorMessage = 'Не удалось подключиться к серверу. Проверьте интернет.'
+            } else if (errorMessage.includes('401')) {
+              errorMessage = 'Ошибка авторизации. Попробуйте войти заново.'
+            }
+            
+            // Предлагаем альтернативу
+            showConfirmModal(
+              '❌ Ошибка',
+              `${errorMessage}\n\nХотите очистить данные в облаке, но оставить профиль?`,
+              async () => {
+                await clearCloudData()
+                
+                await supabaseClient.auth.signOut()
+                currentUser = null
+                localStorage.removeItem(STORAGE_KEYS.USER)
+                currentSyncMode = SYNC_MODES.LOCAL
+                localStorage.setItem(STORAGE_KEYS.SYNC_MODE, SYNC_MODES.LOCAL)
+                updateCloudUI()
+                showToast('✅ Данные очищены, профиль сохранен', true)
+              }
+            )
+          }
+        }
+      )
     }
-    
-    console.log('Удаление пользователя:', currentUser.id, currentUser.email)
-    
-    // URL вашей Edge Function
-    const functionUrl = `${SUPABASE_URL}/functions/v1/delete-user`
-    
-    // Вызов Edge Function
-    const response = await fetch(functionUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${session.access_token}`
-      }
-    })
-    
-    const result = await response.json()
-    
-    if (!response.ok) {
-      throw new Error(result.error || `Ошибка HTTP: ${response.status}`)
-    }
-    
-    if (!result.success) {
-      throw new Error(result.error || 'Неизвестная ошибка')
-    }
-    
-    console.log('Профиль удален:', result)
-    
-    // Выходим из системы (на всякий случай)
-    await supabaseClient.auth.signOut()
-    
-    // Очищаем локальные данные пользователя
-    currentUser = null
-    localStorage.removeItem(STORAGE_KEYS.USER)
-    localStorage.removeItem(STORAGE_KEYS.LAST_SYNC)
-    localStorage.removeItem(STORAGE_KEYS.PENDING_CHANGES)
-    
-    // Переключаем на локальный режим
-    currentSyncMode = SYNC_MODES.LOCAL
-    localStorage.setItem(STORAGE_KEYS.SYNC_MODE, SYNC_MODES.LOCAL)
-    
-    // Очищаем локальные уроки (если пользователь хочет)
-    if (confirm('Очистить локальные данные на этом устройстве?')) {
-      lessons = []
-      saveLessonsToStorage()
-      calendar.refetchEvents()
-    }
-    
-    // Обновляем UI
-    updateCloudUI()
-    
-    showToast('✅ Профиль полностью удален', true)
-    
-    // Закрываем настройки
-    document.getElementById('settingsSheet').classList.remove('active')
-    
-  } catch (error) {
-    console.error('Ошибка удаления профиля:', error)
-    
-    let errorMessage = error.message
-    
-    // Понятные сообщения об ошибках
-    if (errorMessage.includes('Failed to fetch')) {
-      errorMessage = 'Не удалось подключиться к серверу. Проверьте интернет.'
-    } else if (errorMessage.includes('401')) {
-      errorMessage = 'Ошибка авторизации. Попробуйте войти заново.'
-    }
-    
-    if (confirm(`❌ ${errorMessage}\n\nХотите очистить данные в облаке, но оставить профиль?`)) {
-      await clearCloudData()
-      
-      // Выходим
-      await supabaseClient.auth.signOut()
-      currentUser = null
-      localStorage.removeItem(STORAGE_KEYS.USER)
-      currentSyncMode = SYNC_MODES.LOCAL
-      localStorage.setItem(STORAGE_KEYS.SYNC_MODE, SYNC_MODES.LOCAL)
-      updateCloudUI()
-      showToast('✅ Данные очищены, профиль сохранен', true)
-    } else {
-      showToast('❌ Ошибка удаления профиля', false)
-    }
-  }
+  )
 }
+
 // Очистка локальных данных (для кнопки "Очистить локально")
 function clearLocalData() {
-  if (confirm('⚠️ Очистить все ЛОКАЛЬНЫЕ данные на этом устройстве?\n\nДанные в облаке останутся нетронутыми.')) {
-    lessons = []
-    localStorage.removeItem('teacher_lessons')
-    localStorage.removeItem('teacher_settings')
-    localStorage.removeItem('teacher_theme')
-    localStorage.removeItem('teacher_notification')
+  showConfirmModal(
+    '⚠️ Очистить локальные данные',
+    'Вы действительно хотите очистить все ЛОКАЛЬНЫЕ данные на этом устройстве?\n\nДанные в облаке останутся нетронутыми.',
+    () => {
+      lessons = []
+      localStorage.removeItem('teacher_lessons')
+      localStorage.removeItem('teacher_settings')
+      localStorage.removeItem('teacher_theme')
+      localStorage.removeItem('teacher_notification')
+      
+      document.body.className = 'dark'
+      if (themeSelect) themeSelect.value = 'dark'
+      workHours = { from: "09:00", to: "18:00" }
+      
+      calendar.setOption('slotMinTime', workHours.from)
+      calendar.setOption('slotMaxTime', workHours.to)
+      calendar.refetchEvents()
+      calculateScrollerHeight()
+      
+      showToast('✅ Локальные данные очищены', true)
+    }
+  )
+}
+
+async function connectTelegram(chatId, telegramId) {
+  if (!currentUser) {
+    showToast('❌ Сначала войдите в облако', false)
+    return
+  }
+  
+  try {
+    const { error } = await supabaseClient
+      .from('telegram_users')
+      .upsert({
+        user_id: currentUser.id,
+        chat_id: chatId,
+        telegram_id: telegramId,
+        updated_at: new Date().toISOString()
+      })
     
-    document.body.className = 'dark'
-    if (themeSelect) themeSelect.value = 'dark'
-    workHours = { from: "09:00", to: "18:00" }
+    if (error) throw error
     
-    calendar.setOption('slotMinTime', workHours.from)
-    calendar.setOption('slotMaxTime', workHours.to)
-    calendar.refetchEvents()
-    calculateScrollerHeight()
-    
-    showToast('✅ Локальные данные очищены', true)
+    showToast('✅ Telegram подключен', true)
+  } catch (error) {
+    console.error('Ошибка подключения Telegram:', error)
+    showToast('❌ Ошибка подключения', false)
   }
 }
 
-
 // Очистка данных в облаке (НО профиль остается)
-async function clearCloudData() {
+function clearCloudData() {
   if (!currentUser) {
     showToast('❌ Нет подключения к облаку', false)
     return
   }
   
-  if (!confirm('⚠️ Удалить ВСЕ данные в облаке?\n\nУроки и настройки будут удалены.\nПрофиль (email) останется.')) {
-    return
-  }
-  
-  showToast('⏳ Очистка облака...', false)
-  
-  try {
-    // Удаляем все уроки пользователя
-    const { error: lessonsError } = await supabaseClient
-      .from('lessons')
-      .delete()
-      .eq('user_id', currentUser.id)
-    
-    if (lessonsError) throw lessonsError
-    
-    // Удаляем настройки пользователя
-    const { error: settingsError } = await supabaseClient
-      .from('user_settings')
-      .delete()
-      .eq('user_id', currentUser.id)
-    
-    if (settingsError && settingsError.code !== 'PGRST116') throw settingsError
-    
-    // Очищаем локальные уроки, если пользователь хочет
-    if (confirm('Очистить также локальные данные?')) {
-      lessons = []
-      saveLessonsToStorage()
+  showConfirmModal(
+    '⚠️ Очистить данные в облаке',
+    'Вы действительно хотите удалить ВСЕ данные в облаке?\n\nУроки и настройки будут удалены.\nПрофиль (email) останется.',
+    async () => {
+      showToast('⏳ Очистка облака...', false)
+      
+      try {
+        const { error: lessonsError } = await supabaseClient
+          .from('lessons')
+          .delete()
+          .eq('user_id', currentUser.id)
+        
+        if (lessonsError) throw lessonsError
+        
+        const { error: settingsError } = await supabaseClient
+          .from('user_settings')
+          .delete()
+          .eq('user_id', currentUser.id)
+        
+        if (settingsError && settingsError.code !== 'PGRST116') throw settingsError
+        
+        // Спрашиваем про локальные данные отдельно
+        if (confirm('Очистить также локальные данные?')) {
+          lessons = []
+          saveLessonsToStorage()
+        }
+        
+        calendar.refetchEvents()
+        showToast('✅ Данные в облаке очищены', true)
+      } catch (error) {
+        console.error('Ошибка очистки облака:', error)
+        showToast('❌ Ошибка при очистке облака', false)
+      }
     }
-    
-    calendar.refetchEvents()
-    
-    showToast('✅ Данные в облаке очищены', true)
-  } catch (error) {
-    console.error('Ошибка очистки облака:', error)
-    showToast('❌ Ошибка при очистке облака', false)
-  }
+  )
 }
 
 
