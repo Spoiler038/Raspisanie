@@ -7,6 +7,18 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="tailwind" content="true">
 
+  <!-- Supabase -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  
+  <!-- FullCalendar 2026 - правильные ссылки -->
+  <link href="https://cdn.jsdelivr.net/npm/fullcalendar@6/index.global.min.css" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6/index.global.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6/locales-all.global.min.js"></script>
+  
+  <!-- Tailwind -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>tailwind.config = { important: true }</script>
+  
   <!-- Подавление предупреждения Tailwind -->
   <script>
     const originalWarn = console.warn;
@@ -17,18 +29,7 @@
       originalWarn.apply(console, args);
     };
   </script>
-
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   
-  <!-- FullCalendar - правильные ссылки -->
-  <link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/main.min.css" rel="stylesheet">
-  <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/main.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/locales-all.min.js"></script>
-  
-  <!-- Tailwind -->
-  <script src="https://cdn.tailwindcss.com/3.4.1?plugins=forms"></script>
-  <script>tailwind.config = { important: true }</script>
-
   <style>
     html,
     body {
