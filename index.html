@@ -1264,7 +1264,10 @@ function showConfirmModal(title, message, onConfirm) {
 // ===== УПРАВЛЕНИЕ РЕЖИМАМИ ХРАНЕНИЯ =====
 function checkSyncMode() {
   const mode = localStorage.getItem(STORAGE_KEYS.SYNC_MODE)
+  console.log('Текущий режим:', mode) // Для отладки
+  
   if (!mode) {
+    console.log('Первый запуск - показываем выбор режима')
     // Первый запуск - показываем выбор режима
     document.getElementById('syncModeModal').style.display = 'flex'
   } else {
@@ -1901,7 +1904,7 @@ async function exportCloud() {
     
     if (lessonsError) throw lessonsError
     
-    // Загружаем настройки
+    // Загружаем настройки - используем upsert
     const { error: settingsError } = await supabaseClient
       .from('user_settings')
       .upsert({
@@ -1945,12 +1948,12 @@ async function importCloud() {
     
     if (lessonsError) throw lessonsError
     
-    // Загружаем настройки из облака
+    // Загружаем настройки из облака - ИСПРАВЛЕНО
     const { data: cloudSettings, error: settingsError } = await supabaseClient
       .from('user_settings')
       .select('*')
       .eq('user_id', currentUser.id)
-      .single()
+      .maybeSingle() // Вместо .single() используем .maybeSingle()
     
     if (settingsError && settingsError.code !== 'PGRST116') throw settingsError
     
@@ -2849,6 +2852,7 @@ function logoutCloud() {
 function updateCloudUI() {
   const cloudButton = document.getElementById('cloudActionButton')
   const profileSection = document.getElementById('profileSection')
+  const telegramSection = document.getElementById('telegramSection') // ДОБАВИТЬ
   const clearCloudButton = document.getElementById('clearCloudButton')
   const exportCloudBtn = document.querySelector('button[onclick="exportCloud()"]')
   const importCloudBtn = document.querySelector('button[onclick="importCloud()"]')
@@ -2861,6 +2865,7 @@ function updateCloudUI() {
       cloudButton.style.background = '#dc2626'
     }
     if (profileSection) profileSection.style.display = 'block'
+    if (telegramSection) telegramSection.style.display = 'block' // ДОБАВИТЬ - показываем Telegram секцию
     if (clearCloudButton) {
       clearCloudButton.disabled = false
       clearCloudButton.style.opacity = '1'
@@ -2886,6 +2891,7 @@ function updateCloudUI() {
       cloudButton.style.background = '#2563eb'
     }
     if (profileSection) profileSection.style.display = 'none'
+    if (telegramSection) telegramSection.style.display = 'none' // ДОБАВИТЬ - скрываем Telegram секцию
     if (clearCloudButton) {
       clearCloudButton.disabled = true
       clearCloudButton.style.opacity = '0.5'
@@ -3086,7 +3092,6 @@ let telegramChatId = null
 // Проверка статуса Telegram
 async function checkTelegramStatus() {
   if (!currentUser) {
-    showToast('❌ Сначала войдите в облако', false)
     return
   }
   
@@ -3151,7 +3156,7 @@ async function connectTelegram() {
   
   // Создаем уникальный код для глубинной ссылки
   const userId = currentUser.id
-  const botUsername = 'YOUR_BOT_USERNAME' // Замените на username вашего бота
+  const telegramLink = `https://t.me/${TELEGRAM_BOT_USERNAME}?start=${userId}`
   
   // Ссылка для перехода в бота
   const telegramLink = `https://t.me/${botUsername}?start=${userId}`
@@ -3313,19 +3318,17 @@ document.addEventListener('DOMContentLoaded', function() {
 
   handleEmailConfirmation()
 
-  setTimeout(() => {
-  updateCloudUI()
-}, 500)
-
   // Запускаем проверку оповещений
   startNotificationChecker()
   
+  // Обновляем UI (один раз, с небольшой задержкой)
+  setTimeout(() => {
+    updateCloudUI()
+  }, 500)
 
-  updateCloudUI()
   // Удаляем старую кнопку выхода
-const oldLogoutBtn = document.getElementById('logoutButton')
-if (oldLogoutBtn) oldLogoutBtn.style.display = 'none'
-
+  const oldLogoutBtn = document.getElementById('logoutButton')
+  if (oldLogoutBtn) oldLogoutBtn.style.display = 'none'
   
   // Запрашиваем разрешение на уведомления
   if (Notification.permission === "default") {
