@@ -6,6 +6,23 @@
   <title>Расписание</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="tailwind" content="true">
+  <!-- iOS-specific мета-теги -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Расписание">
+
+  <!-- iOS иконки разных размеров -->
+  <link rel="apple-touch-icon" href="icons/ios/icon-60x60.png">
+  <link rel="apple-touch-icon" sizes="76x76" href="icons/ios/icon-76x76.png">
+  <link rel="apple-touch-icon" sizes="120x120" href="icons/ios/icon-120x120.png">
+  <link rel="apple-touch-icon" sizes="152x152" href="icons/ios/icon-152x152.png">
+  <link rel="apple-touch-icon" sizes="167x167" href="icons/ios/icon-167x167.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="icons/ios/icon-180x180.png">
+
+
+
+
+
 
   <!-- ПОДАВЛЕНИЕ ПРЕДУПРЕЖДЕНИЯ - ДО Tailwind -->
   <script>
@@ -1186,10 +1203,10 @@ function startNotificationChecker() {
   setTimeout(checkNotifications, 5000)
 }
 
-// Проверка предстоящих уроков
+// Проверка предстоящих уроков - ИСПРАВЛЕННАЯ
 function checkNotifications() {
-  const notificationSetting = localStorage.getItem('teacher_notification') || 'Не оповещать'
-  if (notificationSetting === 'Не оповещать') return
+  const notificationSetting = localStorage.getItem('teacher_notification') || 'Не оповещать';
+  if (notificationSetting === 'Не оповещать') return;
   
   // Переводим настройку в минуты
   const minutesMap = {
@@ -1198,33 +1215,47 @@ function checkNotifications() {
     'За 6 часов': 360,
     'За 12 часов': 720,
     'За день': 1440
-  }
+  };
   
-  const notifyMinutes = minutesMap[notificationSetting]
-  if (!notifyMinutes) return
+  const notifyMinutes = minutesMap[notificationSetting];
+  if (!notifyMinutes) return;
   
-  const now = new Date()
+  const now = new Date();
   
   lessons.forEach(lesson => {
     // Если уже оповещали - пропускаем
-    if (notifiedLessons.has(lesson.id)) return
+    if (notifiedLessons.has(lesson.id)) return;
     
-    const lessonDateTime = new Date(`${lesson.date}T${lesson.time}`)
-    const diffMinutes = Math.floor((lessonDateTime - now) / (1000 * 60))
+    const lessonDateTime = new Date(`${lesson.date}T${lesson.time}`);
+    const diffMinutes = Math.floor((lessonDateTime - now) / (1000 * 60));
     
     // Если урок в прошлом - помечаем как оповещенный (чтобы больше не проверять)
     if (diffMinutes < 0) {
-      notifiedLessons.add(lesson.id)
-      return
+      notifiedLessons.add(lesson.id);
+      return;
     }
     
-    // Если время урока в пределах окна оповещения
-    if (diffMinutes <= notifyMinutes && diffMinutes > 0) {
-      // Показываем оповещение
-      showNotification(lesson)
-      notifiedLessons.add(lesson.id)
+    // Проверяем, нужно ли отправить уведомление (с окном точности)
+    // Увеличиваем окно для push уведомлений (чтобы не пропустить)
+    if (diffMinutes <= notifyMinutes && diffMinutes > notifyMinutes - 5) {
+      
+      // 1. Показываем браузерное уведомление (если разрешено)
+      if (Notification.permission === "granted") {
+        sendPushNotification(lesson);
+      }
+      
+      // 2. Показываем тост как дополнительное уведомление
+      showToast(`🔔 Через ${getTimeToLesson(lesson)} занятие с ${lesson.student}`, true);
+      
+      // 3. Если есть Telegram, отправляем и туда (ваша существующая логика)
+      if (telegramConnected) {
+        sendTelegramNotification(lesson, notificationSetting);
+      }
+      
+      // Помечаем как оповещенный
+      notifiedLessons.add(lesson.id);
     }
-  })
+  });
 }
 
 // Показ оповещения
@@ -2858,6 +2889,75 @@ async function updateTelegramNotificationSettings(setting) {
   }
 }
 
+// Отправка уведомления в Telegram
+async function sendTelegramNotification(lesson, interval) {
+  if (!telegramConnected || !telegramChatId) return;
+  
+  try {
+    const timeStr = lesson.time.substring(0, 5);
+    const durationHours = Math.floor(lesson.duration / 60);
+    const durationMins = lesson.duration % 60;
+    const durationStr = durationHours > 0 
+      ? `${durationHours}ч ${durationMins > 0 ? durationMins + 'м' : ''}`
+      : `${durationMins}м`;
+    
+    // Определяем текст интервала для отображения
+    const intervalText = {
+      'За 30 минут': '30 минут',
+      'За 1 час': 'часа',
+      'За 6 часов': '6 часов',
+      'За 12 часов': '12 часов',
+      'За день': '24 часа'
+    }[interval] || interval;
+    
+    // Текст уведомления
+    const message = `📅 <b>Напоминание о занятии</b>\n\n` +
+      `⏰ До начала: ${intervalText}\n` +
+      `👤 Ученик: ${lesson.student}\n` +
+      `🕐 Время: ${timeStr}\n` +
+      `⏱️ Длительность: ${durationStr}\n` +
+      (lesson.notes ? `📝 Заметки: ${lesson.notes}` : '');
+    
+    // Отправляем в Telegram
+    const response = await fetch(
+      `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          chat_id: telegramChatId,
+          text: message,
+          parse_mode: 'HTML'
+        })
+      }
+    );
+    
+    const result = await response.json();
+    
+    if (result.ok) {
+      console.log('📤 Telegram notification sent:', result);
+      
+      // СОХРАНЯЕМ В ТАБЛИЦУ notification_logs
+      await supabaseClient
+        .from('notification_logs')
+        .insert({
+          user_id: currentUser.id,
+          lesson_id: lesson.id,
+          sent_at: new Date().toISOString(),
+          type: 'telegram',
+          interval: interval
+        });
+      
+      console.log('✅ Уведомление сохранено в лог');
+    } else {
+      console.error('❌ Ошибка отправки в Telegram:', result);
+    }
+    
+  } catch (error) {
+    console.error('❌ Ошибка отправки Telegram уведомления:', error);
+  }
+}
+
 // Экспорт данных
 function exportData() {
   const data = {
@@ -3546,6 +3646,66 @@ setTimeout(() => {
 })
 
 
+  </script>
+
+  <script>
+    // Регистрация Service Worker
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', function() {
+      navigator.serviceWorker.register('sw.js').then(function(registration) {
+        console.log('ServiceWorker registered: ', registration);
+        
+        // Запрашиваем разрешение на уведомления
+        if (Notification.permission === 'default') {
+          Notification.requestPermission();
+        }
+      }, function(err) {
+        console.log('ServiceWorker registration failed: ', err);
+      });
+    });
+  }
+  
+  // Функция для отправки push-уведомления
+  async function sendPushNotification(lesson) {
+    if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+      console.log('Push уведомления не поддерживаются');
+      return;
+    }
+    
+    if (Notification.permission !== 'granted') {
+      console.log('Нет разрешения на уведомления');
+      return;
+    }
+    
+    // Создаем уведомление
+    const timeToLesson = getTimeToLesson(lesson);
+    const title = '📅 Напоминание о занятии';
+    const body = `Через ${timeToLesson} занятие с ${lesson.student}`;
+    
+    // Показываем уведомление через Service Worker
+    navigator.serviceWorker.ready.then(registration => {
+      registration.showNotification(title, {
+    body: body,
+    icon: '/icons/android/icon-192x192.png',  // Android использует это
+    badge: '/icons/android/icon-72x72.png',   // Маленькая иконка в статус-баре
+    vibrate: [200, 100, 200],
+    data: {
+      url: window.location.href,
+      lessonId: lesson.id
+    },
+    actions: [
+      {
+        action: 'open',
+        title: 'Открыть'
+      }
+    ]
+  });
+}
+    
+    // Также показываем toast (у вас уже есть)
+    showToast(`🔔 ${body}`, true);
+  }
+  
   </script>
 
 </body>
