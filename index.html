@@ -2331,7 +2331,7 @@ const calendar = new FullCalendar.Calendar(document.getElementById('calendar'), 
         const durationStr = arg.event.extendedProps.durationStr
         
         return {
-          html: `<div style="font-size:11px; padding:2px 4px; line-height:1.2;">
+          html: `<div style="font-size:11px; line-height:1.2;">
                   <div style="font-weight:bold; margin-bottom:1px;">${time} - ${endTime}</div>
                   <div>${student} (${durationStr})</div>
                 </div>`
