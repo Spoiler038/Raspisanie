@@ -155,7 +155,7 @@
     /* Стили для событий в режиме месяца - ТОЛЬКО ВРЕМЯ */
     .fc-daygrid-event {
       margin: 1px 2px !important;
-      padding: 1px 3px !important;
+      padding: 1px 0px !important;
       font-size: 11px !important;
       line-height: 1.2 !important;
       border-radius: 3px !important;
@@ -182,7 +182,6 @@
 
     /* Стили для событий в режиме недели и дня */
     .fc-timegrid-event {
-      padding: 2px 4px !important;
       font-size: 11px !important;
       line-height: 1.2 !important;
       background-color: var(--fc-event-bg-color) !important;
@@ -2321,7 +2320,7 @@ const calendar = new FullCalendar.Calendar(document.getElementById('calendar'), 
         const durationStr = arg.event.extendedProps.durationStr
         
         return {
-          html: `<div style="font-size:11px; padding:2px 4px; line-height:1.2;">
+          html: `<div style="font-size:11px; line-height:1.2;">
                   <div style="font-weight:bold; margin-bottom:1px;">${time} - ${endTime}</div>
                   <div>${student} (${durationStr})</div>
                 </div>`
