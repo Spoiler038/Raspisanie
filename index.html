@@ -7,34 +7,29 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="tailwind" content="true">
 
-  <!-- Supabase -->
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-
-  <!-- FullCalendar 2026 - правильные ссылки -->
-  <link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.css" rel="stylesheet">
-  <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/locales-all.global.min.js"></script>
-
-  <!-- Tailwind -->
-  <script>
-    // Перехватываем console.warn до загрузки Tailwind
-  (function() {
-    const originalWarn = console.warn;
-    console.warn = function(...args) {
-      // Проверяем, содержит ли сообщение текст о tailwindcss.com
-      if (args[0] && typeof args[0] === 'string' && 
-          args[0].includes('tailwindcss.com should not be used in production')) {
-        return; // Игнорируем это предупреждение
-      }
-      originalWarn.apply(console, args);
-    };
-  })();
-  </script>
+  <!-- Локальные файлы -->
+  <script src="js/supabase.js"></script>
+  <script src="js/fullcalendar.js"></script>
+  <script src="js/fullcalendar-locales.js"></script>
 
   <!-- Tailwind -->
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
     tailwind.config = { important: true }
+  </script>
+
+  <!-- Подавление предупреждения Tailwind -->
+  <script>
+    (function() {
+      const originalWarn = console.warn;
+      console.warn = function(...args) {
+        if (args[0] && typeof args[0] === 'string' && 
+            args[0].includes('tailwindcss.com should not be used in production')) {
+          return;
+        }
+        originalWarn.apply(console, args);
+      };
+    })();
   </script>
 
   <style>
@@ -916,7 +911,7 @@
         </select>
         </div>
         <div style="flex: 1;">
-          <div class="text-xs mb-1">Оповещение</div>
+          <div class="text-xs mb-1">Оповещение (⏰ будет с точностью ±2 минуты)</div>
           <select id="notificationSelect" style="padding: 8px; font-size: 14px;">
           <option>Не оповещать</option>
           <option>За 30 мин</option>
