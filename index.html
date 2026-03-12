@@ -16,20 +16,25 @@
   <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/locales-all.global.min.js"></script>
 
   <!-- Tailwind -->
-  <script src="https://cdn.tailwindcss.com"></script>
   <script>
-    tailwind.config = { important: true }
-  </script>
-
-  <!-- Подавление предупреждения Tailwind -->
-  <script>
+    // Перехватываем console.warn до загрузки Tailwind
+  (function() {
     const originalWarn = console.warn;
     console.warn = function(...args) {
-      if (args[0] && args[0].includes('tailwindcss.com should not be used in production')) {
-        return;
+      // Проверяем, содержит ли сообщение текст о tailwindcss.com
+      if (args[0] && typeof args[0] === 'string' && 
+          args[0].includes('tailwindcss.com should not be used in production')) {
+        return; // Игнорируем это предупреждение
       }
       originalWarn.apply(console, args);
     };
+  })();
+  </script>
+
+  <!-- Tailwind -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = { important: true }
   </script>
 
   <style>
@@ -3122,8 +3127,6 @@ async function checkTelegramStatus() {
         connectBtn.textContent = '📱 Управление'
         connectBtn.style.background = '#2563eb'
       }
-      
-      showTelegramControls(true)
     } else {
       telegramConnected = false
       telegramChatId = null
@@ -3133,76 +3136,13 @@ async function checkTelegramStatus() {
         connectBtn.textContent = '📱 Подключить'
         connectBtn.style.background = '#2563eb'
       }
-      
-      showTelegramControls(false)
     }
   } catch (error) {
     console.error('Ошибка проверки Telegram:', error)
   }
 }
 
-// Показать/скрыть элементы управления Telegram
-function showTelegramControls(connected) {
-  // Можно добавить дополнительные кнопки
-  const statusEl = document.getElementById('telegramStatus')
-  if (connected) {
-    // Добавляем кнопку отключения, если нужно
-  }
-}
-
-// Подключение Telegram
-// Специальная функция для Telegram (не использует showConfirmModal)
-function showTelegramModal() {
-  if (!currentUser) {
-    showToast('❌ Сначала войдите в облако', false)
-    return
-  }
-  
-  const userId = currentUser.id
-  const botUsername = TELEGRAM_BOT_USERNAME
-  const telegramLink = `https://t.me/${botUsername}?start=${userId}`
-  
-  const modal = document.getElementById('confirmModal')
-  const titleEl = document.getElementById('confirmModalTitle')
-  const messageEl = document.getElementById('confirmModalMessage')
-  const okBtn = document.getElementById('confirmModalOk')
-  const cancelBtn = document.getElementById('confirmModalCancel')
-  
-  titleEl.textContent = '📱 Подключение Telegram'
-  messageEl.innerHTML = 
-    '1. Нажмите "Открыть Telegram"<br>' +
-    '2. Нажмите /start в чате с ботом<br>' +
-    '3. Вернитесь и нажмите "Проверить"<br><br>' +
-    `<span style="color: #94a3b8;">ID: ${userId.substring(0, 8)}...</span>`
-  
-  // Создаём новые кнопки
-  const newOkBtn = okBtn.cloneNode(true)
-  const newCancelBtn = cancelBtn.cloneNode(true)
-  okBtn.parentNode.replaceChild(newOkBtn, okBtn)
-  cancelBtn.parentNode.replaceChild(newCancelBtn, cancelBtn)
-  
-  newOkBtn.textContent = '📱 Открыть Telegram'
-  newOkBtn.addEventListener('click', () => {
-    modal.style.display = 'none'
-    window.open(telegramLink, '_blank')
-  })
-  
-  newCancelBtn.textContent = 'Проверить'
-  newCancelBtn.addEventListener('click', () => {
-    modal.style.display = 'none'
-    checkTelegramStatus()
-  })
-  
-  modal.onclick = function(e) {
-    if (e.target === modal) {
-      modal.style.display = 'none'
-    }
-  }
-  
-  modal.style.display = 'flex'
-}
-
-// Подключение Telegram
+// Основная функция подключения Telegram
 async function connectTelegram() {
   if (!currentUser) {
     showToast('❌ Сначала войдите в облако', false)
@@ -3217,8 +3157,6 @@ async function connectTelegram() {
     return
   }
   
-  const telegramLink = `https://t.me/${botUsername}?start=${userId}`
-  
   // Проверяем текущий статус
   const { data } = await supabaseClient
     .from('telegram_users')
@@ -3231,11 +3169,12 @@ async function connectTelegram() {
     showTelegramManagementModal()
   } else {
     // Если не подключен, показываем окно подключения
+    const telegramLink = `https://t.me/${botUsername}?start=${userId}`
     showTelegramConnectModal(telegramLink, userId)
   }
 }
 
-// Модальное окно для подключения
+// Модальное окно для подключения (использует telegramModal)
 function showTelegramConnectModal(telegramLink, userId) {
   const modal = document.getElementById('telegramModal')
   const titleEl = document.getElementById('telegramModalTitle')
@@ -3243,24 +3182,7 @@ function showTelegramConnectModal(telegramLink, userId) {
   const okBtn = document.getElementById('telegramModalOk')
   const cancelBtn = document.getElementById('telegramModalCancel')
   
-  if (!modal) {
-    // Если отдельного модального окна нет, используем confirmModal
-    showConfirmModal(
-      '📱 Подключение Telegram',
-      `1. Нажмите "Открыть Telegram"\n` +
-      `2. Нажмите /start в чате с ботом\n` +
-      `3. Вернитесь и нажмите "Проверить"\n\n` +
-      `ID: ${userId.substring(0, 8)}...`,
-      () => {
-        window.open(telegramLink, '_blank')
-        showToast('✅ После нажатия /start, проверьте статус', true)
-        setTimeout(() => checkTelegramStatus(), 5000)
-      }
-    )
-    return
-  }
-  
-  // Используем отдельное модальное окно
+  // Обновляем заголовок и сообщение
   titleEl.textContent = '📱 Подключение Telegram'
   messageEl.innerHTML = 
     '1. Нажмите "Открыть Telegram"<br>' +
@@ -3268,25 +3190,29 @@ function showTelegramConnectModal(telegramLink, userId) {
     '3. Вернитесь и нажмите "Проверить"<br><br>' +
     `<span style="color: #94a3b8;">ID: ${userId.substring(0, 8)}...</span>`
   
+  // Создаём новые кнопки (чтобы убрать старые обработчики)
   const newOkBtn = okBtn.cloneNode(true)
   const newCancelBtn = cancelBtn.cloneNode(true)
   okBtn.parentNode.replaceChild(newOkBtn, okBtn)
   cancelBtn.parentNode.replaceChild(newCancelBtn, cancelBtn)
   
+  // Настраиваем кнопку "Открыть Telegram"
   newOkBtn.textContent = '📱 Открыть Telegram'
   newOkBtn.addEventListener('click', () => {
     modal.style.display = 'none'
     window.open(telegramLink, '_blank')
-    showToast('✅ После нажатия /start, проверьте статус', true)
-    setTimeout(() => checkTelegramStatus(), 5000)
+    showToast('✅ После нажатия /start в боте, нажмите "Проверить"', true)
   })
   
+  // Настраиваем кнопку "Проверить"
   newCancelBtn.textContent = '✅ Проверить'
+  newCancelBtn.style.background = '#10b981'
   newCancelBtn.addEventListener('click', () => {
     modal.style.display = 'none'
     checkTelegramStatus()
   })
   
+  // Закрытие по клику вне
   modal.onclick = function(e) {
     if (e.target === modal) {
       modal.style.display = 'none'
@@ -3304,21 +3230,10 @@ function showTelegramManagementModal() {
   const okBtn = document.getElementById('telegramModalOk')
   const cancelBtn = document.getElementById('telegramModalCancel')
   
-  if (!modal) {
-    // Если отдельного модального окна нет, используем confirmModal
-    showConfirmModal(
-      '📱 Управление Telegram',
-      'Что вы хотите сделать?',
-      async () => {
-        await disconnectTelegram()
-      }
-    )
-    return
-  }
-  
   titleEl.textContent = '📱 Управление Telegram'
   messageEl.innerHTML = 'Выберите действие:'
   
+  // Создаём новые кнопки
   const newOkBtn = okBtn.cloneNode(true)
   const newCancelBtn = cancelBtn.cloneNode(true)
   okBtn.parentNode.replaceChild(newOkBtn, okBtn)
@@ -3344,7 +3259,6 @@ function showTelegramManagementModal() {
   
   modal.style.display = 'flex'
 }
-  
 
 // Отключение Telegram
 async function disconnectTelegram() {
@@ -3365,7 +3279,6 @@ async function disconnectTelegram() {
     showToast('❌ Ошибка при отключении', false)
   }
 }
-
 
 // Восстановление при загрузке
 document.addEventListener('DOMContentLoaded', function() {
