@@ -7,10 +7,25 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="tailwind" content="true">
 
-  <!-- Локальные файлы -->
-  <script src="js/supabase.js"></script>
-  <script src="js/fullcalendar.js"></script>
-  <script src="js/fullcalendar-locales.js"></script>
+  <!-- ПОДАВЛЕНИЕ ПРЕДУПРЕЖДЕНИЯ - ДО Tailwind -->
+  <script>
+    // Полное отключение предупреждения Tailwind
+    (function() {
+      // Сохраняем оригинальный console.warn
+      const originalWarn = console.warn;
+      
+      // Заменяем на свою функцию
+      console.warn = function(...args) {
+        // Проверяем, содержит ли сообщение текст о tailwindcss.com
+        if (args[0] && typeof args[0] === 'string' && 
+            args[0].includes('tailwindcss.com should not be used in production')) {
+          return; // Игнорируем это предупреждение
+        }
+        // Все остальные предупреждения пропускаем
+        originalWarn.apply(console, args);
+      };
+    })();
+  </script>
 
   <!-- Tailwind -->
   <script src="https://cdn.tailwindcss.com"></script>
@@ -18,19 +33,10 @@
     tailwind.config = { important: true }
   </script>
 
-  <!-- Подавление предупреждения Tailwind -->
-  <script>
-    (function() {
-      const originalWarn = console.warn;
-      console.warn = function(...args) {
-        if (args[0] && typeof args[0] === 'string' && 
-            args[0].includes('tailwindcss.com should not be used in production')) {
-          return;
-        }
-        originalWarn.apply(console, args);
-      };
-    })();
-  </script>
+  <!-- Локальные файлы -->
+  <script src="js/supabase.js"></script>
+  <script src="js/fullcalendar.js"></script>
+  <script src="js/fullcalendar-locales.js"></script>
 
   <style>
     html,
@@ -911,7 +917,7 @@
         </select>
         </div>
         <div style="flex: 1;">
-          <div class="text-xs mb-1">Оповещение (⏰ точность ±2 минуты)</div>
+          <div class="text-xs mb-1">Оповещение (⏰ ±2 мин)</div>
           <select id="notificationSelect" style="padding: 8px; font-size: 14px;">
           <option>Не оповещать</option>
           <option>За 30 мин</option>
@@ -2789,17 +2795,41 @@ const workToEl = document.getElementById('workTo')
 if (workFromEl) workFromEl.addEventListener('change', saveWorkHours)
 if (workToEl) workToEl.addEventListener('change', saveWorkHours)
 
-// Сохранение настроек оповещений - ОБНОВЛЕННАЯ
+// Сохранение настроек оповещений - ИСПРАВЛЕННАЯ
 const notificationSelect = document.getElementById('notificationSelect')
 if (notificationSelect) {
-  notificationSelect.onchange = function() {
+  notificationSelect.onchange = async function() {
     const value = this.value
     localStorage.setItem('teacher_notification', value)
     showToast('Настройки оповещений сохранены', true)
     
-    // Если Telegram подключен, отправляем обновление в базу
-    if (currentUser && telegramConnected) {
-      updateTelegramNotificationSettings(value)
+    // Если пользователь авторизован, сохраняем в облако
+    if (currentUser) {
+      try {
+        // Сохраняем настройки в таблицу user_settings
+        const { error } = await supabaseClient
+          .from('user_settings')
+          .upsert({
+            user_id: currentUser.id,
+            work_from: workHours.from,
+            work_to: workHours.to,
+            theme: localStorage.getItem('teacher_theme') || 'dark',
+            notification_default: value,
+            updated_at: new Date().toISOString()
+          }, { onConflict: 'user_id' })
+        
+        if (error) throw error
+        
+        console.log('✅ Настройки сохранены в облако:', value)
+        
+        // Если Telegram подключен, отправляем уведомление
+        if (telegramConnected) {
+          await updateTelegramNotificationSettings(value)
+        }
+      } catch (error) {
+        console.error('❌ Ошибка сохранения настроек в облако:', error)
+        showToast('❌ Ошибка сохранения в облако', false)
+      }
     }
   }
 }
@@ -3521,4 +3551,3 @@ setTimeout(() => {
 </body>
 
 </html>
-
