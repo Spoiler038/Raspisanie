@@ -3,7 +3,7 @@ name: Telegram Lesson Notifications
 on:
   schedule:
     # Запуск каждые 15 минут
-    - cron: '*/15 * * * *'
+    - cron: '*/5 * * * *'
   # Возможность ручного запуска
   workflow_dispatch:
 
