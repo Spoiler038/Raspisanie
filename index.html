@@ -945,12 +945,12 @@
       </div>
 
       <div id="telegramSection" style="display: none; margin-bottom: 12px;">
-        <div class="text-xs mb-1">Telegram</div>
+        <div class="text-xs mb-1" id="telegramStatusTitle">Telegram не подключен ❌</div>
         <div style="display: flex; gap: 8px; align-items: center;">
           <button id="connectTelegramBtn" class="btn-primary" onclick="connectTelegram()" style="flex: 1; padding: 8px; font-size: 13px;">📱 Подключить</button>
-          <button id="telegramStatusBtn" class="btn-secondary" onclick="checkTelegramStatus()" style="width: 36px; padding: 8px;">🔍</button>
+          <button id="telegramStatusBtn" class="btn-secondary" onclick="checkTelegramStatus()" style="width: 36px; padding: 8px;">🔄</button>
         </div>
-        <div id="telegramStatus" class="text-xs mt-1" style="color: #94a3b8;"></div>
+        <!-- Убираем отдельный div для статуса, теперь статус только в заголовке -->
       </div>
 
       <div>
@@ -1024,6 +1024,18 @@
       <div class="modal-buttons" style="display: flex; flex-direction: column; gap: 8px;">
         <button id="confirmModalOk" class="btn-primary" style="width: 100%;">Подтвердить</button>
         <button id="confirmModalCancel" class="btn-secondary" style="width: 100%;">Отмена</button>
+      </div>
+    </div>
+  </div>
+
+
+  <div id="telegramModal" class="modal-overlay" style="display: none; z-index: 3000;">
+    <div class="modal" style="max-width: 300px;">
+      <div class="modal-title" id="telegramModalTitle">Подключение Telegram</div>
+      <div class="modal-content" id="telegramModalMessage" style="white-space: pre-line; min-height: 60px;"></div>
+      <div class="modal-buttons" style="display: flex; flex-direction: column; gap: 8px;">
+        <button id="telegramModalOk" class="btn-primary" style="width: 100%;">Открыть Telegram</button>
+        <button id="telegramModalCancel" class="btn-secondary" style="width: 100%;">Проверить</button>
       </div>
     </div>
   </div>
@@ -1223,7 +1235,7 @@ function getTimeToLesson(lesson) {
   return `${Math.floor(diffMin / 1440)} дней`
 }
 
-// Универсальная функция подтверждения
+// Универсальная функция подтверждения - ИСПРАВЛЕННАЯ
 function showConfirmModal(title, message, onConfirm) {
   const modal = document.getElementById('confirmModal')
   const titleEl = document.getElementById('confirmModalTitle')
@@ -1234,28 +1246,30 @@ function showConfirmModal(title, message, onConfirm) {
   titleEl.textContent = title
   messageEl.textContent = message
   
-  // Убираем предыдущие обработчики
+  // Убираем ВСЕ предыдущие обработчики
   const newOkBtn = okBtn.cloneNode(true)
   const newCancelBtn = cancelBtn.cloneNode(true)
   okBtn.parentNode.replaceChild(newOkBtn, okBtn)
   cancelBtn.parentNode.replaceChild(newCancelBtn, cancelBtn)
   
-  newOkBtn.addEventListener('click', () => {
+  // Добавляем обработчики на новые кнопки
+  newOkBtn.addEventListener('click', function() {
     modal.style.display = 'none'
-    onConfirm()
+    if (onConfirm) onConfirm()
   })
   
-  newCancelBtn.addEventListener('click', () => {
+  newCancelBtn.addEventListener('click', function() {
     modal.style.display = 'none'
   })
   
-  // Закрытие по клику вне
+  // Закрытие по клику вне модального окна
   modal.onclick = function(e) {
     if (e.target === modal) {
       modal.style.display = 'none'
     }
   }
   
+  // Открываем модальное окно
   modal.style.display = 'flex'
 }
 
@@ -2865,7 +2879,11 @@ function updateCloudUI() {
       cloudButton.style.background = '#dc2626'
     }
     if (profileSection) profileSection.style.display = 'block'
-    if (telegramSection) telegramSection.style.display = 'block' // ДОБАВИТЬ - показываем Telegram секцию
+    if (telegramSection) {
+  telegramSection.style.display = 'block'
+  // Проверяем статус при каждом открытии настроек
+  checkTelegramStatus()
+}
     if (clearCloudButton) {
       clearCloudButton.disabled = false
       clearCloudButton.style.opacity = '1'
@@ -3013,30 +3031,7 @@ function clearLocalData() {
   )
 }
 
-async function connectTelegram(chatId, telegramId) {
-  if (!currentUser) {
-    showToast('❌ Сначала войдите в облако', false)
-    return
-  }
-  
-  try {
-    const { error } = await supabaseClient
-      .from('telegram_users')
-      .upsert({
-        user_id: currentUser.id,
-        chat_id: chatId,
-        telegram_id: telegramId,
-        updated_at: new Date().toISOString()
-      })
-    
-    if (error) throw error
-    
-    showToast('✅ Telegram подключен', true)
-  } catch (error) {
-    console.error('Ошибка подключения Telegram:', error)
-    showToast('❌ Ошибка подключения', false)
-  }
-}
+
 
 // Очистка данных в облаке (НО профиль остается)
 function clearCloudData() {
@@ -3104,30 +3099,33 @@ async function checkTelegramStatus() {
     
     if (error) throw error
     
-    const statusEl = document.getElementById('telegramStatus')
+    const titleEl = document.getElementById('telegramStatusTitle')
     const connectBtn = document.getElementById('connectTelegramBtn')
     
     if (data) {
       telegramConnected = true
       telegramChatId = data.chat_id
       
-      const status = data.notifications_enabled ? '✅ Активны' : '❌ Отключены'
-      statusEl.innerHTML = `Статус: ${status}<br>ID: ${data.telegram_id || 'не указан'}`
+      // Меняем заголовок в зависимости от статуса уведомлений
+      if (data.notifications_enabled) {
+        titleEl.innerHTML = 'Telegram подключен ✅'
+      } else {
+        titleEl.innerHTML = 'Telegram отключен ⚠️'
+      }
       
       if (connectBtn) {
-        connectBtn.textContent = '🔄 Обновить подключение'
+        connectBtn.textContent = '📱 Управление'
         connectBtn.style.background = '#2563eb'
       }
       
-      // Показываем кнопку отключения в другом месте
       showTelegramControls(true)
     } else {
       telegramConnected = false
       telegramChatId = null
-      statusEl.textContent = '❌ Telegram не подключен'
+      titleEl.innerHTML = 'Telegram не подключен ❌'
       
       if (connectBtn) {
-        connectBtn.textContent = '📱 Подключить Telegram'
+        connectBtn.textContent = '📱 Подключить'
         connectBtn.style.background = '#2563eb'
       }
       
@@ -3148,35 +3146,17 @@ function showTelegramControls(connected) {
 }
 
 // Подключение Telegram
-async function connectTelegram() {
+// Специальная функция для Telegram (не использует showConfirmModal)
+function showTelegramModal() {
   if (!currentUser) {
     showToast('❌ Сначала войдите в облако', false)
     return
   }
   
-  // Создаем уникальный код для глубинной ссылки
   const userId = currentUser.id
-  const telegramLink = `https://t.me/${TELEGRAM_BOT_USERNAME}?start=${userId}`
+  const botUsername = TELEGRAM_BOT_USERNAME
+  const telegramLink = `https://t.me/${botUsername}?start=${userId}`
   
-  // Показываем модальное окно с инструкцией
-  showConfirmModal(
-    '📱 Подключение Telegram',
-    `1. Нажмите кнопку "Открыть Telegram"\n` +
-    `2. Нажмите /start в чате с ботом\n` +
-    `3. Вернитесь и проверьте статус\n\n` +
-    `Ваш ID для автоматического подключения: ${userId.substring(0, 8)}...`,
-    () => {
-      // Открываем Telegram в новой вкладке
-      window.open(telegramLink, '_blank')
-      
-      // Ждем подключения
-      setTimeout(() => {
-        checkTelegramStatus()
-      }, 5000)
-    }
-  )
-  
-  // Кастомное окно с кнопкой "Открыть Telegram"
   const modal = document.getElementById('confirmModal')
   const titleEl = document.getElementById('confirmModalTitle')
   const messageEl = document.getElementById('confirmModalMessage')
@@ -3190,7 +3170,7 @@ async function connectTelegram() {
     '3. Вернитесь и нажмите "Проверить"<br><br>' +
     `<span style="color: #94a3b8;">ID: ${userId.substring(0, 8)}...</span>`
   
-  // Меняем кнопки
+  // Создаём новые кнопки
   const newOkBtn = okBtn.cloneNode(true)
   const newCancelBtn = cancelBtn.cloneNode(true)
   okBtn.parentNode.replaceChild(newOkBtn, okBtn)
@@ -3200,14 +3180,6 @@ async function connectTelegram() {
   newOkBtn.addEventListener('click', () => {
     modal.style.display = 'none'
     window.open(telegramLink, '_blank')
-    
-    // Показываем уведомление
-    showToast('✅ После нажатия /start в боте, проверьте статус', true)
-    
-    // Проверяем статус через 5 секунд
-    setTimeout(() => {
-      checkTelegramStatus()
-    }, 5000)
   })
   
   newCancelBtn.textContent = 'Проверить'
@@ -3216,33 +3188,177 @@ async function connectTelegram() {
     checkTelegramStatus()
   })
   
+  modal.onclick = function(e) {
+    if (e.target === modal) {
+      modal.style.display = 'none'
+    }
+  }
+  
   modal.style.display = 'flex'
 }
+
+// Подключение Telegram
+async function connectTelegram() {
+  if (!currentUser) {
+    showToast('❌ Сначала войдите в облако', false)
+    return
+  }
+  
+  const userId = currentUser.id
+  const botUsername = TELEGRAM_BOT_USERNAME
+  
+  if (!botUsername || botUsername === 'YOUR_BOT_USERNAME') {
+    showToast('❌ Bot username не настроен', false)
+    return
+  }
+  
+  const telegramLink = `https://t.me/${botUsername}?start=${userId}`
+  
+  // Проверяем текущий статус
+  const { data } = await supabaseClient
+    .from('telegram_users')
+    .select('*')
+    .eq('user_id', currentUser.id)
+    .maybeSingle()
+  
+  if (data) {
+    // Если уже подключен, показываем меню управления
+    showTelegramManagementModal()
+  } else {
+    // Если не подключен, показываем окно подключения
+    showTelegramConnectModal(telegramLink, userId)
+  }
+}
+
+// Модальное окно для подключения
+function showTelegramConnectModal(telegramLink, userId) {
+  const modal = document.getElementById('telegramModal')
+  const titleEl = document.getElementById('telegramModalTitle')
+  const messageEl = document.getElementById('telegramModalMessage')
+  const okBtn = document.getElementById('telegramModalOk')
+  const cancelBtn = document.getElementById('telegramModalCancel')
+  
+  if (!modal) {
+    // Если отдельного модального окна нет, используем confirmModal
+    showConfirmModal(
+      '📱 Подключение Telegram',
+      `1. Нажмите "Открыть Telegram"\n` +
+      `2. Нажмите /start в чате с ботом\n` +
+      `3. Вернитесь и нажмите "Проверить"\n\n` +
+      `ID: ${userId.substring(0, 8)}...`,
+      () => {
+        window.open(telegramLink, '_blank')
+        showToast('✅ После нажатия /start, проверьте статус', true)
+        setTimeout(() => checkTelegramStatus(), 5000)
+      }
+    )
+    return
+  }
+  
+  // Используем отдельное модальное окно
+  titleEl.textContent = '📱 Подключение Telegram'
+  messageEl.innerHTML = 
+    '1. Нажмите "Открыть Telegram"<br>' +
+    '2. Нажмите /start в чате с ботом<br>' +
+    '3. Вернитесь и нажмите "Проверить"<br><br>' +
+    `<span style="color: #94a3b8;">ID: ${userId.substring(0, 8)}...</span>`
+  
+  const newOkBtn = okBtn.cloneNode(true)
+  const newCancelBtn = cancelBtn.cloneNode(true)
+  okBtn.parentNode.replaceChild(newOkBtn, okBtn)
+  cancelBtn.parentNode.replaceChild(newCancelBtn, cancelBtn)
+  
+  newOkBtn.textContent = '📱 Открыть Telegram'
+  newOkBtn.addEventListener('click', () => {
+    modal.style.display = 'none'
+    window.open(telegramLink, '_blank')
+    showToast('✅ После нажатия /start, проверьте статус', true)
+    setTimeout(() => checkTelegramStatus(), 5000)
+  })
+  
+  newCancelBtn.textContent = '✅ Проверить'
+  newCancelBtn.addEventListener('click', () => {
+    modal.style.display = 'none'
+    checkTelegramStatus()
+  })
+  
+  modal.onclick = function(e) {
+    if (e.target === modal) {
+      modal.style.display = 'none'
+    }
+  }
+  
+  modal.style.display = 'flex'
+}
+
+// Модальное окно для управления
+function showTelegramManagementModal() {
+  const modal = document.getElementById('telegramModal')
+  const titleEl = document.getElementById('telegramModalTitle')
+  const messageEl = document.getElementById('telegramModalMessage')
+  const okBtn = document.getElementById('telegramModalOk')
+  const cancelBtn = document.getElementById('telegramModalCancel')
+  
+  if (!modal) {
+    // Если отдельного модального окна нет, используем confirmModal
+    showConfirmModal(
+      '📱 Управление Telegram',
+      'Что вы хотите сделать?',
+      async () => {
+        await disconnectTelegram()
+      }
+    )
+    return
+  }
+  
+  titleEl.textContent = '📱 Управление Telegram'
+  messageEl.innerHTML = 'Выберите действие:'
+  
+  const newOkBtn = okBtn.cloneNode(true)
+  const newCancelBtn = cancelBtn.cloneNode(true)
+  okBtn.parentNode.replaceChild(newOkBtn, okBtn)
+  cancelBtn.parentNode.replaceChild(newCancelBtn, cancelBtn)
+  
+  newOkBtn.textContent = '🔌 Отключить уведомления'
+  newOkBtn.style.background = '#dc2626'
+  newOkBtn.addEventListener('click', async () => {
+    modal.style.display = 'none'
+    await disconnectTelegram()
+  })
+  
+  newCancelBtn.textContent = '❌ Закрыть'
+  newCancelBtn.addEventListener('click', () => {
+    modal.style.display = 'none'
+  })
+  
+  modal.onclick = function(e) {
+    if (e.target === modal) {
+      modal.style.display = 'none'
+    }
+  }
+  
+  modal.style.display = 'flex'
+}
+  
 
 // Отключение Telegram
 async function disconnectTelegram() {
   if (!currentUser) return
   
-  showConfirmModal(
-    '⚠️ Отключить Telegram',
-    'Вы действительно хотите отключить Telegram уведомления?',
-    async () => {
-      try {
-        const { error } = await supabaseClient
-          .from('telegram_users')
-          .update({ notifications_enabled: false })
-          .eq('user_id', currentUser.id)
-        
-        if (error) throw error
-        
-        showToast('✅ Telegram уведомления отключены', true)
-        checkTelegramStatus()
-      } catch (error) {
-        console.error('Ошибка отключения:', error)
-        showToast('❌ Ошибка при отключении', false)
-      }
-    }
-  )
+  try {
+    const { error } = await supabaseClient
+      .from('telegram_users')
+      .update({ notifications_enabled: false })
+      .eq('user_id', currentUser.id)
+    
+    if (error) throw error
+    
+    showToast('✅ Telegram уведомления отключены', true)
+    checkTelegramStatus()
+  } catch (error) {
+    console.error('Ошибка отключения:', error)
+    showToast('❌ Ошибка при отключении', false)
+  }
 }
 
 
