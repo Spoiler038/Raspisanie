@@ -960,7 +960,6 @@
           <button id="connectTelegramBtn" class="btn-primary" onclick="connectTelegram()" style="flex: 1; padding: 8px; font-size: 13px;">📱 Подключить</button>
           <button id="telegramStatusBtn" class="btn-secondary" onclick="checkTelegramStatus()" style="width: 36px; padding: 8px;">🔄</button>
         </div>
-        <!-- Убираем отдельный div для статуса, теперь статус только в заголовке -->
       </div>
 
       <div>
@@ -3094,9 +3093,12 @@ function clearCloudData() {
 let telegramConnected = false
 let telegramChatId = null
 
-// Проверка статуса Telegram
+// Проверка статуса Telegram - ИСПРАВЛЕННАЯ
 async function checkTelegramStatus() {
+  console.log('🔄 Проверка статуса Telegram...')
+  
   if (!currentUser) {
+    console.log('❌ Пользователь не авторизован')
     return
   }
   
@@ -3107,10 +3109,21 @@ async function checkTelegramStatus() {
       .eq('user_id', currentUser.id)
       .maybeSingle()
     
-    if (error) throw error
+    if (error) {
+      console.error('❌ Ошибка запроса:', error)
+      throw error
+    }
+    
+    console.log('📊 Данные из БД:', data)
     
     const titleEl = document.getElementById('telegramStatusTitle')
     const connectBtn = document.getElementById('connectTelegramBtn')
+    const statusBtn = document.getElementById('telegramStatusBtn')
+    
+    if (!titleEl || !connectBtn) {
+      console.error('❌ Элементы Telegram не найдены')
+      return
+    }
     
     if (data) {
       telegramConnected = true
@@ -3127,6 +3140,12 @@ async function checkTelegramStatus() {
         connectBtn.textContent = '📱 Управление'
         connectBtn.style.background = '#2563eb'
       }
+      
+      if (statusBtn) {
+        statusBtn.style.background = '#10b981' // зеленый для индикации
+      }
+      
+      console.log('✅ Telegram подключен:', data)
     } else {
       telegramConnected = false
       telegramChatId = null
@@ -3136,9 +3155,20 @@ async function checkTelegramStatus() {
         connectBtn.textContent = '📱 Подключить'
         connectBtn.style.background = '#2563eb'
       }
+      
+      if (statusBtn) {
+        statusBtn.style.background = '#64748b' // серый
+      }
+      
+      console.log('❌ Telegram не подключен')
     }
   } catch (error) {
-    console.error('Ошибка проверки Telegram:', error)
+    console.error('❌ Ошибка проверки Telegram:', error)
+    
+    const titleEl = document.getElementById('telegramStatusTitle')
+    if (titleEl) {
+      titleEl.innerHTML = 'Telegram ошибка ⚠️'
+    }
   }
 }
 
@@ -3357,6 +3387,13 @@ document.addEventListener('DOMContentLoaded', function() {
     updateCloudUI()
   }, 500)
 
+  // После updateCloudUI добавить:
+setTimeout(() => {
+  if (currentUser) {
+    checkTelegramStatus()
+  }
+}, 1000)
+
   // Удаляем старую кнопку выхода
   const oldLogoutBtn = document.getElementById('logoutButton')
   if (oldLogoutBtn) oldLogoutBtn.style.display = 'none'
@@ -3365,6 +3402,7 @@ document.addEventListener('DOMContentLoaded', function() {
   if (Notification.permission === "default") {
     Notification.requestPermission()
   }
+
 })
 
 
