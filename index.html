@@ -266,7 +266,6 @@
     select,
     textarea {
       width: 100%;
-      padding: 14px;
       border-radius: 12px;
       background: #ffffff;
       color: #020617 !important;
@@ -826,6 +825,13 @@
     body.dark {
       scrollbar-width: thin;
       scrollbar-color: #475569 #1e293b;
+    }
+
+    /* Только для полей в форме создания/редактирования урока */
+    .sheet-content input,
+    .sheet-content select,
+    .sheet-content textarea {
+      padding: 0px 8px !important;
     }
   </style>
 </head>
@@ -2320,7 +2326,7 @@ const calendar = new FullCalendar.Calendar(document.getElementById('calendar'), 
         const durationStr = arg.event.extendedProps.durationStr
         
         return {
-          html: `<div style="font-size:11px; line-height:1.2;">
+          html: `<div style="font-size:11px; padding:2px 4px; line-height:1.2;">
                   <div style="font-weight:bold; margin-bottom:1px;">${time} - ${endTime}</div>
                   <div>${student} (${durationStr})</div>
                 </div>`
