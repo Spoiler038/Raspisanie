@@ -3877,10 +3877,15 @@ window.testPushNotification = function() {
   }
 };
 
-// ТЕСТОВАЯ ФУНКЦИЯ ДЛЯ TELEGRAM
+// ТЕСТОВАЯ ФУНКЦИЯ ДЛЯ TELEGRAM - ИСПРАВЛЕННАЯ
 window.testTelegramNotification = async function() {
   if (!telegramConnected || !telegramChatId) {
     showToast('❌ Telegram не подключен', false);
+    return;
+  }
+  
+  if (!currentUser) {
+    showToast('❌ Нет активного пользователя', false);
     return;
   }
   
@@ -3893,6 +3898,14 @@ window.testTelegramNotification = async function() {
   showToast('⏳ Отправка тестового уведомления...', false);
   
   try {
+    // Получаем свежую сессию
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    
+    if (!session) {
+      showToast('❌ Нет активной сессии', false);
+      return;
+    }
+    
     const timeStr = lesson.time.substring(0, 5);
     const durationHours = Math.floor(lesson.duration / 60);
     const durationMins = lesson.duration % 60;
@@ -3905,26 +3918,31 @@ window.testTelegramNotification = async function() {
       `🕐 Время: ${timeStr}\n` +
       `⏱️ Длительность: ${durationStr}`;
     
+    // Отправляем через Edge Function (не напрямую в Telegram!)
     const response = await fetch(
-      `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`,
+      `${SUPABASE_URL}/functions/v1/telegram-send`,
       {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`
+        },
         body: JSON.stringify({
-          chat_id: telegramChatId,
-          text: message,
-          parse_mode: 'HTML'
+          chatId: telegramChatId,
+          message: message,
+          lessonId: lesson.id,
+          interval: 'test'
         })
       }
     );
     
     const result = await response.json();
     
-    if (result.ok) {
+    if (result.success) {
       showToast('✅ Тестовое уведомление отправлено!', true);
       console.log('✅ Результат:', result);
     } else {
-      showToast('❌ Ошибка: ' + result.description, false);
+      showToast('❌ Ошибка: ' + result.error, false);
       console.error('❌ Ошибка:', result);
     }
   } catch (error) {
