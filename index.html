@@ -1545,7 +1545,8 @@ async function handleLogin() {
         'Invalid login credentials': '❌ Неверный email или пароль',
         'Email not confirmed': '❌ Email не подтвержден. Проверьте почту',
         'Invalid email': '❌ Неверный формат email',
-        'Password should be at least 6 characters': '❌ Пароль должен быть не менее 6 символов'
+        'Password should be at least 6 characters': '❌ Пароль должен быть не менее 6 символов',
+        'Failed to fetch': '❌ Проверьте подключение к интернету'
       }
       
       const userMessage = errorMessages[error.message] || `❌ Ошибка: ${error.message}`
