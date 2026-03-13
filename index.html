@@ -3216,7 +3216,6 @@ function updateCloudUI() {
     }
     if (oldLogoutBtn) oldLogoutBtn.style.display = 'none'
     
-    setTimeout(() => checkTelegramStatus(), 500)
   } else {
     // Только локальный режим - кнопки неактивны
     if (cloudButton) {
@@ -3746,18 +3745,14 @@ document.addEventListener('DOMContentLoaded', function() {
   // Запускаем проверку оповещений
   startNotificationChecker()
   
-  // Обновляем UI (один раз, с небольшой задержкой)
-  setTimeout(() => {
+
+    setTimeout(() => {
     updateCloudUI()
-  }, 500)
-
-  // После updateCloudUI добавить:
-setTimeout(() => {
-  if (currentUser) {
-    checkTelegramStatus()
-  }
-}, 1000)
-
+    if (currentUser) {
+     checkTelegramStatus() // один раз, после обновления UI
+      }
+    } , 500)
+  
   // Удаляем старую кнопку выхода
   const oldLogoutBtn = document.getElementById('logoutButton')
   if (oldLogoutBtn) oldLogoutBtn.style.display = 'none'
