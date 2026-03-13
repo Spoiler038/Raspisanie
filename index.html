@@ -3572,7 +3572,7 @@ function showTelegramConnectModal(telegramLink, userId) {
   modal.style.display = 'flex'
 }
 
-// Модальное окно для управления - ИСПРАВЛЕНО
+// Модальное окно для управления - ДИНАМИЧЕСКАЯ КНОПКА
 function showTelegramManagementModal() {
   const modal = document.getElementById('telegramModal')
   const titleEl = document.getElementById('telegramModalTitle')
@@ -3586,37 +3586,54 @@ function showTelegramManagementModal() {
   titleEl.textContent = '📱 Управление Telegram'
   messageEl.innerHTML = 
     `Текущий статус: ${telegramConnected ? '✅ Подключен' : '❌ Не подключен'}<br><br>` +
-    `Текущие уведомления: ${notificationSetting}<br><br>` +
-    'Выберите действие:'
+    `Текущие уведомления: ${notificationSetting}`
   
-  // Создаём новую кнопку OK
+  // Создаём новую кнопку (только одну!)
   const newOkBtn = okBtn.cloneNode(true)
   okBtn.parentNode.replaceChild(newOkBtn, okBtn)
   
-  // Полностью удаляем кнопку Cancel (с проверкой)
+  // Полностью удаляем кнопку Cancel
   if (cancelBtn && cancelBtn.parentNode) {
     cancelBtn.parentNode.removeChild(cancelBtn)
   }
   
-  // Если подключен - показываем кнопку отключения
+  // Если подключен - показываем переключатель уведомлений
   if (telegramConnected) {
-    newOkBtn.textContent = '🔌 Отключить уведомления'
-    newOkBtn.style.background = '#dc2626'
-    newOkBtn.addEventListener('click', async () => {
-      modal.style.display = 'none'
-      await disconnectTelegram()
-    })
+    // Получаем текущий статус уведомлений из БД
+    supabaseClient
+      .from('telegram_users')
+      .select('notifications_enabled')
+      .eq('user_id', currentUser.id)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (data) {
+          const isEnabled = data.notifications_enabled;
+          
+          if (isEnabled) {
+            newOkBtn.textContent = '🔇 Отключить уведомления'
+            newOkBtn.style.background = '#dc2626'
+          } else {
+            newOkBtn.textContent = '🔔 Включить уведомления'
+            newOkBtn.style.background = '#10b981'
+          }
+          
+          newOkBtn.addEventListener('click', async () => {
+            modal.style.display = 'none'
+            // Переключаем статус уведомлений
+            await toggleTelegramNotifications(!isEnabled)
+          }, { once: true })
+        }
+      })
   } else {
     // Если не подключен - показываем кнопку подключения
     newOkBtn.textContent = '📱 Подключить Telegram'
     newOkBtn.style.background = '#2563eb'
     newOkBtn.addEventListener('click', () => {
       modal.style.display = 'none'
-      // Показываем окно подключения
       const userId = currentUser.id
       const telegramLink = `https://t.me/${TELEGRAM_BOT_USERNAME}?start=${userId}`
       showTelegramConnectModal(telegramLink, userId)
-    })
+    }, { once: true })
   }
   
   // Закрытие по клику вне области
@@ -3629,25 +3646,26 @@ function showTelegramManagementModal() {
   modal.style.display = 'flex'
 }
 
-// Отключение Telegram
-async function disconnectTelegram() {
+// Новая функция для переключения уведомлений
+async function toggleTelegramNotifications(enable) {
   if (!currentUser) return
   
   try {
     const { error } = await supabaseClient
       .from('telegram_users')
-      .update({ notifications_enabled: false })
+      .update({ notifications_enabled: enable })
       .eq('user_id', currentUser.id)
     
     if (error) throw error
     
-    showToast('✅ Telegram уведомления отключены', true)
-    checkTelegramStatus()
+    showToast(enable ? '✅ Уведомления включены' : '🔇 Уведомления отключены', true)
+    checkTelegramStatus() // обновляем статус в интерфейсе
   } catch (error) {
-    console.error('Ошибка отключения:', error)
-    showToast('❌ Ошибка при отключении', false)
+    console.error('Ошибка переключения уведомлений:', error)
+    showToast('❌ Ошибка при изменении настроек', false)
   }
 }
+
 
 // Функция показа модального окна загрузки
 function showLoadDataModal(message, showOk = false) {
@@ -3796,18 +3814,20 @@ async function sendPushNotification(lesson) {
     return;
   }
   
-  // Создаем уведомление
-  const timeToLesson = getTimeToLesson(lesson);
-  const title = '📅 Напоминание о занятии';
-  const body = `Через ${timeToLesson} занятие с ${lesson.student}`;
-  
-  // Показываем уведомление через Service Worker
-  navigator.serviceWorker.ready.then(registration => {
-    registration.showNotification(title, {
+  try {
+    const timeToLesson = getTimeToLesson(lesson);
+    const title = '📅 Напоминание о занятии';
+    const body = `Через ${timeToLesson} занятие с ${lesson.student}`;
+    
+    const registration = await navigator.serviceWorker.ready;
+    
+    await registration.showNotification(title, {
       body: body,
       icon: '/icons/android/icon-192x192.png',
       badge: '/icons/android/icon-72x72.png',
       vibrate: [200, 100, 200],
+      tag: `lesson-${lesson.id}`, // чтобы не дублировать
+      renotify: false,
       data: {
         url: window.location.href,
         lessonId: lesson.id
@@ -3819,10 +3839,12 @@ async function sendPushNotification(lesson) {
         }
       ]
     });
-  });
-  
-  // Также показываем toast (у вас уже есть)
-  showToast(`🔔 ${body}`, true);
+    
+    console.log('✅ Push-уведомление отправлено');
+    
+  } catch (error) {
+    console.error('❌ Ошибка отправки push:', error);
+  }
 }
   
   </script>
