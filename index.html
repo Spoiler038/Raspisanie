@@ -3957,7 +3957,7 @@ window.testPushNotification = function() {
   }
 };
 
-// ТЕСТОВАЯ ФУНКЦИЯ ДЛЯ TELEGRAM - ИСПРАВЛЕННАЯ
+// ИСПРАВЛЕННАЯ ТЕСТОВАЯ ФУНКЦИЯ ДЛЯ TELEGRAM
 window.testTelegramNotification = async function() {
   if (!telegramConnected || !telegramChatId) {
     showToast('❌ Telegram не подключен', false);
@@ -3974,16 +3974,22 @@ window.testTelegramNotification = async function() {
     return;
   }
   
-  const { data: { session } } = await supabaseClient.auth.getSession();
-  if (!session) {
-    showToast('❌ Нет активной сессии', false);
-    return;
-  }
-  
-  const lesson = lessons[0];
   showToast('⏳ Отправка тестового уведомления...', false);
   
   try {
+    // Получаем свежую сессию
+    const { data: { session }, error: sessionError } = await supabaseClient.auth.getSession();
+    
+    if (sessionError) throw sessionError;
+    
+    if (!session) {
+      showToast('❌ Нет активной сессии. Выполните вход заново', false);
+      return;
+    }
+    
+    console.log('✅ Сессия получена:', session.user.email);
+    
+    const lesson = lessons[0];
     const timeStr = lesson.time.substring(0, 5);
     const durationHours = Math.floor(lesson.duration / 60);
     const durationMins = lesson.duration % 60;
@@ -3996,14 +4002,17 @@ window.testTelegramNotification = async function() {
       `🕐 Время: ${timeStr}\n` +
       `⏱️ Длительность: ${durationStr}`;
     
-    // Отправляем через Edge Function
+    console.log('📤 Отправка запроса к Edge Function...');
+    
+    // Отправляем через Edge Function с правильными заголовками
     const response = await fetch(
       `${SUPABASE_URL}/functions/v1/telegram-send`,
       {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.access_token}`
+          'Authorization': `Bearer ${session.access_token}`,
+          'apikey': SUPABASE_KEY // Добавляем API ключ
         },
         body: JSON.stringify({
           chatId: telegramChatId,
@@ -4015,19 +4024,83 @@ window.testTelegramNotification = async function() {
     );
     
     const result = await response.json();
+    console.log('📥 Ответ от Edge Function:', result);
     
-    if (result.success) {
+    if (response.ok && result.success) {
       showToast('✅ Тестовое уведомление отправлено!', true);
-      console.log('✅ Результат:', result);
     } else {
-      showToast('❌ Ошибка: ' + result.error, false);
-      console.error('❌ Ошибка:', result);
+      showToast(`❌ Ошибка: ${result.error || 'Неизвестная ошибка'}`, false);
     }
   } catch (error) {
     console.error('❌ Ошибка:', error);
-    showToast('❌ Ошибка отправки', false);
+    showToast(`❌ Ошибка: ${error.message}`, false);
   }
 };
+
+// ТАКЖЕ ИСПРАВЛЯЕМ ФУНКЦИЮ sendTelegramNotification
+async function sendTelegramNotification(lesson, interval) {
+  if (!telegramConnected || !telegramChatId || !currentUser) return;
+  
+  try {
+    const { data: { session }, error: sessionError } = await supabaseClient.auth.getSession();
+    
+    if (sessionError || !session) {
+      console.error('❌ Нет активной сессии для отправки Telegram');
+      return;
+    }
+    
+    const timeStr = lesson.time.substring(0, 5);
+    const durationHours = Math.floor(lesson.duration / 60);
+    const durationMins = lesson.duration % 60;
+    const durationStr = durationHours > 0 
+      ? `${durationHours}ч ${durationMins > 0 ? durationMins + 'м' : ''}`
+      : `${durationMins}м`;
+    
+    const intervalText = {
+      'За 30 минут': '30 минут',
+      'За 1 час': 'часа',
+      'За 6 часов': '6 часов',
+      'За 12 часов': '12 часов',
+      'За день': '24 часа'
+    }[interval] || interval;
+    
+    const message = `📅 <b>Напоминание о занятии</b>\n\n` +
+      `⏰ До начала: ${intervalText}\n` +
+      `👤 Ученик: ${lesson.student}\n` +
+      `🕐 Время: ${timeStr}\n` +
+      `⏱️ Длительность: ${durationStr}\n` +
+      (lesson.notes ? `📝 Заметки: ${lesson.notes}` : '');
+    
+    const response = await fetch(
+      `${SUPABASE_URL}/functions/v1/telegram-send`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+          'apikey': SUPABASE_KEY
+        },
+        body: JSON.stringify({
+          chatId: telegramChatId,
+          message: message,
+          lessonId: lesson.id,
+          interval: interval
+        })
+      }
+    );
+    
+    const result = await response.json();
+    
+    if (result.success) {
+      console.log('✅ Telegram notification sent via Edge Function');
+    } else {
+      console.error('❌ Error from Edge Function:', result.error);
+    }
+    
+  } catch (error) {
+    console.error('❌ Ошибка отправки Telegram уведомления:', error);
+  }
+}
 
   
   </script>
