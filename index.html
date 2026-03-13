@@ -9,6 +9,7 @@
   <!-- PWA Manifest (для Android) -->
   <link rel="manifest" href="manifest.json">
   <!-- iOS-specific мета-теги -->
+  <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Расписание">
@@ -3840,6 +3841,102 @@ async function sendPushNotification(lesson) {
     console.error('❌ Ошибка отправки push:', error);
   }
 }
+
+// ТЕСТОВАЯ ФУНКЦИЯ ДЛЯ PUSH-УВЕДОМЛЕНИЙ
+window.testPushNotification = function() {
+  if (lessons.length === 0) {
+    showToast('❌ Нет уроков для теста', false);
+    return;
+  }
+  
+  // Берем первый урок для теста
+  const lesson = lessons[0];
+  
+  // Создаем тестовое уведомление
+  const timeToLesson = getTimeToLesson(lesson);
+  const title = '📅 ТЕСТОВОЕ уведомление';
+  const body = `Тест: ${lesson.student} через ${timeToLesson}`;
+  
+  // Показываем обычное уведомление (не через Service Worker)
+  if (Notification.permission === 'granted') {
+    new Notification(title, {
+      body: body,
+      icon: '/icons/android/icon-192x192.png',
+      vibrate: [200, 100, 200]
+    });
+    showToast('✅ Тестовое уведомление отправлено', true);
+  } else if (Notification.permission !== 'denied') {
+    Notification.requestPermission().then(permission => {
+      if (permission === 'granted') {
+        new Notification(title, {
+          body: body,
+          icon: '/icons/android/icon-192x192.png',
+          vibrate: [200, 100, 200]
+        });
+        showToast('✅ Тестовое уведомление отправлено', true);
+      }
+    });
+  } else {
+    showToast('❌ Нет разрешения на уведомления', false);
+  }
+};
+
+// ТЕСТОВАЯ ФУНКЦИЯ ДЛЯ TELEGRAM
+window.testTelegramNotification = async function() {
+  if (!telegramConnected || !telegramChatId) {
+    showToast('❌ Telegram не подключен', false);
+    return;
+  }
+  
+  if (lessons.length === 0) {
+    showToast('❌ Нет уроков для теста', false);
+    return;
+  }
+  
+  const lesson = lessons[0];
+  showToast('⏳ Отправка тестового уведомления...', false);
+  
+  try {
+    const timeStr = lesson.time.substring(0, 5);
+    const durationHours = Math.floor(lesson.duration / 60);
+    const durationMins = lesson.duration % 60;
+    const durationStr = durationHours > 0 
+      ? `${durationHours}ч ${durationMins > 0 ? durationMins + 'м' : ''}`
+      : `${durationMins}м`;
+    
+    const message = `🔔 ТЕСТОВОЕ УВЕДОМЛЕНИЕ\n\n` +
+      `👤 Ученик: ${lesson.student}\n` +
+      `🕐 Время: ${timeStr}\n` +
+      `⏱️ Длительность: ${durationStr}`;
+    
+    const response = await fetch(
+      `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          chat_id: telegramChatId,
+          text: message,
+          parse_mode: 'HTML'
+        })
+      }
+    );
+    
+    const result = await response.json();
+    
+    if (result.ok) {
+      showToast('✅ Тестовое уведомление отправлено!', true);
+      console.log('✅ Результат:', result);
+    } else {
+      showToast('❌ Ошибка: ' + result.description, false);
+      console.error('❌ Ошибка:', result);
+    }
+  } catch (error) {
+    console.error('❌ Ошибка:', error);
+    showToast('❌ Ошибка отправки', false);
+  }
+};
+
   
   </script>
 
