@@ -6,6 +6,8 @@
   <title>Расписание</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="tailwind" content="true">
+  <!-- PWA Manifest (для Android) -->
+  <link rel="manifest" href="manifest.json">
   <!-- iOS-specific мета-теги -->
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -976,7 +978,7 @@
         <div class="text-xs mb-1" id="telegramStatusTitle">Telegram не подключен ❌</div>
         <div style="display: flex; gap: 8px; align-items: center;">
           <button id="connectTelegramBtn" class="btn-primary" onclick="connectTelegram()" style="flex: 1; padding: 8px; font-size: 13px;">📱 Подключить</button>
-          <button id="telegramStatusBtn" class="btn-secondary" onclick="checkTelegramStatus()" style="width: 36px; padding: 8px;">🔄</button>
+          <button id="telegramStatusBtn" class="btn-secondary" onclick="checkTelegramStatus(true)" style="width: 36px; padding: 8px;">🔄</button>
         </div>
       </div>
 
@@ -2149,23 +2151,7 @@ function showToast(message, isSuccess = false) {
   }, 3000)
 }
 
-// Проверка валидности времени работы
-function validateWorkHours(fromTime, toTime) {
-  if (!fromTime || !toTime) {
-    showToast('Введите время начала и окончания работы')
-    return false
-  }
-  
-  const fromDate = new Date(`2000-01-01T${fromTime}`)
-  const toDate = new Date(`2000-01-01T${toTime}`)
-  
-  if (fromDate >= toDate) {
-    showToast('Время окончания работы должно быть позже времени начала')
-    return false
-  }
-  
-  return true
-}
+
 
 // Инициализация базы данных
 function initStorage() {
@@ -2884,15 +2870,15 @@ if (themeSelect) {
   }
 }
 
-// Сохранение режима работы с валидацией
+// Сохранение режима работы с валидацией - ИСПРАВЛЕНО
 function saveWorkHours() {
   const workFrom = document.getElementById('workFrom')
   const workTo = document.getElementById('workTo')
   
   if (workFrom && workTo) {
     if (!validateWorkHours(workFrom.value, workTo.value)) {
-      workFrom.value = workHours.from
-      workTo.value = workHours.to
+      // Если валидация не пройдена - просто показываем сообщение
+      // НЕ возвращаем старые значения!
       return
     }
     
@@ -2908,6 +2894,24 @@ function saveWorkHours() {
     
     showToast('Время работы успешно сохранено', true)
   }
+}
+
+// Функция валидации - ТОЛЬКО проверяет, но не меняет значения
+function validateWorkHours(fromTime, toTime) {
+  if (!fromTime || !toTime) {
+    showToast('Введите время начала и окончания работы')
+    return false
+  }
+  
+  const fromDate = new Date(`2000-01-01T${fromTime}`)
+  const toDate = new Date(`2000-01-01T${toTime}`)
+  
+  if (fromDate >= toDate) {
+    showToast('Время окончания работы должно быть позже времени начала')
+    return false
+  }
+  
+  return true
 }
 
 const workFromEl = document.getElementById('workFrom')
@@ -3047,7 +3051,7 @@ async function sendTelegramNotification(lesson, interval) {
   }
 }
 
-// Экспорт данных
+// Экспорт данных - ИСПРАВЛЕНО
 function exportData() {
   const data = {
     lessons: lessons,
@@ -3067,9 +3071,16 @@ function exportData() {
   const linkElement = document.createElement('a')
   linkElement.setAttribute('href', dataUri)
   linkElement.setAttribute('download', exportFileDefaultName)
-  linkElement.click()
   
-  showToast('Данные экспортированы', true)
+  // Вешаем обработчик на событие click, чтобы показать уведомление ПОСЛЕ сохранения
+  linkElement.addEventListener('click', () => {
+    // Небольшая задержка, чтобы файл точно начал скачиваться
+    setTimeout(() => {
+      showToast('✅ Данные экспортированы', true)
+    }, 100)
+  })
+  
+  linkElement.click()
 }
 
 // Импорт данных
@@ -3388,12 +3399,20 @@ function clearCloudData() {
 let telegramConnected = false
 let telegramChatId = null
 
-// Проверка статуса Telegram - ИСПРАВЛЕННАЯ
-async function checkTelegramStatus() {
+// Проверка статуса Telegram - ИСПРАВЛЕННАЯ С УВЕДОМЛЕНИЕМ
+async function checkTelegramStatus(showNotification = false) {
   console.log('🔄 Проверка статуса Telegram...')
+  
+  // Если showNotification = true, показываем уведомление о начале проверки
+  if (showNotification) {
+    showToast('⏳ Проверка статуса Telegram...', false);
+  }
   
   if (!currentUser) {
     console.log('❌ Пользователь не авторизован')
+    if (showNotification) {
+      showToast('❌ Сначала войдите в облако', false);
+    }
     return
   }
   
@@ -3421,11 +3440,17 @@ async function checkTelegramStatus() {
       // Меняем заголовок
       if (data.notifications_enabled) {
         titleEl.innerHTML = 'Telegram подключен ✅'
+        if (showNotification) {
+          showToast('✅ Telegram подключен и активен', true);
+        }
       } else {
         titleEl.innerHTML = 'Telegram отключен ⚠️'
+        if (showNotification) {
+          showToast('⚠️ Telegram подключен, но уведомления отключены', false);
+        }
       }
       
-      // ВАЖНО: кнопка должна быть "Управление" в любом случае, если данные есть
+      // Кнопка "Управление" в любом случае, если данные есть
       connectBtn.textContent = '📱 Управление'
       connectBtn.style.background = '#2563eb'
       
@@ -3437,6 +3462,10 @@ async function checkTelegramStatus() {
       telegramChatId = null
       titleEl.innerHTML = 'Telegram не подключен ❌'
       
+      if (showNotification) {
+        showToast('❌ Telegram не подключен. Нажмите "Подключить"', false);
+      }
+      
       // Только если нет данных - кнопка "Подключить"
       connectBtn.textContent = '📱 Подключить'
       connectBtn.style.background = '#2563eb'
@@ -3447,6 +3476,15 @@ async function checkTelegramStatus() {
     }
   } catch (error) {
     console.error('❌ Ошибка проверки Telegram:', error)
+    
+    const titleEl = document.getElementById('telegramStatusTitle')
+    if (titleEl) {
+      titleEl.innerHTML = 'Telegram ошибка ⚠️'
+    }
+    
+    if (showNotification) {
+      showToast('❌ Ошибка при проверке статуса', false);
+    }
   }
 }
 
@@ -3535,7 +3573,7 @@ function showTelegramConnectModal(telegramLink, userId) {
   modal.style.display = 'flex'
 }
 
-// Модальное окно для управления
+// Модальное окно для управления - ИСПРАВЛЕНО
 function showTelegramManagementModal() {
   const modal = document.getElementById('telegramModal')
   const titleEl = document.getElementById('telegramModalTitle')
@@ -3548,27 +3586,41 @@ function showTelegramManagementModal() {
   
   titleEl.textContent = '📱 Управление Telegram'
   messageEl.innerHTML = 
+    `Текущий статус: ${telegramConnected ? '✅ Подключен' : '❌ Не подключен'}<br><br>` +
     `Текущие уведомления: ${notificationSetting}<br><br>` +
     'Выберите действие:'
   
-  // Создаём новые кнопки
+  // Создаём новую кнопку OK
   const newOkBtn = okBtn.cloneNode(true)
-  const newCancelBtn = cancelBtn.cloneNode(true)
   okBtn.parentNode.replaceChild(newOkBtn, okBtn)
-  cancelBtn.parentNode.replaceChild(newCancelBtn, cancelBtn)
   
-  newOkBtn.textContent = '🔌 Отключить уведомления'
-  newOkBtn.style.background = '#dc2626'
-  newOkBtn.addEventListener('click', async () => {
-    modal.style.display = 'none'
-    await disconnectTelegram()
-  })
+  // Полностью удаляем кнопку Cancel (с проверкой)
+  if (cancelBtn && cancelBtn.parentNode) {
+    cancelBtn.parentNode.removeChild(cancelBtn)
+  }
   
-  newCancelBtn.textContent = '❌ Закрыть'
-  newCancelBtn.addEventListener('click', () => {
-    modal.style.display = 'none'
-  })
+  // Если подключен - показываем кнопку отключения
+  if (telegramConnected) {
+    newOkBtn.textContent = '🔌 Отключить уведомления'
+    newOkBtn.style.background = '#dc2626'
+    newOkBtn.addEventListener('click', async () => {
+      modal.style.display = 'none'
+      await disconnectTelegram()
+    })
+  } else {
+    // Если не подключен - показываем кнопку подключения
+    newOkBtn.textContent = '📱 Подключить Telegram'
+    newOkBtn.style.background = '#2563eb'
+    newOkBtn.addEventListener('click', () => {
+      modal.style.display = 'none'
+      // Показываем окно подключения
+      const userId = currentUser.id
+      const telegramLink = `https://t.me/${TELEGRAM_BOT_USERNAME}?start=${userId}`
+      showTelegramConnectModal(telegramLink, userId)
+    })
+  }
   
+  // Закрытие по клику вне области
   modal.onclick = function(e) {
     if (e.target === modal) {
       modal.style.display = 'none'
