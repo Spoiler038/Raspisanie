@@ -2744,7 +2744,58 @@ async function saveLesson() {
   showToast('Занятие сохранено', true)
 }
 
+// Повторная синхронизация отложенных изменений
+async function retryPendingSync() {
+  if (!currentUser || currentSyncMode !== SYNC_MODES.CLOUD) return;
+  
+  if (pendingChanges.length === 0) {
+    console.log('✅ Нет отложенных изменений');
+    return;
+  }
+  
+  console.log('🔄 Повторная синхронизация отложенных изменений:', pendingChanges);
+  
+  const changes = [...pendingChanges];
+  pendingChanges = [];
+  localStorage.removeItem(STORAGE_KEYS.PENDING_CHANGES);
+  
+  for (const change of changes) {
+    try {
+      if (change.action === 'delete') {
+        // Повторная попытка удаления
+        const { error } = await supabaseClient
+          .from('lessons')
+          .delete()
+          .eq('user_id', currentUser.id)
+          .eq('lesson_id', change.lesson_id);
+        
+        if (error) throw error;
+        console.log('✅ Урок удален из облака (повторно):', change.lesson_id);
+        
+      } else if (change.action === 'insert' || change.action === 'update') {
+        // Повторная попытка вставки/обновления
+        await syncLessonToCloud(change.lesson, change.action);
+      }
+      
+    } catch (error) {
+      console.error('❌ Ошибка повторной синхронизации:', error);
+      
+      // Добавляем обратно в очередь
+      pendingChanges.push(change);
+      localStorage.setItem(STORAGE_KEYS.PENDING_CHANGES, JSON.stringify(pendingChanges));
+    }
+  }
+  
+  if (pendingChanges.length > 0) {
+    console.log('⚠️ Остались несинхронизированные изменения:', pendingChanges.length);
+  } else {
+    console.log('✅ Все изменения синхронизированы');
+  }
+}
+
 async function syncLessonToCloud(lesson, action) {
+  console.log('🔄 Синхронизация урока с облаком:', { lesson, action });
+  
   try {
     const lessonData = {
       user_id: currentUser.id,
@@ -2753,30 +2804,40 @@ async function syncLessonToCloud(lesson, action) {
       date: lesson.date,
       time: lesson.time,
       duration: lesson.duration,
-      notes: lesson.notes,
+      notes: lesson.notes || '',
       notification_time: lesson.notification_time,
       updated_at: new Date().toISOString()
     }
     
+    console.log('📤 Отправка данных в Supabase:', lessonData);
+    
     if (action === 'insert') {
-      const { error } = await supabaseClient
+      const { data, error } = await supabaseClient
         .from('lessons')
         .insert([lessonData])
       
       if (error) throw error
+      console.log('✅ Урок вставлен в облако:', data);
     } else {
-      const { error } = await supabaseClient
+      const { data, error } = await supabaseClient
         .from('lessons')
         .update(lessonData)
         .eq('user_id', currentUser.id)
         .eq('lesson_id', lesson.id)
       
       if (error) throw error
+      console.log('✅ Урок обновлен в облаке:', data);
     }
     
-    console.log('Урок синхронизирован с облаком')
+    console.log('✅ Урок синхронизирован с облаком');
+    
+    // Показываем тост об успешной синхронизации
+    showToast('✅ Данные синхронизированы с облаком', true);
+    
   } catch (error) {
-    console.log('Ошибка синхронизации урока:', error)
+    console.error('❌ Ошибка синхронизации урока:', error);
+    showToast('❌ Ошибка синхронизации с облаком', false);
+    
     // Добавляем в очередь на повторную синхронизацию
     pendingChanges.push({
       action,
@@ -2818,15 +2879,33 @@ async function deleteLesson() {
     lessons = lessons.filter(l => l.id !== editingLessonId);
     saveLessonsToStorage();
     
+    // Если есть пользователь и облачный режим - удаляем из Supabase
     if (currentUser && currentSyncMode === SYNC_MODES.CLOUD && deletedLesson) {
       try {
-        await supabaseClient
+        console.log('🔄 Удаление урока из облака:', deletedLesson.id);
+        
+        const { error } = await supabaseClient
           .from('lessons')
           .delete()
           .eq('user_id', currentUser.id)
           .eq('lesson_id', editingLessonId);
+        
+        if (error) throw error;
+        
+        console.log('✅ Урок удален из облака');
+        
       } catch (error) {
-        console.log('Ошибка удаления из облака:', error);
+        console.error('❌ Ошибка удаления из облака:', error);
+        
+        // Добавляем в очередь на повторное удаление
+        pendingChanges.push({
+          action: 'delete',
+          lesson_id: editingLessonId,
+          timestamp: new Date().toISOString()
+        });
+        localStorage.setItem(STORAGE_KEYS.PENDING_CHANGES, JSON.stringify(pendingChanges));
+        
+        showToast('⚠️ Будет удалено при следующей синхронизации', false);
       }
     }
     
