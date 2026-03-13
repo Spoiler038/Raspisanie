@@ -3666,6 +3666,18 @@ async function toggleTelegramNotifications(enable) {
   }
 }
 
+    // ВРЕМЕННО: тест push-уведомления
+function testPushNotification() {
+  if (lessons.length > 0) {
+    sendPushNotification(lessons[0]);
+  } else {
+    showToast('Нет уроков для теста', false);
+  }
+}
+
+// Вызовите в консоли:
+// testPushNotification()
+
 
 // Функция показа модального окна загрузки
 function showLoadDataModal(message, showOk = false) {
@@ -3852,3 +3864,4 @@ async function sendPushNotification(lesson) {
 </body>
 
 </html>
+
