@@ -1,4 +1,3 @@
-// sw.js - Service Worker
 const CACHE_NAME = 'raspisanie-v1';
 const urlsToCache = [
   '/Raspisanie/',
@@ -42,7 +41,6 @@ self.addEventListener('fetch', event => {
   event.respondWith(
     caches.match(event.request)
       .then(response => {
-        // Возвращаем из кэша или делаем запрос
         return response || fetch(event.request);
       })
   );
@@ -52,32 +50,35 @@ self.addEventListener('fetch', event => {
 self.addEventListener('push', event => {
   if (!event.data) return;
   
-  const data = event.data.json();
-  console.log('Push received:', data);
-  
-  const options = {
-    body: data.body || 'Напоминание о занятии',
-    icon: '/icons/icon-192x192.png',
-    badge: '/icons/icon-72x72.png',
-    vibrate: [200, 100, 200],
-    data: {
-      url: data.url || '/Raspisanie/',
-      lessonId: data.lessonId
-    },
-    actions: [
-      {
-        action: 'open',
-        title: 'Открыть'
-      }
-    ]
-  };
-  
-  event.waitUntil(
-    self.registration.showNotification(
-      data.title || '📅 Расписание',
-      options
-    )
-  );
+  try {
+    const data = event.data.json();
+    
+    const options = {
+      body: data.body || 'Напоминание о занятии',
+      icon: '/icons/android/icon-192x192.png',
+      badge: '/icons/android/icon-72x72.png',
+      vibrate: [200, 100, 200],
+      data: {
+        url: data.url || '/Raspisanie/',
+        lessonId: data.lessonId
+      },
+      actions: [
+        {
+          action: 'open',
+          title: 'Открыть'
+        }
+      ]
+    };
+    
+    event.waitUntil(
+      self.registration.showNotification(
+        data.title || '📅 Расписание',
+        options
+      )
+    );
+  } catch (error) {
+    console.error('Push notification error:', error);
+  }
 });
 
 // Обработка клика по уведомлению
