@@ -3790,45 +3790,45 @@ setTimeout(() => {
   }
   
   // Функция для отправки push-уведомления
-  async function sendPushNotification(lesson) {
-    if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
-      console.log('Push уведомления не поддерживаются');
-      return;
-    }
-    
-    if (Notification.permission !== 'granted') {
-      console.log('Нет разрешения на уведомления');
-      return;
-    }
-    
-    // Создаем уведомление
-    const timeToLesson = getTimeToLesson(lesson);
-    const title = '📅 Напоминание о занятии';
-    const body = `Через ${timeToLesson} занятие с ${lesson.student}`;
-    
-    // Показываем уведомление через Service Worker
-    navigator.serviceWorker.ready.then(registration => {
-      registration.showNotification(title, {
-    body: body,
-    icon: '/icons/android/icon-192x192.png',  // Android использует это
-    badge: '/icons/android/icon-72x72.png',   // Маленькая иконка в статус-баре
-    vibrate: [200, 100, 200],
-    data: {
-      url: window.location.href,
-      lessonId: lesson.id
-    },
-    actions: [
-      {
-        action: 'open',
-        title: 'Открыть'
-      }
-    ]
-  });
-}
-    
-    // Также показываем toast (у вас уже есть)
-    showToast(`🔔 ${body}`, true);
+async function sendPushNotification(lesson) {
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+    console.log('Push уведомления не поддерживаются');
+    return;
   }
+  
+  if (Notification.permission !== 'granted') {
+    console.log('Нет разрешения на уведомления');
+    return;
+  }
+  
+  // Создаем уведомление
+  const timeToLesson = getTimeToLesson(lesson);
+  const title = '📅 Напоминание о занятии';
+  const body = `Через ${timeToLesson} занятие с ${lesson.student}`;
+  
+  // Показываем уведомление через Service Worker
+  navigator.serviceWorker.ready.then(registration => {
+    registration.showNotification(title, {
+      body: body,
+      icon: '/icons/android/icon-192x192.png',
+      badge: '/icons/android/icon-72x72.png',
+      vibrate: [200, 100, 200],
+      data: {
+        url: window.location.href,
+        lessonId: lesson.id
+      },
+      actions: [
+        {
+          action: 'open',
+          title: 'Открыть'
+        }
+      ]
+    });
+  });
+  
+  // Также показываем toast (у вас уже есть)
+  showToast(`🔔 ${body}`, true);
+}
   
   </script>
 
