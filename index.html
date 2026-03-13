@@ -2988,7 +2988,7 @@ async function sendTelegramNotification(lesson, interval) {
   if (!telegramConnected || !telegramChatId || !currentUser) return;
   
   try {
-    // Получаем свежую сессию для токена
+    // Получаем свежую сессию для токена авторизации
     const { data: { session } } = await supabaseClient.auth.getSession();
     
     if (!session) {
@@ -3895,18 +3895,16 @@ window.testTelegramNotification = async function() {
     return;
   }
   
+  const { data: { session } } = await supabaseClient.auth.getSession();
+  if (!session) {
+    showToast('❌ Нет активной сессии', false);
+    return;
+  }
+  
   const lesson = lessons[0];
   showToast('⏳ Отправка тестового уведомления...', false);
   
   try {
-    // Получаем свежую сессию
-    const { data: { session } } = await supabaseClient.auth.getSession();
-    
-    if (!session) {
-      showToast('❌ Нет активной сессии', false);
-      return;
-    }
-    
     const timeStr = lesson.time.substring(0, 5);
     const durationHours = Math.floor(lesson.duration / 60);
     const durationMins = lesson.duration % 60;
@@ -3919,7 +3917,7 @@ window.testTelegramNotification = async function() {
       `🕐 Время: ${timeStr}\n` +
       `⏱️ Длительность: ${durationStr}`;
     
-    // Отправляем через Edge Function (не напрямую в Telegram!)
+    // Отправляем через Edge Function
     const response = await fetch(
       `${SUPABASE_URL}/functions/v1/telegram-send`,
       {
