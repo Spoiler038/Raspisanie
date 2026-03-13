@@ -3398,11 +3398,10 @@ function clearCloudData() {
 let telegramConnected = false
 let telegramChatId = null
 
-// Проверка статуса Telegram - ИСПРАВЛЕННАЯ С УВЕДОМЛЕНИЕМ
+// Проверка статуса Telegram - ИСПРАВЛЕННАЯ
 async function checkTelegramStatus(showNotification = false) {
   console.log('🔄 Проверка статуса Telegram...')
   
-  // Если showNotification = true, показываем уведомление о начале проверки
   if (showNotification) {
     showToast('⏳ Проверка статуса Telegram...', false);
   }
@@ -3436,20 +3435,19 @@ async function checkTelegramStatus(showNotification = false) {
       telegramConnected = true
       telegramChatId = data.chat_id
       
-      // Меняем заголовок
+      // Четкое разделение: статус подключения и статус уведомлений
       if (data.notifications_enabled) {
-        titleEl.innerHTML = 'Telegram подключен ✅'
+        titleEl.innerHTML = 'Telegram ✅ (уведомления вкл)'
         if (showNotification) {
-          showToast('✅ Telegram подключен и активен', true);
+          showToast('✅ Telegram подключен, уведомления активны', true);
         }
       } else {
-        titleEl.innerHTML = 'Telegram отключен ⚠️'
+        titleEl.innerHTML = 'Telegram ⚠️ (уведомления выкл)'
         if (showNotification) {
           showToast('⚠️ Telegram подключен, но уведомления отключены', false);
         }
       }
       
-      // Кнопка "Управление" в любом случае, если данные есть
       connectBtn.textContent = '📱 Управление'
       connectBtn.style.background = '#2563eb'
       
@@ -3459,13 +3457,12 @@ async function checkTelegramStatus(showNotification = false) {
     } else {
       telegramConnected = false
       telegramChatId = null
-      titleEl.innerHTML = 'Telegram не подключен ❌'
+      titleEl.innerHTML = 'Telegram ❌ не подключен'
       
       if (showNotification) {
-        showToast('❌ Telegram не подключен. Нажмите "Подключить"', false);
+        showToast('❌ Telegram не подключен', false);
       }
       
-      // Только если нет данных - кнопка "Подключить"
       connectBtn.textContent = '📱 Подключить'
       connectBtn.style.background = '#2563eb'
       
@@ -3572,7 +3569,7 @@ function showTelegramConnectModal(telegramLink, userId) {
   modal.style.display = 'flex'
 }
 
-// Модальное окно для управления - ДИНАМИЧЕСКАЯ КНОПКА
+// Модальное окно для управления - ИСПРАВЛЕНО
 function showTelegramManagementModal() {
   const modal = document.getElementById('telegramModal')
   const titleEl = document.getElementById('telegramModalTitle')
@@ -3580,61 +3577,58 @@ function showTelegramManagementModal() {
   const okBtn = document.getElementById('telegramModalOk')
   const cancelBtn = document.getElementById('telegramModalCancel')
   
-  // Получаем текущие настройки уведомлений
-  const notificationSetting = localStorage.getItem('teacher_notification') || 'Не оповещать'
-  
-  titleEl.textContent = '📱 Управление Telegram'
-  messageEl.innerHTML = 
-    `Текущий статус: ${telegramConnected ? '✅ Подключен' : '❌ Не подключен'}<br><br>` +
-    `Текущие уведомления: ${notificationSetting}`
-  
-  // Создаём новую кнопку (только одну!)
-  const newOkBtn = okBtn.cloneNode(true)
-  okBtn.parentNode.replaceChild(newOkBtn, okBtn)
-  
-  // Полностью удаляем кнопку Cancel
-  if (cancelBtn && cancelBtn.parentNode) {
-    cancelBtn.parentNode.removeChild(cancelBtn)
-  }
-  
-  // Если подключен - показываем переключатель уведомлений
-  if (telegramConnected) {
-    // Получаем текущий статус уведомлений из БД
-    supabaseClient
-      .from('telegram_users')
-      .select('notifications_enabled')
-      .eq('user_id', currentUser.id)
-      .maybeSingle()
-      .then(({ data }) => {
-        if (data) {
-          const isEnabled = data.notifications_enabled;
-          
-          if (isEnabled) {
-            newOkBtn.textContent = '🔇 Отключить уведомления'
-            newOkBtn.style.background = '#dc2626'
-          } else {
-            newOkBtn.textContent = '🔔 Включить уведомления'
-            newOkBtn.style.background = '#10b981'
-          }
-          
+  // Получаем актуальные данные из БД
+  supabaseClient
+    .from('telegram_users')
+    .select('*')
+    .eq('user_id', currentUser.id)
+    .maybeSingle()
+    .then(({ data }) => {
+      
+      const isConnected = !!data
+      const isEnabled = data?.notifications_enabled || false
+      
+      titleEl.textContent = '📱 Управление Telegram'
+      messageEl.innerHTML = 
+        `Статус подключения: ${isConnected ? '✅ Подключен' : '❌ Не подключен'}<br>` +
+        `Уведомления: ${isEnabled ? '✅ Включены' : '❌ Отключены'}<br><br>`
+      
+      // Создаём новую кнопку
+      const newOkBtn = okBtn.cloneNode(true)
+      okBtn.parentNode.replaceChild(newOkBtn, okBtn)
+      
+      // Удаляем кнопку Cancel
+      if (cancelBtn && cancelBtn.parentNode) {
+        cancelBtn.parentNode.removeChild(cancelBtn)
+      }
+      
+      if (isConnected) {
+        if (isEnabled) {
+          newOkBtn.textContent = '🔇 Отключить уведомления'
+          newOkBtn.style.background = '#dc2626'
           newOkBtn.addEventListener('click', async () => {
             modal.style.display = 'none'
-            // Переключаем статус уведомлений
-            await toggleTelegramNotifications(!isEnabled)
+            await toggleTelegramNotifications(false)
+          }, { once: true })
+        } else {
+          newOkBtn.textContent = '🔔 Включить уведомления'
+          newOkBtn.style.background = '#10b981'
+          newOkBtn.addEventListener('click', async () => {
+            modal.style.display = 'none'
+            await toggleTelegramNotifications(true)
           }, { once: true })
         }
-      })
-  } else {
-    // Если не подключен - показываем кнопку подключения
-    newOkBtn.textContent = '📱 Подключить Telegram'
-    newOkBtn.style.background = '#2563eb'
-    newOkBtn.addEventListener('click', () => {
-      modal.style.display = 'none'
-      const userId = currentUser.id
-      const telegramLink = `https://t.me/${TELEGRAM_BOT_USERNAME}?start=${userId}`
-      showTelegramConnectModal(telegramLink, userId)
-    }, { once: true })
-  }
+      } else {
+        newOkBtn.textContent = '📱 Подключить Telegram'
+        newOkBtn.style.background = '#2563eb'
+        newOkBtn.addEventListener('click', () => {
+          modal.style.display = 'none'
+          const userId = currentUser.id
+          const telegramLink = `https://t.me/${TELEGRAM_BOT_USERNAME}?start=${userId}`
+          showTelegramConnectModal(telegramLink, userId)
+        }, { once: true })
+      }
+    })
   
   // Закрытие по клику вне области
   modal.onclick = function(e) {
@@ -3665,18 +3659,6 @@ async function toggleTelegramNotifications(enable) {
     showToast('❌ Ошибка при изменении настроек', false)
   }
 }
-
-    // ВРЕМЕННО: тест push-уведомления
-function testPushNotification() {
-  if (lessons.length > 0) {
-    sendPushNotification(lessons[0]);
-  } else {
-    showToast('Нет уроков для теста', false);
-  }
-}
-
-// Вызовите в консоли:
-// testPushNotification()
 
 
 // Функция показа модального окна загрузки
@@ -3864,4 +3846,3 @@ async function sendPushNotification(lesson) {
 </body>
 
 </html>
-
