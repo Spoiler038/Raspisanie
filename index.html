@@ -910,19 +910,42 @@
   </div>
 
   <!-- МОДАЛЬНОЕ ОКНО СВОДКИ ДНЯ -->
-  <div id="dayBriefModal" class="modal-overlay" style="display: none; z-index: 3000;">
-    <div class="modal" style="max-width: 340px; max-height: 85vh; display: flex; flex-direction: column;">
+  <!-- ONBOARDING — первый запуск -->
+  <div id="onboardingModal" class="modal-overlay" onclick="if(event.target.id==='onboardingModal')this.style.display='none'" style="display: none; z-index: 4000;">
+    <div class="modal" style="max-width: 340px;">
+      <div class="modal-title">👋 Добро пожаловать!</div>
+      <div class="modal-content" style="font-size: 14px; line-height: 1.6;">
+        <p style="margin: 0 0 12px;">Приложение работает полностью офлайн — данные хранятся на устройстве.</p>
+        <p style="margin: 0 0 8px; font-weight: 600;">📲 Об уведомлениях об уроках:</p>
+        <p style="margin: 0 0 8px;">Пока приложение открыто — уведомления работают автоматически.</p>
+        <p style="margin: 0 0 8px;">Для уведомлений <b>в фоне</b> (даже при закрытом приложении) используйте экспорт в системный календарь:</p>
+        <ul style="margin: 0 0 12px; padding-left: 18px;">
+          <li style="margin-bottom: 4px;"><b>Google Calendar</b> — войдите в один аккаунт Google на телефоне и в браузере, нажмите «🗓 Google» в сводке дня</li>
+          <li style="margin-bottom: 4px;"><b>Apple / iCloud Calendar</b> — скачайте .ics файл и откройте его на устройстве</li>
+        </ul>
+        <p style="margin: 0; font-size: 12px; opacity: 0.6;">⚠️ Синхронизация с Google/iCloud требует интернета</p>
+      </div>
+      <div class="modal-buttons">
+        <button class="btn-primary" onclick="document.getElementById('onboardingModal').style.display='none'" style="width: 100%;">Понятно, начнём!</button>
+      </div>
+    </div>
+  </div>
+
+    <div id="dayBriefModal" class="modal-overlay" onclick="if(event.target.id==='dayBriefModal')this.style.display='none'" style="display: none; z-index: 3000;">
+    <div class="modal" style="max-width: 340px; max-height: 88vh; display: flex; flex-direction: column;">
       <div class="modal-title" style="flex-shrink: 0;">📅 Уроки на сегодня</div>
       <div id="dayBriefContent" class="modal-content" style="overflow-y: auto; flex: 1; padding: 0 4px;"></div>
-      <div class="modal-buttons" style="display: flex; flex-direction: column; gap: 8px; flex-shrink: 0;">
-        <button class="btn-primary" onclick="exportTodayToCalendar()" style="width: 100%;">📲 Добавить всё в календарь</button>
-        <button class="btn-secondary" onclick="document.getElementById('dayBriefModal').style.display='none'" style="width: 100%;">Закрыть</button>
+      <div id="dayBriefButtons" class="modal-buttons" style="flex-shrink: 0; display: none; flex-direction: column; gap: 6px;">
+        <div style="display: flex; gap: 6px;">
+          <button class="flex-1 btn-primary" onclick="addAllToGoogleCalendar()" style="font-size: 12px; padding: 8px 4px;">🗓 Google</button>
+          <button class="flex-1 btn-secondary" onclick="exportTodayToCalendar()" style="font-size: 12px; padding: 8px 4px;">📥 .ics файл</button>
+        </div>
       </div>
     </div>
   </div>
 
   <!-- МОДАЛЬНОЕ ОКНО ДЛЯ IOS ПРЕДУПРЕЖДЕНИЯ -->
-  <div id="iosWarningModal" class="modal-overlay" style="display: none; z-index: 3000;">
+  <div id="iosWarningModal" class="modal-overlay" onclick="if(event.target.id==='iosWarningModal')this.style.display='none'" style="display: none; z-index: 3000;">
     <div class="modal" style="max-width: 320px;">
       <div class="modal-title">📱 Внимание!</div>
       <div class="modal-content" style="white-space: pre-line; min-height: 60px;">
@@ -1017,6 +1040,55 @@
 
     // ===== СИСТЕМНЫЙ КАЛЕНДАРЬ: ICS ЭКСПОРТ И СВОДКА ДНЯ =====
 
+    // ── Добавить уроки дня прямо в Google Calendar (открывает вкладку) ──
+    // Google Calendar API принимает один event за раз через URL.
+    // Для нескольких уроков открываем вкладки последовательно с небольшой задержкой.
+    function addAllToGoogleCalendar() {
+      const today = new Date().toISOString().split('T')[0]
+      const alarm = getAlarmMinutes()
+      const todayLessons = lessons
+        .filter(l => l.date === today)
+        .sort((a, b) => a.time.localeCompare(b.time))
+
+      if (todayLessons.length === 0) {
+        showToast('Сегодня уроков нет', false)
+        return
+      }
+
+      // Показываем подсказку
+      showToast(`🗓 Открываем ${todayLessons.length} событий в Google Calendar...`, true)
+      document.getElementById('dayBriefModal').style.display = 'none'
+
+      todayLessons.forEach((lesson, i) => {
+        setTimeout(() => {
+          const startDt = new Date(lesson.date + 'T' + lesson.time + ':00')
+          const endDt = new Date(startDt.getTime() + (lesson.duration || 60) * 60000)
+          const fmt = dt => dt.getFullYear().toString() +
+            String(dt.getMonth()+1).padStart(2,'0') +
+            String(dt.getDate()).padStart(2,'0') + 'T' +
+            String(dt.getHours()).padStart(2,'0') +
+            String(dt.getMinutes()).padStart(2,'0') + '00'
+          const dates = fmt(startDt) + '/' + fmt(endDt)
+          const title = encodeURIComponent('Занятие: ' + lesson.student)
+          const details = encodeURIComponent('Добавлено из приложения Расписание')
+          const url = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${title}&dates=${dates}&details=${details}`
+          window.open(url, '_blank')
+        }, i * 600) // небольшая задержка между вкладками
+      })
+    }
+
+    // ── Onboarding: показать при первом запуске ──
+    function maybeShowOnboarding() {
+      const key = 'onboarding_v1'
+      if (localStorage.getItem(key)) return
+      localStorage.setItem(key, '1')
+      const isDark = document.body.classList.contains('dark')
+      const modal = document.getElementById('onboardingModal')
+      if (modal) modal.style.display = 'flex'
+    }
+
+
+
     // Получаем минуты для напоминания из настроек
     function getAlarmMinutes() {
       const setting = localStorage.getItem('teacher_notification') || 'Не оповещать'
@@ -1108,11 +1180,13 @@
         .sort((a, b) => a.time.localeCompare(b.time))
 
       const modal = document.getElementById('dayBriefModal')
-      const content = document.getElementById('dayBriefContent')
+      const cnt = document.getElementById('dayBriefContent')
+      const btns = document.getElementById('dayBriefButtons')
 
       if (todayLessons.length === 0) {
         if (force) {
-          content.innerHTML = '<p style="text-align:center; padding: 20px; opacity: 0.6;">Сегодня уроков нет 🎉</p>'
+          cnt.innerHTML = '<p style="text-align:center; padding: 20px; opacity: 0.6;">Сегодня уроков нет 🎉</p>'
+          btns.style.display = 'none'
           modal.style.display = 'flex'
         }
         return
@@ -1130,7 +1204,7 @@
         ${todayLessons.length} ${todayLessons.length === 1 ? 'урок' : todayLessons.length < 5 ? 'урока' : 'уроков'}${alarmLabel}
       </p>`
 
-      todayLessons.forEach((lesson, i) => {
+      todayLessons.forEach(lesson => {
         const startDt = new Date(lesson.date + 'T' + lesson.time + ':00')
         const endDt = new Date(startDt.getTime() + (lesson.duration || 60) * 60000)
         const pad = n => String(n).padStart(2, '0')
@@ -1145,7 +1219,8 @@
         </div>`
       })
 
-      content.innerHTML = html
+      cnt.innerHTML = html
+      btns.style.display = 'flex'
       modal.style.display = 'flex'
     }
 
@@ -2721,6 +2796,8 @@
       handlePasswordReset()
       startNotificationChecker()
       requestNotificationPermission()
+      // Onboarding при первом запуске
+      setTimeout(maybeShowOnboarding, 800)
       // Показываем сводку дня один раз при открытии
       setTimeout(maybeShowDayBrief, 2000)
 
