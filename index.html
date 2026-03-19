@@ -438,13 +438,11 @@
 
     // ===== НОВАЯ СИСТЕМА УВЕДОМЛЕНИЙ (ОФЛАЙН) =====
     let notificationTimer = null
-    let notificationHistory = new Set() // для предотвращения дублирования
+    let notificationHistory = new Set()
 
     function startNotificationSystem() {
       console.log('🔔 Система уведомлений запущена')
       checkAndScheduleNotifications()
-      
-      // Проверяем каждые 15 минут на всякий случай
       setInterval(checkAndScheduleNotifications, 15 * 60 * 1000)
     }
 
@@ -468,7 +466,6 @@
 
       const now = new Date()
       
-      // Очищаем старую историю (уроки в прошлом)
       lessons.forEach(lesson => {
         const lessonTime = new Date(`${lesson.date}T${lesson.time}`)
         if (lessonTime < now) {
@@ -476,7 +473,6 @@
         }
       })
 
-      // Ищем ближайший урок для уведомления
       let nextNotification = null
       let minTimeDiff = Infinity
 
@@ -486,15 +482,12 @@
         const lessonTime = new Date(`${lesson.date}T${lesson.time}`)
         const timeToLesson = Math.floor((lessonTime - now) / (1000 * 60))
         
-        if (timeToLesson <= 0) return // урок уже прошел
+        if (timeToLesson <= 0) return
 
-        // Проверяем, нужно ли уведомить сейчас
         if (timeToLesson <= notifyMinutes && timeToLesson > notifyMinutes - 5) {
-          // Отправляем уведомление сейчас
           sendLocalNotification(lesson, setting)
           notificationHistory.add(lesson.id)
         } 
-        // Планируем будущее уведомление
         else if (timeToLesson > notifyMinutes && timeToLesson < notifyMinutes + 24*60) {
           const notifyTime = lessonTime.getTime() - notifyMinutes * 60 * 1000
           if (notifyTime > now.getTime() && notifyTime - now.getTime() < minTimeDiff) {
@@ -504,13 +497,12 @@
         }
       })
 
-      // Планируем следующее уведомление
       if (nextNotification) {
         if (notificationTimer) clearTimeout(notificationTimer)
         notificationTimer = setTimeout(() => {
           sendLocalNotification(nextNotification.lesson, setting)
           notificationHistory.add(nextNotification.lesson.id)
-          checkAndScheduleNotifications() // перепланируем
+          checkAndScheduleNotifications()
         }, nextNotification.notifyTime - now.getTime())
         
         console.log(`⏰ Следующее уведомление через ${Math.round((nextNotification.notifyTime - now.getTime())/60000)} минут`)
@@ -524,7 +516,7 @@
       
       console.log(`🔔 Уведомление: ${body}`)
 
-      // 1. Звуковой сигнал (короткий, 300мс)
+      // Звук
       try {
         const audioContext = new (window.AudioContext || window.webkitAudioContext)()
         const oscillator = audioContext.createOscillator()
@@ -545,15 +537,15 @@
         console.log('Звук не поддерживается')
       }
 
-      // 2. Вибрация (если поддерживается)
+      // Вибрация
       if (navigator.vibrate) {
         navigator.vibrate([200, 100, 200])
       }
 
-      // 3. Toast уведомление
+      // Toast
       showToast(`🔔 ${body}`, true)
 
-      // 4. Системное уведомление
+      // Системное уведомление
       if (Notification.permission === 'granted') {
         try {
           const isPageVisible = document.visibilityState === 'visible'
@@ -579,7 +571,6 @@
         }
       }
 
-      // Обновляем планировщик
       setTimeout(checkAndScheduleNotifications, 1000)
     }
 
@@ -593,7 +584,6 @@
       return `${Math.floor(diffMin / 1440)} дн`
     }
 
-    // Запрос разрешения на уведомления при загрузке
     function requestNotificationPermission() {
       if (!("Notification" in window)) {
         console.log("Браузер не поддерживает уведомления")
@@ -629,7 +619,7 @@
       }
     }
 
-    // ===== ОСТАЛЬНЫЕ ФУНКЦИИ (без изменений, но удалены Telegram) =====
+    // ===== ОСТАЛЬНЫЕ ФУНКЦИИ =====
     function showToast(message, isSuccess = false) {
       const toast = document.getElementById('toast')
       if (!toast) return
@@ -1047,7 +1037,6 @@
     function saveLessonsToStorage() {
       try {
         localStorage.setItem('teacher_lessons', JSON.stringify(lessons))
-        // Обновляем планировщик уведомлений при изменении
         checkAndScheduleNotifications()
       } catch (e) { console.log('Ошибка сохранения уроков:', e) }
     }
@@ -1500,7 +1489,6 @@
         localStorage.setItem('teacher_notification', value)
         showToast('✅ Настройки оповещений сохранены', true)
         
-        // Сбрасываем историю и перепланируем
         notificationHistory.clear()
         checkAndScheduleNotifications()
         
