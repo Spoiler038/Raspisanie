@@ -15,6 +15,9 @@
   <meta name="apple-mobile-web-app-title" content="Расписание">
 
   <!-- iOS иконки разных размеров -->
+  <!-- Favicon встроен как data URI — устраняет 404 на /favicon.ico -->
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📅</text></svg>">
+  <link rel="shortcut icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📅</text></svg>">
   <link rel="apple-touch-icon" href="icons/ios/icon-60x60.png">
   <link rel="apple-touch-icon" sizes="76x76" href="icons/ios/icon-76x76.png">
   <link rel="apple-touch-icon" sizes="120x120" href="icons/ios/icon-120x120.png">
@@ -1941,22 +1944,46 @@
     }
 
     function calculateScrollerHeight() {
-      const header = document.querySelector('header')
+      const headerEl = document.querySelector('header')
       const bottomBar = document.querySelector('.bottom-bar')
       const calendarEl = document.getElementById('calendar')
-      if (!header || !bottomBar || !calendarEl) return
-      
-      const headerHeight = header.offsetHeight
+      if (!headerEl || !bottomBar || !calendarEl) return
+
+      const headerHeight = headerEl.offsetHeight
       const bottomBarHeight = bottomBar.offsetHeight
       const viewportHeight = window.innerHeight
       const availableHeight = viewportHeight - headerHeight - bottomBarHeight - 5
-      
+
+      // Задаём высоту контейнеру
       calendarEl.style.height = availableHeight + 'px'
-      
+
+      // Передаём высоту FullCalendar — это ключевое для корректного скролла
+      if (calendar) {
+        try { calendar.setOption('height', availableHeight) } catch(e) {}
+      }
+
       if (window.scrollerTimer) clearTimeout(window.scrollerTimer)
       window.scrollerTimer = setTimeout(() => {
-        if (calendar && calendar.view && calendar.view.type === 'dayGridMonth') {
+        if (!calendar || !calendar.view) return
+        const viewType = calendar.view.type
+
+        if (viewType === 'dayGridMonth') {
           normalizeMonthHeights()
+        } else {
+          // В режимах День/Неделя: явно задаём высоту скроллеру
+          // чтобы он занимал всё доступное пространство
+          const scroller = calendarEl.querySelector(
+            '.fc-timeGridDay-view .fc-scroller-liquid-absolute,' +
+            '.fc-timeGridWeek-view .fc-scroller-liquid-absolute,' +
+            '.fc-timeGridDay-view .fc-scroller,' +
+            '.fc-timeGridWeek-view .fc-scroller'
+          )
+          if (scroller) {
+            // Высота скроллера = доступная высота минус высота шапки дней/часов
+            const colHeader = calendarEl.querySelector('.fc-col-header')
+            const colHeaderH = colHeader ? colHeader.offsetHeight : 0
+            scroller.style.height = (availableHeight - colHeaderH - 2) + 'px'
+          }
         }
       }, 50)
     }
@@ -1967,8 +1994,9 @@
       firstDay: 1,
       initialView: 'dayGridMonth',
       headerToolbar: false,
-      height: 'auto',
+      height: window.innerHeight - 56 - 56,
       contentHeight: 'auto',
+      expandRows: true,
       allDaySlot: false,
       slotDuration: '00:30:00',
       selectable: true,
