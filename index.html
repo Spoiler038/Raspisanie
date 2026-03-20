@@ -411,6 +411,68 @@
       try { pendingChanges = JSON.parse(savedPending) } catch (e) { console.log('Ошибка загрузки ожидающих изменений') }
     }
 
+    // ===== WEB PUSH =====
+const VAPID_PUBLIC_KEY = 'BO5mDuU0D0DbYXwwHi_Q6XeuwobMS3G9eRX4NwlOKoDNGC4EXFx8k1Hn4L47rDuImr8dKSjlhQEo53vvEj5Feog';
+
+function urlBase64ToUint8Array(base64String) {
+  const padding = '='.repeat((4 - base64String.length % 4) % 4);
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const rawData = atob(base64);
+  return Uint8Array.from([...rawData].map(char => char.charCodeAt(0)));
+}
+
+async function subscribeToPushNotifications() {
+  if (!currentUser) return;
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
+  try {
+    const permission = await Notification.requestPermission();
+    if (permission !== 'granted') return;
+    const registration = await navigator.serviceWorker.ready;
+    let subscription = await registration.pushManager.getSubscription();
+    if (!subscription) {
+      subscription = await registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
+      });
+    }
+    const subJson = subscription.toJSON();
+    await supabaseClient
+      .from('push_subscriptions')
+      .upsert({
+        user_id: currentUser.id,
+        endpoint: subJson.endpoint,
+        p256dh: subJson.keys.p256dh,
+        auth: subJson.keys.auth,
+        updated_at: new Date().toISOString()
+      }, { onConflict: 'user_id, endpoint' });
+    console.log('✅ Push-подписка сохранена');
+  } catch (error) {
+    console.error('Ошибка подписки на push:', error);
+  }
+}
+
+async function unsubscribeFromPushNotifications() {
+  if (!('serviceWorker' in navigator)) return;
+  try {
+    const registration = await navigator.serviceWorker.ready;
+    const subscription = await registration.pushManager.getSubscription();
+    if (subscription) {
+      const endpoint = subscription.endpoint;
+      await subscription.unsubscribe();
+      if (currentUser) {
+        await supabaseClient
+          .from('push_subscriptions')
+          .delete()
+          .eq('user_id', currentUser.id)
+          .eq('endpoint', endpoint);
+      }
+      console.log('✅ Отписка выполнена');
+    }
+  } catch (error) {
+    console.error('Ошибка отписки:', error);
+  }
+}
+    
     // ===== SUPABASE КОНФИГУРАЦИЯ =====
     const SUPABASE_URL = 'https://dbhqxfaennimfqephxat.supabase.co'
     const SUPABASE_KEY = 'sb_publishable_t3Q_kfvFl0kbwtoxdswMaw_Y0vdlaTQ'
@@ -756,6 +818,7 @@
         closeAuthModal()
         updateCloudUI()
         showToast(`✅ Вход выполнен: ${data.user.email}`, true)
+        setTimeout(() => subscribeToPushNotifications(), 1000)
         
         loginBtn.textContent = originalText
         loginBtn.disabled = false
@@ -1355,7 +1418,8 @@
             time: lesson.time,
             duration: lesson.duration,
             notes: lesson.notes || '',
-            updated_at: new Date().toISOString()
+            updated_at: new Date().toISOString(),
+            notified: false
           }
           
           if (editingLessonId) {
@@ -1492,6 +1556,11 @@
         
         notificationHistory.clear()
         checkAndScheduleNotifications()
+        if (value === 'Не оповещать') {
+  unsubscribeFromPushNotifications();
+} else {
+  subscribeToPushNotifications();
+}
         
         if (currentUser && currentSyncMode === SYNC_MODES.CLOUD) {
           try {
