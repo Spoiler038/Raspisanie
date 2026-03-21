@@ -1553,7 +1553,7 @@ async function unsubscribeFromPushNotifications() {
       
       saveLessonsToStorage()
       
-      if (currentUser && currentSyncMode === SYNC_MODES.CLOUD) {
+      if (currentUser) {
         try {
           const lessonData = {
             user_id: currentUser.id,
@@ -1617,7 +1617,7 @@ async function unsubscribeFromPushNotifications() {
         lessons = lessons.filter(l => l.id !== editingLessonId)
         saveLessonsToStorage()
         
-        if (currentUser && currentSyncMode === SYNC_MODES.CLOUD) {
+        if (currentUser) {
           try {
             await supabaseClient
               .from('lessons')
@@ -2143,7 +2143,7 @@ async function unsubscribeFromPushNotifications() {
       for (const item of _pendingTimeChanges) {
         const idx = lessons.findIndex(l => l.id === item.id)
         if (idx !== -1) lessons[idx].time = item.newTime
-        if (currentUser && currentSyncMode === SYNC_MODES.CLOUD) {
+        if (currentUser) {
           try {
             await supabaseClient.from('lessons')
               .update({ time: item.newTime, notified: false, updated_at: new Date().toISOString() })
@@ -2173,7 +2173,7 @@ async function unsubscribeFromPushNotifications() {
       document.getElementById('deleteCheckedModal').style.display = 'none'
       const ids = _pendingDeletes.map(r => r.id)
       lessons = lessons.filter(l => !ids.includes(l.id))
-      if (currentUser && currentSyncMode === SYNC_MODES.CLOUD) {
+      if (currentUser) {
         for (const item of _pendingDeletes) {
           try {
             await supabaseClient.from('lessons').delete()
