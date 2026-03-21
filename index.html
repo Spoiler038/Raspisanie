@@ -743,23 +743,47 @@ async function unsubscribeFromPushNotifications() {
           updateCloudUI()
           if (currentSyncMode === SYNC_MODES.CLOUD) syncWithCloud()
 
-          // Загружаем настройки из облака и если уведомления включены — подписываемся
+          // Загружаем ВСЕ настройки из облака и применяем
           try {
             const { data: cloudSettings } = await supabaseClient
               .from('user_settings')
-              .select('notification_default')
+              .select('*')
               .eq('user_id', currentUser.id)
               .maybeSingle()
-            if (cloudSettings && cloudSettings.notification_default) {
-              const notif = cloudSettings.notification_default
-              localStorage.setItem('teacher_notification', notif)
-              const notifSelect = document.getElementById('notificationSelect')
-              if (notifSelect) notifSelect.value = notif
-              if (notif !== 'Не оповещать') {
-                setTimeout(() => subscribeToPushNotifications(), 1500)
+
+            if (cloudSettings) {
+              // Тема
+              if (cloudSettings.theme) {
+                document.body.className = cloudSettings.theme
+                localStorage.setItem('teacher_theme', cloudSettings.theme)
+                const themeEl = document.getElementById('themeSelect')
+                if (themeEl) themeEl.value = cloudSettings.theme
+              }
+              // Режим работы
+              if (cloudSettings.work_from && cloudSettings.work_to) {
+                if (validateWorkHours(cloudSettings.work_from, cloudSettings.work_to)) {
+                  workHours = { from: cloudSettings.work_from, to: cloudSettings.work_to }
+                  saveSettingsToStorage()
+                  calendar.setOption('slotMinTime', workHours.from)
+                  calendar.setOption('slotMaxTime', workHours.to)
+                  const wfEl = document.getElementById('workFrom')
+                  const wtEl = document.getElementById('workTo')
+                  if (wfEl) wfEl.value = workHours.from
+                  if (wtEl) wtEl.value = workHours.to
+                }
+              }
+              // Уведомления — подписываемся только если включены
+              if (cloudSettings.notification_default) {
+                const notif = cloudSettings.notification_default
+                localStorage.setItem('teacher_notification', notif)
+                const notifEl = document.getElementById('notificationSelect')
+                if (notifEl) notifEl.value = notif
+                if (notif !== 'Не оповещать') {
+                  setTimeout(() => subscribeToPushNotifications(), 1500)
+                }
               }
             }
-          } catch (e) { console.log('Ошибка загрузки настроек уведомлений:', e) }
+          } catch (e) { console.log('Ошибка загрузки настроек из облака:', e) }
 
         } else {
           if (currentSyncMode === SYNC_MODES.CLOUD) setTimeout(() => showAuthModal(), 500)
@@ -1623,7 +1647,9 @@ async function unsubscribeFromPushNotifications() {
         if (value === 'Не оповещать') {
           unsubscribeFromPushNotifications()
         } else {
-          subscribeToPushNotifications()
+          // Предупреждаем что push работает только при наличии интернета
+          showToast('⚠️ Push-уведомления работают только при наличии интернета', false)
+          setTimeout(() => subscribeToPushNotifications(), 1000)
         }
         settingsChanged = true
       }
