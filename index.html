@@ -2019,13 +2019,10 @@ async function unsubscribeFromPushNotifications() {
     })
 
     // ===== ВЕРСИЯ ПРИЛОЖЕНИЯ =====
-    // Меняйте эту строку при каждом деплое на GitHub
-    const APP_VERSION = '1.0.3'
+    // Версия берётся из Supabase app_config — менять код не нужно
 
     async function checkAppVersion() {
-      // Показываем текущую версию в настройках
       const vLabel = document.getElementById('appVersionLabel')
-      if (vLabel) vLabel.textContent = `v${APP_VERSION}`
       try {
         const { data, error } = await supabaseClient
           .from('app_config')
@@ -2034,14 +2031,22 @@ async function unsubscribeFromPushNotifications() {
           .maybeSingle()
 
         if (error || !data) return
-
         const serverVersion = data.value
-        if (serverVersion && serverVersion !== APP_VERSION) {
-          console.log(`🆕 Новая версия: ${serverVersion} (у вас: ${APP_VERSION})`)
+        if (!serverVersion) return
+
+        const knownVersion = localStorage.getItem('app_known_version')
+        if (vLabel) vLabel.textContent = `v${serverVersion}`
+
+        if (!knownVersion) {
+          localStorage.setItem('app_known_version', serverVersion)
+        } else if (knownVersion !== serverVersion) {
+          console.log(`🆕 Новая версия: ${serverVersion} (у вас: ${knownVersion})`)
           showUpdateBanner()
         }
       } catch (e) {
         console.log('Ошибка проверки версии:', e)
+        const knownVersion = localStorage.getItem('app_known_version')
+        if (vLabel && knownVersion) vLabel.textContent = `v${knownVersion}`
       }
     }
 
@@ -2054,6 +2059,7 @@ async function unsubscribeFromPushNotifications() {
       isReloading = true
       const banner = document.getElementById('updateBanner')
       if (banner) banner.style.display = 'none'
+      localStorage.removeItem('app_known_version')
       if (newWorker) {
         newWorker.postMessage({ action: 'skipWaiting' })
       } else {
