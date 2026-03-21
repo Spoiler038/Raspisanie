@@ -249,10 +249,8 @@
           <input id="durationInput" type="number" value="60" placeholder="Длительность (мин)" min="30" step="30">
           <textarea id="notesInput" placeholder="Заметки (необязательно)" rows="2"></textarea>
           <div class="flex gap-2">
+            <button id="deleteSection" class="flex-1 btn-danger" style="display:none;" onclick="deleteLesson()">Удалить</button>
             <button class="flex-1 btn-primary" onclick="saveLesson()">Сохранить</button>
-          </div>
-          <div id="deleteSection" style="display:none;">
-            <button class="btn-danger mt-2" onclick="deleteLesson()">Удалить занятие</button>
           </div>
         </div>
       </div>
@@ -1448,7 +1446,7 @@ async function unsubscribeFromPushNotifications() {
     function openEditForm(lesson) {
       editingLessonId = lesson.id
       document.getElementById('formTitle').textContent = 'Редактировать занятие'
-      document.getElementById('deleteSection').style.display = 'block'
+      document.getElementById('deleteSection').style.display = 'flex'
       const dateInput = document.getElementById('dateInput')
       const timeInput = document.getElementById('timeInput')
       const studentInput = document.getElementById('studentInput')
