@@ -1557,6 +1557,7 @@ async function unsubscribeFromPushNotifications() {
       saveLessonsToStorage()
       
       if (currentUser) {
+        console.log('💾 Сохраняем в Supabase, user:', currentUser.id)
         try {
           const lessonData = {
             user_id: currentUser.id,
@@ -1569,28 +1570,35 @@ async function unsubscribeFromPushNotifications() {
             updated_at: new Date().toISOString(),
             notified: false
           }
+          console.log('📤 lessonData:', JSON.stringify(lessonData))
           
           if (editingLessonId) {
-            await supabaseClient
+            const { error } = await supabaseClient
               .from('lessons')
               .update(lessonData)
               .eq('user_id', currentUser.id)
               .eq('lesson_id', lesson.id)
+            if (error) throw error
           } else {
-            await supabaseClient
+            const { error } = await supabaseClient
               .from('lessons')
               .insert([lessonData])
+            if (error) throw error
           }
+          console.log('✅ Supabase сохранил успешно')
           showToast('✅ Данные синхронизированы с облаком', true)
         } catch (error) {
+          console.error('❌ Ошибка Supabase:', error.message, error)
           if (error.message && error.message.includes('Failed to fetch')) {
             showToast('⚠️ Урок сохранен локально. Будет синхронизирован при подключении', false)
           } else {
-            showToast('❌ Ошибка синхронизации с облаком', false)
+            showToast('❌ Ошибка синхронизации: ' + error.message, false)
           }
           pendingChanges.push({ action: editingLessonId ? 'update' : 'insert', lesson, timestamp: new Date().toISOString() })
           localStorage.setItem(STORAGE_KEYS.PENDING_CHANGES, JSON.stringify(pendingChanges))
         }
+      } else {
+        console.warn('⚠️ currentUser = null, сохранение только локально. syncMode:', currentSyncMode)
       }
       
       calendar.refetchEvents()
@@ -2011,8 +2019,13 @@ async function unsubscribeFromPushNotifications() {
     })
 
     // ===== ВЕРСИЯ ПРИЛОЖЕНИЯ =====
+    // Меняйте эту строку при каждом деплое на GitHub
+    const APP_VERSION = '1.0.3'
+
     async function checkAppVersion() {
+      // Показываем текущую версию в настройках
       const vLabel = document.getElementById('appVersionLabel')
+      if (vLabel) vLabel.textContent = `v${APP_VERSION}`
       try {
         const { data, error } = await supabaseClient
           .from('app_config')
@@ -2023,35 +2036,13 @@ async function unsubscribeFromPushNotifications() {
         if (error || !data) return
 
         const serverVersion = data.value
-        if (!serverVersion) return
-
-        // Версия которую пользователь уже видел (сохранена локально)
-        const knownVersion = localStorage.getItem('app_known_version')
-
-        // Показываем серверную версию в настройках
-        if (vLabel) vLabel.textContent = `v${serverVersion}`
-
-        if (!knownVersion) {
-          // Первый запуск — просто сохраняем версию
-          localStorage.setItem('app_known_version', serverVersion)
-        } else if (knownVersion !== serverVersion) {
-          // Версия изменилась — показываем баннер
-          console.log(`🆕 Новая версия: ${serverVersion} (у вас: ${knownVersion})`)
+        if (serverVersion && serverVersion !== APP_VERSION) {
+          console.log(`🆕 Новая версия: ${serverVersion} (у вас: ${APP_VERSION})`)
           showUpdateBanner()
         }
       } catch (e) {
         console.log('Ошибка проверки версии:', e)
-        // Если нет сети — показываем локально сохранённую версию
-        const knownVersion = localStorage.getItem('app_known_version')
-        if (vLabel && knownVersion) vLabel.textContent = `v${knownVersion}`
       }
-    }
-
-    // После успешного обновления сохраняем новую версию
-    function onUpdateApplied() {
-      // Вызывается после перезагрузки — сбрасываем known_version чтобы
-      // при следующем запуске она обновилась из сервера
-      localStorage.removeItem('app_known_version')
     }
 
     // Регистрация Service Worker + обнаружение обновлений
@@ -2063,8 +2054,6 @@ async function unsubscribeFromPushNotifications() {
       isReloading = true
       const banner = document.getElementById('updateBanner')
       if (banner) banner.style.display = 'none'
-      // Сбрасываем known_version — при следующем запуске загрузится новая из сервера
-      localStorage.removeItem('app_known_version')
       if (newWorker) {
         newWorker.postMessage({ action: 'skipWaiting' })
       } else {
