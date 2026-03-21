@@ -168,6 +168,27 @@
     body.dark { scrollbar-width: thin; scrollbar-color: #475569 #1e293b; }
     .sheet-content input, .sheet-content select, .sheet-content textarea { padding: 0px 8px !important; }
     @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ===== ВКЛАДКИ (только для режима редактирования) ===== */
+    .edit-tabs { display: flex; border-bottom: 1px solid #1e293b; margin: -16px -16px 16px -16px; padding: 0 16px; flex-shrink: 0; }
+    body.light .edit-tabs { border-bottom-color: #cbd5e1; }
+    .edit-tab-btn { flex: 1; padding: 10px 6px; font-size: 13px; font-weight: 500; border: none; background: transparent; cursor: pointer; color: #64748b; border-bottom: 2px solid transparent; margin-bottom: -1px; }
+    .edit-tab-btn.active { color: #2563eb; border-bottom-color: #2563eb; }
+    /* Вкладка Другие */
+    .others-header { display: flex; align-items: center; justify-content: space-between; padding-bottom: 10px; border-bottom: 1px solid #1e293b; margin-bottom: 8px; }
+    body.light .others-header { border-bottom-color: #cbd5e1; }
+    .new-time-label { font-size: 13px; color: #94a3b8; margin-right: 6px; white-space: nowrap; }
+    .new-time-input { width: 110px !important; padding: 4px 8px !important; font-size: 14px !important; border-radius: 8px !important; }
+    .select-all-wrap { display: flex; align-items: center; gap: 10px; font-size: 13px; color: #94a3b8; padding-right: 60px; }
+    .others-lesson-list { overflow-y: auto; max-height: calc(80vh - 180px); }
+    .others-lesson-row { display: flex; align-items: center; justify-content: space-between; padding: 9px 0; border-bottom: 1px solid #1e293b; font-size: 14px; }
+    body.light .others-lesson-row { border-bottom-color: #e2e8f0; }
+    .others-lesson-row:last-child { border-bottom: none; }
+    .others-lesson-info { color: #e5e7eb; }
+    body.light .others-lesson-info { color: #020617; }
+    .others-cb { width: 18px; height: 18px; cursor: pointer; accent-color: #2563eb; flex-shrink: 0; margin-right: 60px; }
+    .others-actions { display: flex; gap: 8px; padding-top: 12px; border-top: 1px solid #1e293b; margin-top: 8px; }
+    body.light .others-actions { border-top-color: #cbd5e1; }
   </style>
 </head>
 
@@ -211,18 +232,75 @@
   <!-- ADD/EDIT FORM -->
   <div id="sheet" class="sheet" onclick="if(event.target.id==='sheet')sheet.classList.remove('active')">
     <div class="sheet-content space-y-3">
-      <h2 class="font-semibold" id="formTitle">Новое занятие</h2>
-      <input id="dateInput" type="date">
-      <input id="timeInput" type="time">
-      <input id="studentInput" placeholder="Имя ученика">
-      <input id="durationInput" type="number" value="60" placeholder="Длительность (мин)" min="30" step="30">
-      <textarea id="notesInput" placeholder="Заметки (необязательно)" rows="2"></textarea>
-      <div class="flex gap-2">
-        <button class="flex-1 btn-secondary" onclick="cancelForm()">Отмена</button>
-        <button class="flex-1 btn-primary" onclick="saveLesson()">Сохранить</button>
+
+      <!-- Вкладки — показываются только при редактировании -->
+      <div id="editTabsBar" class="edit-tabs" style="display:none;">
+        <button class="edit-tab-btn active" id="editTab1Btn" onclick="switchEditTab(1)">Редактировать это занятие</button>
+        <button class="edit-tab-btn" id="editTab2Btn" onclick="switchEditTab(2)">Другие</button>
       </div>
-      <div id="deleteSection" style="display:none;">
-        <button class="btn-danger mt-2" onclick="deleteLesson()">Удалить занятие</button>
+
+      <!-- ПАНЕЛЬ 1: поля занятия (всегда видна при новом, скрывается только при переключении) -->
+      <div id="editPanel1">
+        <div class="space-y-3">
+          <h2 class="font-semibold" id="formTitle">Новое занятие</h2>
+          <input id="dateInput" type="date">
+          <input id="timeInput" type="time">
+          <input id="studentInput" placeholder="Имя ученика">
+          <input id="durationInput" type="number" value="60" placeholder="Длительность (мин)" min="30" step="30">
+          <textarea id="notesInput" placeholder="Заметки (необязательно)" rows="2"></textarea>
+          <div class="flex gap-2">
+            <button class="flex-1 btn-secondary" onclick="cancelForm()">Отмена</button>
+            <button class="flex-1 btn-primary" onclick="saveLesson()">Сохранить</button>
+          </div>
+          <div id="deleteSection" style="display:none;">
+            <button class="btn-danger mt-2" onclick="deleteLesson()">Удалить занятие</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ПАНЕЛЬ 2: другие уроки ученика (только при редактировании) -->
+      <div id="editPanel2" style="display:none;">
+        <div class="others-header">
+          <div style="display:flex; align-items:center;">
+            <span class="new-time-label">Новое общее время</span>
+            <input type="time" id="newCommonTime" class="new-time-input">
+          </div>
+          <div class="select-all-wrap">
+            <span>Все</span>
+            <input type="checkbox" class="others-cb" style="margin-right:0 !important;"
+              onchange="document.querySelectorAll('.other-lesson-cb').forEach(cb => cb.checked = this.checked)">
+          </div>
+        </div>
+        <div class="others-lesson-list" id="otherLessonsList"></div>
+        <div class="others-actions">
+          <button class="btn-danger" style="flex:1; padding:10px; font-size:13px;" onclick="deleteCheckedLessons()">Удалить отмеченные</button>
+          <button class="btn-primary" style="flex:1; padding:10px; font-size:13px;" onclick="applyNewTime()">Применить</button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Подтверждение переноса времени -->
+  <div id="applyTimeModal" class="modal-overlay" style="display:none; z-index:3000;">
+    <div class="modal" style="max-width:320px;">
+      <div class="modal-title">⏰ Подтвердите перенос</div>
+      <div class="modal-content" id="applyTimeList" style="white-space:pre-line; max-height:200px; overflow-y:auto;"></div>
+      <div class="modal-buttons" style="display:flex; gap:12px;">
+        <button class="btn-primary" style="flex:1;" onclick="confirmApplyTime()">Применить</button>
+        <button class="btn-secondary" style="flex:1;" onclick="document.getElementById('applyTimeModal').style.display='none'">Отмена</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Подтверждение группового удаления -->
+  <div id="deleteCheckedModal" class="modal-overlay" style="display:none; z-index:3000;">
+    <div class="modal" style="max-width:320px;">
+      <div class="modal-title" style="color:#ef4444;">🗑️ Удалить отмеченные</div>
+      <div class="modal-content" id="deleteCheckedList" style="white-space:pre-line; max-height:200px; overflow-y:auto;"></div>
+      <div class="modal-buttons" style="display:flex; gap:12px;">
+        <button class="btn-danger" style="flex:1;" onclick="confirmDeleteChecked()">Удалить</button>
+        <button class="btn-secondary" style="flex:1;" onclick="document.getElementById('deleteCheckedModal').style.display='none'">Отмена</button>
       </div>
     </div>
   </div>
@@ -1349,6 +1427,9 @@ async function unsubscribeFromPushNotifications() {
       editingLessonId = null
       document.getElementById('formTitle').textContent = 'Новое занятие'
       document.getElementById('deleteSection').style.display = 'none'
+      document.getElementById('editTabsBar').style.display = 'none'
+      document.getElementById('editPanel1').style.display = 'block'
+      document.getElementById('editPanel2').style.display = 'none'
       const dateInput = document.getElementById('dateInput')
       const timeInput = document.getElementById('timeInput')
       const studentInput = document.getElementById('studentInput')
@@ -1381,6 +1462,10 @@ async function unsubscribeFromPushNotifications() {
         studentInput.value = lesson.student
         durationInput.value = lesson.duration
         notesInput.value = lesson.notes || ''
+        // Показываем вкладки и заполняем "Другие"
+        document.getElementById('editTabsBar').style.display = 'flex'
+        switchEditTab(1)
+        fillOtherLessons(lesson)
         sheet.classList.add('active')
       }
     }
@@ -1389,6 +1474,9 @@ async function unsubscribeFromPushNotifications() {
       editingLessonId = null
       document.getElementById('formTitle').textContent = 'Новое занятие'
       document.getElementById('deleteSection').style.display = 'none'
+      document.getElementById('editTabsBar').style.display = 'none'
+      document.getElementById('editPanel1').style.display = 'block'
+      document.getElementById('editPanel2').style.display = 'none'
       const now = new Date()
       const dateInput = document.getElementById('dateInput')
       const timeInput = document.getElementById('timeInput')
@@ -1999,6 +2087,108 @@ async function unsubscribeFromPushNotifications() {
           }
         })
       })
+    }
+
+    // ===== ВКЛАДКИ И ГРУППОВЫЕ ДЕЙСТВИЯ =====
+    function switchEditTab(n) {
+      document.getElementById('editTab1Btn').classList.toggle('active', n === 1)
+      document.getElementById('editTab2Btn').classList.toggle('active', n === 2)
+      document.getElementById('editPanel1').style.display = n === 1 ? 'block' : 'none'
+      document.getElementById('editPanel2').style.display = n === 2 ? 'block' : 'none'
+    }
+
+    function fillOtherLessons(currentLesson) {
+      const list = document.getElementById('otherLessonsList')
+      const now = new Date()
+      const others = lessons.filter(l =>
+        l.student === currentLesson.student &&
+        l.id !== currentLesson.id &&
+        new Date(`${l.date}T${l.time}`) > now
+      ).sort((a, b) => new Date(`${a.date}T${a.time}`) - new Date(`${b.date}T${b.time}`))
+
+      // Устанавливаем текущее время урока как значение по умолчанию
+      document.getElementById('newCommonTime').value = currentLesson.time.slice(0, 5)
+
+      if (others.length === 0) {
+        list.innerHTML = '<div style="color:#64748b; font-size:14px; padding:16px 0; text-align:center;">Нет других будущих уроков этого ученика</div>'
+        return
+      }
+      list.innerHTML = others.map(l => {
+        const d = new Date(l.date)
+        const dd = String(d.getDate()).padStart(2,'0')
+        const mm = String(d.getMonth()+1).padStart(2,'0')
+        const yyyy = d.getFullYear()
+        return `<div class="others-lesson-row">
+          <span class="others-lesson-info">${dd}.${mm}.${yyyy}&nbsp;&nbsp;${l.time.slice(0,5)} — ${l.duration} мин</span>
+          <input type="checkbox" class="others-cb other-lesson-cb" data-id="${l.id}" data-date="${dd}.${mm}.${yyyy}" data-time="${l.time.slice(0,5)}" checked>
+        </div>`
+      }).join('')
+    }
+
+    let _pendingTimeChanges = []
+    let _pendingDeletes = []
+
+    function applyNewTime() {
+      const newTime = document.getElementById('newCommonTime').value
+      if (!newTime) { showToast('Укажите новое время', false); return }
+      const checked = document.querySelectorAll('.other-lesson-cb:checked')
+      if (checked.length === 0) { showToast('Отметьте хотя бы один урок', false); return }
+      _pendingTimeChanges = Array.from(checked).map(cb => ({
+        id: cb.dataset.id, date: cb.dataset.date, oldTime: cb.dataset.time, newTime
+      }))
+      document.getElementById('applyTimeList').textContent =
+        _pendingTimeChanges.map(r => `${r.date}  ${r.oldTime} → ${r.newTime}`).join('\n')
+      document.getElementById('applyTimeModal').style.display = 'flex'
+    }
+
+    async function confirmApplyTime() {
+      document.getElementById('applyTimeModal').style.display = 'none'
+      for (const item of _pendingTimeChanges) {
+        const idx = lessons.findIndex(l => l.id === item.id)
+        if (idx !== -1) lessons[idx].time = item.newTime
+        if (currentUser && currentSyncMode === SYNC_MODES.CLOUD) {
+          try {
+            await supabaseClient.from('lessons')
+              .update({ time: item.newTime, notified: false, updated_at: new Date().toISOString() })
+              .eq('user_id', currentUser.id).eq('lesson_id', item.id)
+          } catch(e) { console.error('Ошибка обновления времени:', e) }
+        }
+      }
+      saveLessonsToStorage()
+      calendar.refetchEvents()
+      document.getElementById('sheet').classList.remove('active')
+      showToast(`✅ Обновлено уроков: ${_pendingTimeChanges.length}`, true)
+      _pendingTimeChanges = []
+    }
+
+    function deleteCheckedLessons() {
+      const checked = document.querySelectorAll('.other-lesson-cb:checked')
+      if (checked.length === 0) { showToast('Отметьте хотя бы один урок', false); return }
+      _pendingDeletes = Array.from(checked).map(cb => ({
+        id: cb.dataset.id, date: cb.dataset.date, time: cb.dataset.time
+      }))
+      document.getElementById('deleteCheckedList').textContent =
+        'Будут удалены:\n\n' + _pendingDeletes.map(r => `${r.date}  ${r.time}`).join('\n')
+      document.getElementById('deleteCheckedModal').style.display = 'flex'
+    }
+
+    async function confirmDeleteChecked() {
+      document.getElementById('deleteCheckedModal').style.display = 'none'
+      const ids = _pendingDeletes.map(r => r.id)
+      lessons = lessons.filter(l => !ids.includes(l.id))
+      if (currentUser && currentSyncMode === SYNC_MODES.CLOUD) {
+        for (const item of _pendingDeletes) {
+          try {
+            await supabaseClient.from('lessons').delete()
+              .eq('user_id', currentUser.id).eq('lesson_id', item.id)
+          } catch(e) { console.error('Ошибка удаления:', e) }
+        }
+      }
+      saveLessonsToStorage()
+      calendar.refetchEvents()
+      document.getElementById('sheet').classList.remove('active')
+      showToast(`✅ Удалено уроков: ${_pendingDeletes.length}`, true)
+      _pendingDeletes = []
     }
 
     // Функция для тестирования уведомлений
