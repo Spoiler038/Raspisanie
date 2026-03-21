@@ -1,4 +1,7 @@
-const CACHE_NAME = 'raspisanie-v2';
+const CACHE_NAME = 'raspisanie-v3';
+
+// Домены которые НЕЛЬЗЯ кэшировать (API запросы)
+const NEVER_CACHE = ['supabase.co', 'cdn.tailwindcss.com', 'googleapis.com'];
 const urlsToCache = [
   '/Raspisanie/',
   '/Raspisanie/index.html',
@@ -34,8 +37,17 @@ self.addEventListener('activate', event => {
   );
 });
 
-// Обработка fetch запросов
+// Fetch: API запросы всегда идут в сеть, остальное из кэша
 self.addEventListener('fetch', event => {
+  const url = event.request.url;
+
+  // Пропускаем напрямую в сеть — не кэшируем
+  if (NEVER_CACHE.some(domain => url.includes(domain))) {
+    event.respondWith(fetch(event.request));
+    return;
+  }
+
+  // Для остальных — кэш с fallback на сеть
   event.respondWith(
     caches.match(event.request).then(response => response || fetch(event.request))
   );
