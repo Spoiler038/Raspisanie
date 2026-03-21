@@ -228,11 +228,14 @@
   </div>
 
   <!-- SETTINGS -->
-  <div id="settingsSheet" class="sheet" onclick="if(event.target.id==='settingsSheet')settingsSheet.classList.remove('active')">
+  <div id="settingsSheet" class="sheet" onclick="if(event.target.id==='settingsSheet')closeSettings()">
     <div class="sheet-content" style="padding: 16px; max-height: 90vh; overflow-y: hidden;">
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
         <h2 class="font-semibold" style="margin: 0;">Настройки</h2>
-        <button id="cloudActionButton" onclick="handleCloudAction()" style="background: #2563eb; color: white; border: none; border-radius: 8px; padding: 6px 12px; font-size: 13px; cursor: pointer;">☁️ Подключить облако</button>
+        <div style="display: flex; gap: 8px; align-items: center;">
+          <button id="cloudActionButton" onclick="handleCloudAction()" style="background: #2563eb; color: white; border: none; border-radius: 8px; padding: 6px 12px; font-size: 13px; cursor: pointer;">☁️ Подключить облако</button>
+          <button id="saveSettingsBtn" onclick="closeSettings()" style="background: #16a34a; color: white; border: none; border-radius: 8px; padding: 6px 12px; font-size: 13px; cursor: pointer;">💾 Сохранить</button>
+        </div>
       </div>
 
       <div style="display: flex; gap: 12px; margin-bottom: 12px;">
@@ -244,8 +247,8 @@
           </select>
         </div>
         <div style="flex: 1;">
-          <div class="text-xs mb-1">Оповещение (⏰ ±2 мин)</div>
-          <select id="notificationSelect" style="padding: 8px; font-size: 14px;">
+          <div class="text-xs mb-1">Оповещение (⏰ ±3 мин)</div>
+          <select id="notificationSelect" style="padding: 8px; font-size: 14px;" disabled>
             <option>Не оповещать</option>
             <option>За 30 мин</option>
             <option>За 1 час</option>
@@ -739,6 +742,25 @@ async function unsubscribeFromPushNotifications() {
           localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(currentUser))
           updateCloudUI()
           if (currentSyncMode === SYNC_MODES.CLOUD) syncWithCloud()
+
+          // Загружаем настройки из облака и если уведомления включены — подписываемся
+          try {
+            const { data: cloudSettings } = await supabaseClient
+              .from('user_settings')
+              .select('notification_default')
+              .eq('user_id', currentUser.id)
+              .maybeSingle()
+            if (cloudSettings && cloudSettings.notification_default) {
+              const notif = cloudSettings.notification_default
+              localStorage.setItem('teacher_notification', notif)
+              const notifSelect = document.getElementById('notificationSelect')
+              if (notifSelect) notifSelect.value = notif
+              if (notif !== 'Не оповещать') {
+                setTimeout(() => subscribeToPushNotifications(), 1500)
+              }
+            }
+          } catch (e) { console.log('Ошибка загрузки настроек уведомлений:', e) }
+
         } else {
           if (currentSyncMode === SYNC_MODES.CLOUD) setTimeout(() => showAuthModal(), 500)
         }
@@ -1497,6 +1519,9 @@ async function unsubscribeFromPushNotifications() {
       modal.style.display = 'flex'
     }
 
+    // Флаг — были ли изменены настройки с момента открытия панели
+    let settingsChanged = false
+
     function openSettings() {
       const settingsSheet = document.getElementById('settingsSheet')
       const workFrom = document.getElementById('workFrom')
@@ -1504,8 +1529,49 @@ async function unsubscribeFromPushNotifications() {
       if (settingsSheet && workFrom && workTo) {
         workFrom.value = workHours.from
         workTo.value = workHours.to
+        settingsChanged = false
+        resetSaveButton()
         settingsSheet.classList.add('active')
       }
+    }
+
+    function resetSaveButton() {
+      const btn = document.getElementById('saveSettingsBtn')
+      if (btn) { btn.textContent = '💾 Сохранить'; btn.disabled = false; btn.style.opacity = '1'; btn.style.background = '#16a34a' }
+    }
+
+    async function closeSettings() {
+      const settingsSheet = document.getElementById('settingsSheet')
+      if (!settingsChanged || !currentUser || currentSyncMode !== SYNC_MODES.CLOUD) {
+        settingsSheet.classList.remove('active')
+        settingsChanged = false
+        return
+      }
+
+      // Показываем что сохраняем
+      const btn = document.getElementById('saveSettingsBtn')
+      if (btn) { btn.textContent = '⏳ Сохранение...'; btn.disabled = true; btn.style.opacity = '0.7' }
+
+      try {
+        const currentTheme = localStorage.getItem('teacher_theme') || 'dark'
+        const currentNotification = localStorage.getItem('teacher_notification') || 'Не оповещать'
+        await supabaseClient
+          .from('user_settings')
+          .upsert({
+            user_id: currentUser.id,
+            work_from: workHours.from,
+            work_to: workHours.to,
+            theme: currentTheme,
+            notification_default: currentNotification,
+            updated_at: new Date().toISOString()
+          }, { onConflict: 'user_id' })
+        showToast('✅ Настройки сохранены в облаке', true)
+      } catch (error) {
+        showToast('⚠️ Настройки сохранены локально', false)
+      }
+
+      settingsSheet.classList.remove('active')
+      settingsChanged = false
     }
 
     const themeSelect = document.getElementById('themeSelect')
@@ -1513,7 +1579,7 @@ async function unsubscribeFromPushNotifications() {
       themeSelect.onchange = function() {
         document.body.className = this.value
         localStorage.setItem('teacher_theme', this.value)
-        showToast('Тема изменена', true)
+        settingsChanged = true
       }
     }
 
@@ -1527,7 +1593,7 @@ async function unsubscribeFromPushNotifications() {
         calendar.setOption('slotMinTime', workHours.from)
         calendar.setOption('slotMaxTime', workHours.to)
         calendar.render()
-        showToast('Время работы успешно сохранено', true)
+        settingsChanged = true
       }
     }
 
@@ -1548,38 +1614,18 @@ async function unsubscribeFromPushNotifications() {
     if (notificationSelect) {
       const savedNotification = localStorage.getItem('teacher_notification') || 'Не оповещать'
       notificationSelect.value = savedNotification
-      
-      notificationSelect.onchange = async function() {
+
+      notificationSelect.onchange = function() {
         const value = this.value
         localStorage.setItem('teacher_notification', value)
-        showToast('✅ Настройки оповещений сохранены', true)
-        
         notificationHistory.clear()
         checkAndScheduleNotifications()
         if (value === 'Не оповещать') {
-  unsubscribeFromPushNotifications();
-} else {
-  subscribeToPushNotifications();
-}
-        
-        if (currentUser && currentSyncMode === SYNC_MODES.CLOUD) {
-          try {
-            await supabaseClient
-              .from('user_settings')
-              .upsert({
-                user_id: currentUser.id,
-                work_from: workHours.from,
-                work_to: workHours.to,
-                theme: localStorage.getItem('teacher_theme') || 'dark',
-                notification_default: value,
-                updated_at: new Date().toISOString()
-              }, { onConflict: 'user_id' })
-          } catch (error) {
-            if (error.message && error.message.includes('Failed to fetch')) {
-              showToast('⚠️ Настройки сохранены локально', false)
-            }
-          }
+          unsubscribeFromPushNotifications()
+        } else {
+          subscribeToPushNotifications()
         }
+        settingsChanged = true
       }
     }
 
@@ -1656,8 +1702,10 @@ async function unsubscribeFromPushNotifications() {
       } else { showAuthModal() }
     }
 
-    function logoutCloud() {
-      supabaseClient.auth.signOut()
+    async function logoutCloud() {
+      // Отписываем устройство от push перед выходом
+      await unsubscribeFromPushNotifications()
+      await supabaseClient.auth.signOut()
       currentUser = null
       localStorage.removeItem(STORAGE_KEYS.USER)
       localStorage.removeItem(STORAGE_KEYS.LAST_SYNC)
@@ -1674,19 +1722,24 @@ async function unsubscribeFromPushNotifications() {
       const clearCloudButton = document.getElementById('clearCloudButton')
       const exportCloudBtn = document.querySelector('button[onclick="exportCloud()"]')
       const importCloudBtn = document.querySelector('button[onclick="importCloud()"]')
-      
+      const notifSelect = document.getElementById('notificationSelect')
+
       if (currentUser) {
         if (cloudButton) { cloudButton.textContent = '🔌 Отключить облако'; cloudButton.style.background = '#dc2626' }
         if (profileSection) profileSection.style.display = 'block'
         if (clearCloudButton) { clearCloudButton.disabled = false; clearCloudButton.style.opacity = '1'; clearCloudButton.style.background = '#b91c1c' }
         if (exportCloudBtn) { exportCloudBtn.disabled = false; exportCloudBtn.style.opacity = '1'; exportCloudBtn.style.background = '#2563eb' }
         if (importCloudBtn) { importCloudBtn.disabled = false; importCloudBtn.style.opacity = '1'; importCloudBtn.style.background = '#2563eb' }
+        // Включаем выбор уведомлений только для авторизованных
+        if (notifSelect) { notifSelect.disabled = false; notifSelect.style.opacity = '1' }
       } else {
         if (cloudButton) { cloudButton.textContent = '☁️ Подключить облако'; cloudButton.style.background = '#2563eb' }
         if (profileSection) profileSection.style.display = 'none'
         if (clearCloudButton) { clearCloudButton.disabled = true; clearCloudButton.style.opacity = '0.5'; clearCloudButton.style.background = '#7f1d1d' }
         if (exportCloudBtn) { exportCloudBtn.disabled = true; exportCloudBtn.style.opacity = '0.5'; exportCloudBtn.style.background = '#2563eb' }
         if (importCloudBtn) { importCloudBtn.disabled = true; importCloudBtn.style.opacity = '0.5'; importCloudBtn.style.background = '#2563eb' }
+        // Блокируем уведомления если не авторизован
+        if (notifSelect) { notifSelect.disabled = true; notifSelect.style.opacity = '0.5' }
       }
     }
 
