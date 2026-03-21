@@ -293,7 +293,7 @@
   </div>
 
   <!-- Баннер обновления -->
-  <div id="updateBanner" style="display:none; position:fixed; bottom:56px; left:0; right:0; background:#2563eb; color:white; padding:10px 16px; display:none; align-items:center; justify-content:space-between; z-index:9998; font-size:14px;">
+  <div id="updateBanner" style="display:none; position:fixed; bottom:56px; left:0; right:0; background:#2563eb; color:white; padding:10px 16px; align-items:center; justify-content:space-between; z-index:500; font-size:14px;">
     <span>🆕 Доступна новая версия</span>
     <button onclick="applyUpdate()" style="background:white; color:#2563eb; border:none; border-radius:6px; padding:6px 14px; font-weight:600; cursor:pointer; font-size:13px;">Обновить</button>
   </div>
@@ -797,20 +797,9 @@ async function unsubscribeFromPushNotifications() {
           } catch (e) { console.log('Ошибка загрузки настроек из облака:', e) }
 
         } else {
-          // Нет активной сессии
+          // Нет активной сессии — показываем форму входа если режим облако
           if (currentSyncMode === SYNC_MODES.CLOUD) {
-            // Есть сохранённый пользователь в localStorage — пробуем показать форму входа
-            const savedUser = localStorage.getItem(STORAGE_KEYS.USER)
-            if (savedUser) {
-              setTimeout(() => showAuthModal(), 500)
-            } else {
-              // Нет пользователя — показываем выбор режима если ещё не выбран
-              if (!localStorage.getItem(STORAGE_KEYS.SYNC_MODE)) {
-                document.getElementById('syncModeModal').style.display = 'flex'
-              } else {
-                setTimeout(() => showAuthModal(), 500)
-              }
-            }
+            setTimeout(() => showAuthModal(), 500)
           }
         }
       } catch (error) { console.log('Ошибка проверки сессии:', error) }
@@ -1578,6 +1567,9 @@ async function unsubscribeFromPushNotifications() {
         workFrom.value = workHours.from
         workTo.value = workHours.to
         settingsChanged = false
+        // Скрываем баннер пока настройки открыты
+        const banner = document.getElementById('updateBanner')
+        if (banner) banner.style.display = 'none'
         settingsSheet.classList.add('active')
       }
     }
@@ -1959,12 +1951,28 @@ async function unsubscribeFromPushNotifications() {
 
     // Регистрация Service Worker + обнаружение обновлений
     let newWorker = null
+    let isReloading = false
 
     function applyUpdate() {
+      if (isReloading) return
+      isReloading = true
+      const banner = document.getElementById('updateBanner')
+      if (banner) banner.style.display = 'none'
       if (newWorker) {
         newWorker.postMessage({ action: 'skipWaiting' })
+      } else {
+        window.location.reload()
       }
-      window.location.reload()
+    }
+
+    function showUpdateBanner() {
+      const banner = document.getElementById('updateBanner')
+      if (!banner) return
+      banner.style.display = 'flex'
+      // Автоскрытие через 8 секунд
+      setTimeout(() => {
+        if (banner.style.display === 'flex') banner.style.display = 'none'
+      }, 8000)
     }
 
     if ('serviceWorker' in navigator) {
@@ -1973,22 +1981,23 @@ async function unsubscribeFromPushNotifications() {
           console.log('ServiceWorker registered: ', registration)
           if (Notification.permission === 'default') Notification.requestPermission()
 
-          // Обнаружение новой версии
+          // Обнаружение новой версии SW
           registration.addEventListener('updatefound', () => {
             newWorker = registration.installing
             newWorker.addEventListener('statechange', () => {
               if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                // Новая версия готова — показываем баннер
-                const banner = document.getElementById('updateBanner')
-                if (banner) banner.style.display = 'flex'
+                showUpdateBanner()
               }
             })
           })
         }, function(err) { console.log('ServiceWorker registration failed: ', err) })
 
-        // Если SW обновился и страница перезагружена
+        // Перезагрузка только если не уже перезагружаемся
         navigator.serviceWorker.addEventListener('controllerchange', () => {
-          window.location.reload()
+          if (!isReloading) {
+            isReloading = true
+            window.location.reload()
+          }
         })
       })
     }
