@@ -724,10 +724,12 @@ async function unsubscribeFromPushNotifications() {
     function checkSyncMode() {
       const mode = localStorage.getItem(STORAGE_KEYS.SYNC_MODE)
       if (!mode) {
+        // Первый запуск — показываем выбор режима
         document.getElementById('syncModeModal').style.display = 'flex'
       } else {
         currentSyncMode = mode
-        if (mode === SYNC_MODES.CLOUD) checkCloudAuth()
+        // Всегда проверяем сессию — она загрузит настройки и авторизует
+        setTimeout(checkAuthOnLoad, 100)
       }
     }
 
@@ -739,7 +741,6 @@ async function unsubscribeFromPushNotifications() {
           currentUser = { id: session.user.id, email: session.user.email }
           localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(currentUser))
           updateCloudUI()
-          if (currentSyncMode === SYNC_MODES.CLOUD) syncWithCloud()
 
           // Загружаем ВСЕ настройки из облака и применяем
           try {
@@ -770,7 +771,7 @@ async function unsubscribeFromPushNotifications() {
                   if (wtEl) wtEl.value = workHours.to
                 }
               }
-              // Уведомления — подписываемся только если включены
+              // Уведомления
               if (cloudSettings.notification_default) {
                 const notif = cloudSettings.notification_default
                 localStorage.setItem('teacher_notification', notif)
@@ -780,11 +781,26 @@ async function unsubscribeFromPushNotifications() {
                   setTimeout(() => subscribeToPushNotifications(), 1500)
                 }
               }
+              showToast('✅ Настройки загружены из облака', true)
             }
           } catch (e) { console.log('Ошибка загрузки настроек из облака:', e) }
 
         } else {
-          if (currentSyncMode === SYNC_MODES.CLOUD) setTimeout(() => showAuthModal(), 500)
+          // Нет активной сессии
+          if (currentSyncMode === SYNC_MODES.CLOUD) {
+            // Есть сохранённый пользователь в localStorage — пробуем показать форму входа
+            const savedUser = localStorage.getItem(STORAGE_KEYS.USER)
+            if (savedUser) {
+              setTimeout(() => showAuthModal(), 500)
+            } else {
+              // Нет пользователя — показываем выбор режима если ещё не выбран
+              if (!localStorage.getItem(STORAGE_KEYS.SYNC_MODE)) {
+                document.getElementById('syncModeModal').style.display = 'flex'
+              } else {
+                setTimeout(() => showAuthModal(), 500)
+              }
+            }
+          }
         }
       } catch (error) { console.log('Ошибка проверки сессии:', error) }
     }
@@ -1884,7 +1900,8 @@ async function unsubscribeFromPushNotifications() {
       }
 
       checkSyncMode()
-      setTimeout(checkAuthOnLoad, 100)
+      // checkAuthOnLoad вызывается внутри checkSyncMode для облачного режима
+      // отдельный вызов убран чтобы избежать двойного показа модального окна
       
       // Запуск системы уведомлений
       requestNotificationPermission()
