@@ -113,3 +113,9 @@ self.addEventListener('notificationclick', event => {
 self.addEventListener('notificationclose', _event => {
   // Можно логировать аналитику если нужно
 });
+
+self.addEventListener('message', event => {
+  if (event.data && event.data.action === 'skipWaiting') {
+    self.skipWaiting()
+  }
+})
