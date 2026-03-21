@@ -306,7 +306,10 @@
   <div id="settingsSheet" class="sheet" onclick="if(event.target.id==='settingsSheet')closeSettings()">
     <div class="sheet-content" style="padding: 16px; max-height: 90vh; overflow-y: hidden;">
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-        <h2 class="font-semibold" style="margin: 0;">Настройки</h2>
+        <div>
+          <h2 class="font-semibold" style="margin: 0;">Настройки</h2>
+          <span id="appVersionLabel" style="font-size: 11px; color: #475569;">v1.0.3</span>
+        </div>
         <button id="cloudActionButton" onclick="handleCloudAction()" style="background: #2563eb; color: white; border: none; border-radius: 8px; padding: 6px 12px; font-size: 13px; cursor: pointer;">☁️ Подключить облако</button>
       </div>
 
@@ -1662,7 +1665,7 @@ async function unsubscribeFromPushNotifications() {
     async function closeSettings() {
       const settingsSheet = document.getElementById('settingsSheet')
       settingsSheet.classList.remove('active')
-      if (!settingsChanged || !currentUser || currentSyncMode !== SYNC_MODES.CLOUD) {
+      if (!settingsChanged || !currentUser) {
         settingsChanged = false
         return
       }
@@ -1691,7 +1694,6 @@ async function unsubscribeFromPushNotifications() {
       themeSelect.onchange = function() {
         document.body.className = this.value
         localStorage.setItem('teacher_theme', this.value)
-        showToast('✅ Тема изменена', true)
         settingsChanged = true
       }
     }
@@ -1706,7 +1708,6 @@ async function unsubscribeFromPushNotifications() {
         calendar.setOption('slotMinTime', workHours.from)
         calendar.setOption('slotMaxTime', workHours.to)
         calendar.render()
-        showToast('✅ Режим работы сохранён', true)
         settingsChanged = true
       }
     }
@@ -2014,6 +2015,9 @@ async function unsubscribeFromPushNotifications() {
     const APP_VERSION = '1.0.3'
 
     async function checkAppVersion() {
+      // Показываем текущую версию в настройках
+      const vLabel = document.getElementById('appVersionLabel')
+      if (vLabel) vLabel.textContent = `v${APP_VERSION}`
       try {
         const { data, error } = await supabaseClient
           .from('app_config')
