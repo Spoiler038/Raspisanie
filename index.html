@@ -175,8 +175,8 @@
     body.light { scrollbar-width: thin !important; scrollbar-color: #94a3b8 #e2e8f0 !important; }
     body.dark { scrollbar-width: thin; scrollbar-color: #475569 #1e293b; }
     /* FIX iOS: дата и время такой же ширины как остальные поля */
-    .sheet-content input, .sheet-content select, .sheet-content textarea { padding: 0px 8px !important; width: 100% !important; box-sizing: border-box !important; }
-    input[type="date"], input[type="time"] { width: 100% !important; min-width: 0 !important; box-sizing: border-box !important; }
+    .sheet-content input, .sheet-content select, .sheet-content textarea { box-sizing: border-box !important; }
+    input[type="date"], input[type="time"] { min-width: 0 !important; box-sizing: border-box !important; }
     @keyframes spin { to { transform: rotate(360deg); } }
 
     /* ===== ВКЛАДКИ (только для режима редактирования) ===== */
@@ -189,14 +189,14 @@
     body.light .others-header { border-bottom-color: #cbd5e1; }
     .new-time-label { font-size: 13px; color: #94a3b8; margin-right: 6px; white-space: nowrap; }
     .new-time-input { width: 90px !important; padding: 4px 8px !important; font-size: 14px !important; border-radius: 8px !important; flex-shrink: 0; }
-    .select-all-wrap { display: flex; align-items: center; gap: 6px; font-size: 13px; color: #94a3b8; flex-shrink: 0; margin-left: auto; padding-right: 2px; }
+    .select-all-wrap { display: flex; align-items: center; gap: 6px; font-size: 13px; color: #94a3b8; flex-shrink: 0; margin-left: auto; padding-right: 20px; }
     .others-lesson-list { overflow-y: auto; overflow-x: hidden; max-height: calc(80vh - 180px); }
     .others-lesson-row { display: flex; align-items: center; padding: 9px 0; border-bottom: 1px solid #1e293b; font-size: 14px; white-space: nowrap; overflow: hidden; }
     body.light .others-lesson-row { border-bottom-color: #e2e8f0; }
     .others-lesson-row:last-child { border-bottom: none; }
     .others-lesson-info { color: #e5e7eb; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding-right: 8px; }
     body.light .others-lesson-info { color: #020617; }
-    .others-cb { width: 18px !important; height: 18px !important; cursor: pointer; accent-color: #2563eb; flex-shrink: 0; margin-right: 2px; display: inline-block; }
+    .others-cb { width: 18px !important; height: 18px !important; cursor: pointer; accent-color: #2563eb; flex-shrink: 0; margin-right: 20px; display: inline-block; }
     .others-actions { display: flex; gap: 8px; padding-top: 12px; border-top: 1px solid #1e293b; margin-top: 8px; }
     body.light .others-actions { border-top-color: #cbd5e1; }
   </style>
