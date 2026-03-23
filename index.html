@@ -840,8 +840,7 @@ async function unsubscribeFromPushNotifications() {
           currentUser = { id: session.user.id, email: session.user.email }
           localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(currentUser))
           updateCloudUI()
-
-          // Загружаем ВСЕ настройки из облака и применяем
+          subscribeToLessonsRealtime()
           try {
             const { data: cloudSettings } = await supabaseClient
               .from('user_settings')
@@ -967,6 +966,7 @@ async function unsubscribeFromPushNotifications() {
         updateCloudUI()
         showToast(`✅ Вход выполнен: ${data.user.email}`, true)
         setTimeout(() => subscribeToPushNotifications(), 1000)
+        subscribeToLessonsRealtime()
         
         loginBtn.textContent = originalText
         loginBtn.disabled = false
@@ -2112,6 +2112,62 @@ async function unsubscribeFromPushNotifications() {
           }
         })
       })
+    }
+
+    // ===== REALTIME СИНХРОНИЗАЦИЯ =====
+    let realtimeChannel = null
+
+    function subscribeToLessonsRealtime() {
+      if (!currentUser) return
+      // Отписываемся от старого канала если есть
+      if (realtimeChannel) {
+        supabaseClient.removeChannel(realtimeChannel)
+        realtimeChannel = null
+      }
+      realtimeChannel = supabaseClient
+        .channel('lessons-changes')
+        .on('postgres_changes', {
+          event: '*',
+          schema: 'public',
+          table: 'lessons',
+          filter: `user_id=eq.${currentUser.id}`
+        }, (payload) => {
+          console.log('📡 Realtime:', payload.eventType)
+          handleRealtimeLesson(payload)
+        })
+        .subscribe((status) => {
+          console.log('📡 Realtime статус:', status)
+        })
+    }
+
+    function handleRealtimeLesson(payload) {
+      const { eventType, new: newRow, old: oldRow } = payload
+      if (eventType === 'INSERT') {
+        const exists = lessons.find(l => l.id === newRow.lesson_id)
+        if (!exists) {
+          lessons.push({
+            id: newRow.lesson_id, date: newRow.date, time: newRow.time,
+            student: newRow.student, duration: newRow.duration, notes: newRow.notes || ''
+          })
+          saveLessonsToStorage()
+          calendar.refetchEvents()
+          showToast('📡 Новый урок получен', true)
+        }
+      } else if (eventType === 'UPDATE') {
+        const idx = lessons.findIndex(l => l.id === newRow.lesson_id)
+        if (idx !== -1) {
+          lessons[idx] = {
+            id: newRow.lesson_id, date: newRow.date, time: newRow.time,
+            student: newRow.student, duration: newRow.duration, notes: newRow.notes || ''
+          }
+          saveLessonsToStorage()
+          calendar.refetchEvents()
+        }
+      } else if (eventType === 'DELETE') {
+        lessons = lessons.filter(l => l.id !== oldRow.lesson_id)
+        saveLessonsToStorage()
+        calendar.refetchEvents()
+      }
     }
 
     // ===== ВКЛАДКИ И ГРУППОВЫЕ ДЕЙСТВИЯ =====
