@@ -1451,7 +1451,7 @@ async function unsubscribeFromPushNotifications() {
       if (headerDateEl) { const month = d.toLocaleDateString('ru', { month: 'long' }); const year = d.getFullYear(); headerDateEl.textContent = month + ' ' + year }
     }
 
-    function openFormWithDate(date) {
+        function openFormWithDate(date) {
       editingLessonId = null
       document.getElementById('formTitle').textContent = 'Новое занятие'
       document.getElementById('deleteSection').style.display = 'none'
@@ -1472,6 +1472,10 @@ async function unsubscribeFromPushNotifications() {
         notesInput.value = ''
         setTimeout(autoResizeNotes, 0)
         sheet.classList.add('active')
+      }
+    }
+
+    function openEditForm(lesson) {
       editingLessonId = lesson.id
       document.getElementById('formTitle').textContent = 'Редактировать занятие'
       document.getElementById('deleteSection').style.display = 'block'
