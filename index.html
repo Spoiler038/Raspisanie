@@ -97,6 +97,7 @@
     header { padding: 12px; display: flex; align-items: center; flex-shrink: 0; }
     .header-center { flex: 1; text-align: center; font-weight: 600; }
     .header-right { width: 32px; text-align: right }
+    .header-left { width: 32px; text-align: left }
     /* FIX: увеличена высота панели, кнопки подняты через padding-bottom */
     .bottom-bar { position: fixed; bottom: 0; left: 0; right: 0; background: #020617; border-top: 1px solid #1e293b; padding: 8px 8px 16px 8px; display: flex; justify-content: space-around; align-items: center; z-index: 100; height: 64px; box-sizing: border-box; width: 100%; padding-bottom: max(16px, env(safe-area-inset-bottom)); }
     body.light .bottom-bar { background: #e5e7eb }
@@ -209,6 +210,9 @@
 
   <div class="wrapper">
     <header>
+      <div class="header-left">
+        <button onclick="goHome()" title="Сегодня">🏠</button>
+      </div>
       <div class="header-center">
         📅 Расписание <span id="headerDate" class="opacity-70"></span>
       </div>
@@ -320,7 +324,12 @@
           <h2 class="font-semibold" style="margin: 0;">Настройки</h2>
           <span id="appVersionLabel" style="font-size: 11px; color: #475569;"></span>
         </div>
-        <button id="cloudActionButton" onclick="handleCloudAction()" style="background: #2563eb; color: white; border: none; border-radius: 8px; padding: 6px 12px; font-size: 13px; cursor: pointer;">☁️ Подключить облако</button>
+        <div style="display: flex; gap: 6px; align-items: center;">
+          <button id="autoDeleteBtn" onclick="toggleAutoDelete()" title="Автоудаление старых уроков"
+            style="background: #475569; color: white; border: none; border-radius: 8px; padding: 6px 10px; font-size: 15px; cursor: pointer;">🗑️</button>
+          <button id="cloudActionButton" onclick="handleCloudAction()"
+            style="background: #2563eb; color: white; border: none; border-radius: 8px; padding: 6px 12px; font-size: 13px; cursor: pointer;">☁️ Подключить облако</button>
+        </div>
       </div>
 
       <div style="display: flex; gap: 12px; margin-bottom: 12px;">
@@ -880,6 +889,13 @@ async function unsubscribeFromPushNotifications() {
                   setTimeout(() => subscribeToPushNotifications(), 1500)
                 }
               }
+              // Автоудаление
+              if (cloudSettings.auto_delete_old !== undefined && cloudSettings.auto_delete_old !== null) {
+                const autoDelete = cloudSettings.auto_delete_old === true
+                localStorage.setItem('auto_delete_old', autoDelete ? '1' : '0')
+                updateAutoDeleteBtn()
+                if (autoDelete) setTimeout(runAutoDelete, 500)
+              }
               showToast('✅ Настройки загружены из облака', true)
             }
           } catch (e) { console.log('Ошибка загрузки настроек из облака:', e) }
@@ -1331,45 +1347,15 @@ async function unsubscribeFromPushNotifications() {
       }, 30)
     }
 
-    // Кэш высоты — пересчитываем только при реальных изменениях размеров
-    let _cachedScrollerHeight = null
-    let _cachedViewportHeight = 0
-    let _cachedHeaderHeight = 0
-    let _cachedBottomBarHeight = 0
-
-    function calculateScrollerHeight(force = false) {
+    function calculateScrollerHeight() {
       const header = document.querySelector('header')
       const bottomBar = document.querySelector('.bottom-bar')
       const calendarEl = document.getElementById('calendar')
       if (!header || !bottomBar || !calendarEl) return
-
-      const viewportHeight = window.innerHeight
       const headerHeight = header.offsetHeight
       const bottomBarHeight = bottomBar.offsetHeight
-
-      // Проверяем изменились ли размеры
-      const sizeChanged = viewportHeight !== _cachedViewportHeight ||
-                          headerHeight !== _cachedHeaderHeight ||
-                          bottomBarHeight !== _cachedBottomBarHeight
-
-      if (!force && !sizeChanged && _cachedScrollerHeight !== null) {
-        // Размеры не изменились — просто применяем кэш без пересчёта
-        applyScrollerHeight(_cachedScrollerHeight)
-        return
-      }
-
-      // Пересчитываем и кэшируем
-      _cachedViewportHeight = viewportHeight
-      _cachedHeaderHeight = headerHeight
-      _cachedBottomBarHeight = bottomBarHeight
-      _cachedScrollerHeight = viewportHeight - headerHeight - bottomBarHeight - 5
-
-      applyScrollerHeight(_cachedScrollerHeight)
-    }
-
-    function applyScrollerHeight(availableHeight) {
-      const calendarEl = document.getElementById('calendar')
-      if (!calendarEl) return
+      const viewportHeight = window.innerHeight
+      const availableHeight = viewportHeight - headerHeight - bottomBarHeight - 5
       calendarEl.style.setProperty('height', availableHeight + 'px', 'important')
       if (window.scrollerTimer) clearTimeout(window.scrollerTimer)
       window.scrollerTimer = setTimeout(() => {
@@ -1378,7 +1364,8 @@ async function unsubscribeFromPushNotifications() {
         const scrollers = document.querySelectorAll('.fc-timeGridWeek-view .fc-scroller, .fc-timeGridDay-view .fc-scroller, .fc-dayGridMonth-view .fc-scroller')
         scrollers.forEach(scroller => {
           if (scroller.closest('.fc-timeGridWeek-view') || scroller.closest('.fc-timeGridDay-view')) {
-            scroller.style.setProperty('max-height', (availableHeight - dayHeaderHeight - 5) + 'px', 'important')
+            const scrollHeight = availableHeight - dayHeaderHeight - 5
+            scroller.style.setProperty('max-height', scrollHeight + 'px', 'important')
           } else {
             scroller.style.setProperty('max-height', availableHeight + 'px', 'important')
           }
@@ -1387,12 +1374,6 @@ async function unsubscribeFromPushNotifications() {
         })
         if (calendar.view.type === 'dayGridMonth') normalizeMonthHeights()
       }, 50)
-    }
-
-    // Принудительный пересчёт — при изменении времени работы или ориентации
-    function recalculateScrollerHeight() {
-      _cachedScrollerHeight = null
-      calculateScrollerHeight(true)
     }
 
     const calendar = new FullCalendar.Calendar(document.getElementById('calendar'), {
@@ -1459,8 +1440,8 @@ async function unsubscribeFromPushNotifications() {
     }
 
     function updateModes() { ['month', 'week', 'day'].forEach(v => { const element = document.getElementById('mode-' + v); if (element) element.classList.toggle('active', v === currentView) }) }
-    function prev() { calendar.prev(); updateHeader() }
-    function next() { calendar.next(); updateHeader() }
+    function prev() { calendar.prev(); updateHeader(); setTimeout(calculateScrollerHeight, 100) }
+    function next() { calendar.next(); updateHeader(); setTimeout(calculateScrollerHeight, 100) }
 
     function updateHeader() {
       const d = calendar.getDate()
@@ -1708,7 +1689,7 @@ async function unsubscribeFromPushNotifications() {
         workFrom.value = workHours.from
         workTo.value = workHours.to
         settingsChanged = false
-        // Скрываем баннер пока настройки открыты
+        updateAutoDeleteBtn()
         const banner = document.getElementById('updateBanner')
         if (banner) banner.style.display = 'none'
         settingsSheet.classList.add('active')
@@ -1731,6 +1712,7 @@ async function unsubscribeFromPushNotifications() {
             work_to: workHours.to,
             theme: localStorage.getItem('teacher_theme') || 'dark',
             notification_default: localStorage.getItem('teacher_notification') || 'Не оповещать',
+            auto_delete_old: localStorage.getItem('auto_delete_old') === '1',
             updated_at: new Date().toISOString()
           }, { onConflict: 'user_id' })
         showToast('✅ Настройки сохранены в облаке', true)
@@ -1761,7 +1743,6 @@ async function unsubscribeFromPushNotifications() {
         calendar.setOption('slotMinTime', workHours.from)
         calendar.setOption('slotMaxTime', workHours.to)
         calendar.render()
-        setTimeout(recalculateScrollerHeight, 100)
         settingsChanged = true
       }
     }
@@ -2034,7 +2015,10 @@ async function unsubscribeFromPushNotifications() {
         const savedNotification = localStorage.getItem('teacher_notification') || 'Не оповещать'
         if (notificationSelect) notificationSelect.value = savedNotification
       } catch (e) { console.log('Ошибка загрузки настроек оповещений') }
-      
+
+      // Инициализация кнопки автоудаления
+      try { updateAutoDeleteBtn() } catch(e) {}
+
       if (calendar) {
         calendar.render()
         updateHeader()
@@ -2043,25 +2027,21 @@ async function unsubscribeFromPushNotifications() {
       }
 
       checkSyncMode()
-      // checkAuthOnLoad вызывается внутри checkSyncMode для облачного режима
-      // отдельный вызов убран чтобы избежать двойного показа модального окна
-
-      // Проверка версии приложения
       checkAppVersion()
-      
-      // Запуск системы уведомлений
       requestNotificationPermission()
       startNotificationSystem()
-      
-      // Показываем предупреждение для iOS
       showIosWarning()
-      
+
+      // Запуск автоудаления при старте (в начале месяца)
+      setTimeout(() => {
+        const now = new Date()
+        if (now.getDate() <= 3) runAutoDelete() // первые 3 дня месяца
+      }, 2000)
+
       window.addEventListener('resize', function() { setTimeout(recalculateScrollerHeight, 100) })
       window.addEventListener('orientationchange', function() { setTimeout(recalculateScrollerHeight, 200) })
 
-      setTimeout(() => {
-        updateCloudUI()
-      }, 500)
+      setTimeout(() => { updateCloudUI() }, 500)
     })
 
     // ===== ВЕРСИЯ ПРИЛОЖЕНИЯ =====
@@ -2148,6 +2128,89 @@ async function unsubscribeFromPushNotifications() {
           }
         })
       })
+    }
+
+    // ===== СВАЙПЫ =====
+    ;(function() {
+      let touchStartX = 0
+      let touchStartY = 0
+      const calendarEl = document.getElementById('calendar')
+      if (!calendarEl) return
+
+      calendarEl.addEventListener('touchstart', e => {
+        touchStartX = e.touches[0].clientX
+        touchStartY = e.touches[0].clientY
+      }, { passive: true })
+
+      calendarEl.addEventListener('touchend', e => {
+        const dx = e.changedTouches[0].clientX - touchStartX
+        const dy = e.changedTouches[0].clientY - touchStartY
+        // Только горизонтальный свайп (горизонталь > вертикаль и > 50px)
+        if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 50) {
+          if (dx < 0) next()   // влево → вперёд
+          else        prev()   // вправо → назад
+        }
+      }, { passive: true })
+    })()
+
+    // ===== КНОПКА ДОМОЙ =====
+    function goHome() {
+      calendar.today()
+      if (currentView !== 'month') {
+        setView('month')
+      }
+      updateHeader()
+    }
+
+    // ===== АВТОУДАЛЕНИЕ СТАРЫХ УРОКОВ =====
+    function toggleAutoDelete() {
+      const current = localStorage.getItem('auto_delete_old') === '1'
+      const newVal = !current
+      localStorage.setItem('auto_delete_old', newVal ? '1' : '0')
+      updateAutoDeleteBtn()
+      settingsChanged = true
+      if (newVal) {
+        showToast('🗑️ Автоудаление включено', true)
+        runAutoDelete()
+      } else {
+        showToast('🗑️ Автоудаление отключено', true)
+      }
+    }
+
+    function updateAutoDeleteBtn() {
+      const btn = document.getElementById('autoDeleteBtn')
+      if (!btn) return
+      const enabled = localStorage.getItem('auto_delete_old') === '1'
+      btn.style.background = enabled ? '#dc2626' : '#475569'
+      btn.title = enabled ? 'Автоудаление: включено' : 'Автоудаление: отключено'
+    }
+
+    function runAutoDelete() {
+      const enabled = localStorage.getItem('auto_delete_old') === '1'
+      if (!enabled) return
+
+      const now = new Date()
+      // Первый день текущего месяца
+      const startOfCurrentMonth = new Date(now.getFullYear(), now.getMonth(), 1)
+      const cutoffDate = startOfCurrentMonth.toISOString().slice(0, 10)
+
+      const toDelete = lessons.filter(l => l.date < cutoffDate)
+      if (toDelete.length === 0) return
+
+      console.log(`🗑️ Автоудаление ${toDelete.length} уроков до ${cutoffDate}`)
+      lessons = lessons.filter(l => l.date >= cutoffDate)
+      saveLessonsToStorage()
+      calendar.refetchEvents()
+
+      if (currentUser) {
+        toDelete.forEach(async lesson => {
+          try {
+            await supabaseClient.from('lessons').delete()
+              .eq('user_id', currentUser.id).eq('lesson_id', lesson.id)
+          } catch(e) { console.error('Ошибка автоудаления:', e) }
+        })
+      }
+      showToast(`🗑️ Удалено ${toDelete.length} старых уроков`, true)
     }
 
     // ===== ВКЛАДКИ И ГРУППОВЫЕ ДЕЙСТВИЯ =====
