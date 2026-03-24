@@ -178,6 +178,7 @@
     /* FIX iOS: дата и время такой же ширины как остальные поля */
     .sheet-content input, .sheet-content select, .sheet-content textarea { padding: 0px 8px !important; box-sizing: border-box !important; }
     input[type="date"], input[type="time"] { min-width: 0 !important; box-sizing: border-box !important; }
+    #notesInput { resize: none; overflow: hidden; min-height: 44px; }
     @keyframes spin { to { transform: rotate(360deg); } }
 
     /* ===== ВКЛАДКИ (только для режима редактирования) ===== */
@@ -261,7 +262,7 @@
           <input id="timeInput" type="time">
           <input id="studentInput" placeholder="Имя ученика">
           <input id="durationInput" type="number" value="60" placeholder="Длительность (мин)" min="30" step="30">
-          <textarea id="notesInput" placeholder="Заметки (необязательно)" rows="2"></textarea>
+          <textarea id="notesInput" placeholder="Заметки (необязательно)"></textarea>
           <div class="flex gap-2">
             <button id="deleteSection" class="flex-1 btn-danger" style="display:none;" onclick="deleteLesson()">Удалить</button>
             <button class="flex-1 btn-primary" onclick="saveLesson()">Сохранить</button>
@@ -1468,11 +1469,8 @@ async function unsubscribeFromPushNotifications() {
         studentInput.value = ''
         durationInput.value = '60'
         notesInput.value = ''
+        setTimeout(autoResizeNotes, 0)
         sheet.classList.add('active')
-      }
-    }
-
-    function openEditForm(lesson) {
       editingLessonId = lesson.id
       document.getElementById('formTitle').textContent = 'Редактировать занятие'
       document.getElementById('deleteSection').style.display = 'block'
@@ -1488,6 +1486,7 @@ async function unsubscribeFromPushNotifications() {
         studentInput.value = lesson.student
         durationInput.value = lesson.duration
         notesInput.value = lesson.notes || ''
+        setTimeout(autoResizeNotes, 0)
         // Показываем вкладки и заполняем "Другие"
         document.getElementById('editTabsBar').style.display = 'flex'
         switchEditTab(1)
@@ -1516,11 +1515,21 @@ async function unsubscribeFromPushNotifications() {
         studentInput.value = ''
         durationInput.value = '60'
         notesInput.value = ''
-        sheet.classList.add('active')
-      }
+        setTimeout(autoResizeNotes, 0)
+        sheet.classList.add('active') const sheet = document.getElementById('sheet'); if (sheet) sheet.classList.remove('active') }
+
+    function autoResizeNotes() {
+      const el = document.getElementById('notesInput')
+      if (!el) return
+      el.style.height = 'auto'
+      el.style.height = el.scrollHeight + 'px'
     }
 
-    function cancelForm() { const sheet = document.getElementById('sheet'); if (sheet) sheet.classList.remove('active') }
+    // Навешиваем авторастяжку
+    document.addEventListener('DOMContentLoaded', function() {
+      const notesEl = document.getElementById('notesInput')
+      if (notesEl) notesEl.addEventListener('input', autoResizeNotes)
+    })
 
     function hasLessonConflict(newLesson, editMode = false) {
       const lessonStart = new Date(`${newLesson.date}T${newLesson.time}`)
