@@ -1404,15 +1404,23 @@ async function unsubscribeFromPushNotifications() {
           calendar.changeView('timeGridDay', info.date)
           setView('day')
         } else {
-          const roundedDate = roundTo30(new Date(info.date))
-          openFormWithDate(roundedDate)
+          // Задержка 350мс чтобы исключить ложное открытие при свайпе
+          const clickDate = new Date(info.date)
+          clearTimeout(window._dateClickTimer)
+          window._dateClickTimer = setTimeout(() => {
+            const roundedDate = roundTo30(clickDate)
+            openFormWithDate(roundedDate)
+          }, 350)
         }
       },
       select: function(info) {
         lastClickInfo = info
         if (calendar.view.type !== 'dayGridMonth') {
           const startDate = roundTo30(new Date(info.start))
-          openFormWithDate(startDate)
+          clearTimeout(window._dateClickTimer)
+          window._dateClickTimer = setTimeout(() => {
+            openFormWithDate(startDate)
+          }, 350)
         }
       },
       eventClick: function(info) {
@@ -1442,8 +1450,8 @@ async function unsubscribeFromPushNotifications() {
     }
 
     function updateModes() { ['month', 'week', 'day'].forEach(v => { const element = document.getElementById('mode-' + v); if (element) element.classList.toggle('active', v === currentView) }) }
-    function prev() { calendar.prev(); updateHeader(); setTimeout(calculateScrollerHeight, 100) }
-    function next() { calendar.next(); updateHeader(); setTimeout(calculateScrollerHeight, 100) }
+    function prev() { clearTimeout(window._dateClickTimer); calendar.prev(); updateHeader() }
+    function next() { clearTimeout(window._dateClickTimer); calendar.next(); updateHeader() }
 
     function updateHeader() {
       const d = calendar.getDate()
