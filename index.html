@@ -120,6 +120,19 @@
     .btn-secondary { background: #64748b; color: white; padding: 12px 16px; border-radius: 12px; font-weight: 500; text-align: center; border: none; width: 100%; cursor: pointer; }
     .btn-primary { background: #2563eb; color: white; padding: 12px 16px; border-radius: 12px; font-weight: 500; text-align: center; border: none; width: 100%; cursor: pointer; }
     #calendar { cursor: pointer; }
+    /* ===== ТУР ОБУЧЕНИЯ ===== */
+    .tour-highlight { position: fixed; z-index: 9002; border-radius: 12px; box-shadow: 0 0 0 4px #2563eb, 0 0 0 9999px rgba(0,0,0,0.75); pointer-events: none; transition: all 0.3s ease; }
+    .tour-card { position: fixed; z-index: 9003; background: #1e293b; border-radius: 16px; padding: 20px; width: calc(100% - 32px); max-width: 388px; left: 50%; transform: translateX(-50%); box-shadow: 0 8px 32px rgba(0,0,0,0.4); border: 1px solid #334155; }
+    body.light .tour-card { background: #ffffff; border-color: #cbd5e1; }
+    .tour-step-label { font-size: 11px; color: #64748b; margin-bottom: 6px; letter-spacing: 0.5px; }
+    .tour-title { font-size: 16px; font-weight: 600; color: #e5e7eb; margin-bottom: 8px; }
+    body.light .tour-title { color: #020617; }
+    .tour-text { font-size: 14px; color: #94a3b8; line-height: 1.5; margin-bottom: 16px; }
+    body.light .tour-text { color: #475569; }
+    .tour-buttons { display: flex; gap: 8px; align-items: center; }
+    .tour-dots { display: flex; gap: 5px; align-items: center; flex: 1; }
+    .tour-dot { width: 6px; height: 6px; border-radius: 50%; background: #334155; transition: all 0.2s; }
+    .tour-dot.active { background: #2563eb; width: 18px; border-radius: 3px; }
     #calendar { flex: 1; overflow: hidden; }
     * { scrollbar-width: thin; scrollbar-color: #4b5563 #1f2937; }
     ::-webkit-scrollbar { width: 6px; }
@@ -208,6 +221,19 @@
 <body class="dark">
 
   <!-- Toast для уведомлений -->
+  <!-- ТУР ОБУЧЕНИЯ -->
+  <div id="tourHighlight" class="tour-highlight" style="display:none;"></div>
+  <div id="tourCard" class="tour-card" style="display:none;">
+    <div class="tour-step-label" id="tourStepLabel"></div>
+    <div class="tour-title" id="tourTitle"></div>
+    <div class="tour-text" id="tourText"></div>
+    <div class="tour-buttons">
+      <div class="tour-dots" id="tourDots"></div>
+      <button onclick="skipTour()" style="background:transparent;border:none;color:#64748b;font-size:13px;cursor:pointer;padding:6px 4px;flex-shrink:0;">Пропустить</button>
+      <button onclick="tourNext()" id="tourNextBtn" style="background:#2563eb;color:white;border:none;border-radius:10px;padding:8px 18px;font-size:14px;font-weight:500;cursor:pointer;flex-shrink:0;">Далее</button>
+    </div>
+  </div>
+
   <div id="toast" class="toast"></div>
 
   <div class="wrapper">
@@ -327,6 +353,8 @@
           <span id="appVersionLabel" style="font-size: 11px; color: #475569;"></span>
         </div>
         <div style="display: flex; gap: 6px; align-items: center;">
+          <button onclick="startTour()" title="Обучение"
+            style="background:#475569;color:white;border:none;border-radius:8px;padding:6px 10px;font-size:15px;cursor:pointer;">❓</button>
           <button id="autoDeleteBtn" onclick="toggleAutoDelete()" title="Автоудаление старых уроков"
             style="background: #475569; color: white; border: none; border-radius: 8px; padding: 6px 10px; font-size: 15px; cursor: pointer;">🗑️</button>
           <button id="cloudActionButton" onclick="handleCloudAction()"
@@ -1404,23 +1432,15 @@ async function unsubscribeFromPushNotifications() {
           calendar.changeView('timeGridDay', info.date)
           setView('day')
         } else {
-          // Задержка 350мс чтобы исключить ложное открытие при свайпе
-          const clickDate = new Date(info.date)
-          clearTimeout(window._dateClickTimer)
-          window._dateClickTimer = setTimeout(() => {
-            const roundedDate = roundTo30(clickDate)
-            openFormWithDate(roundedDate)
-          }, 350)
+          const roundedDate = roundTo30(new Date(info.date))
+          openFormWithDate(roundedDate)
         }
       },
       select: function(info) {
         lastClickInfo = info
         if (calendar.view.type !== 'dayGridMonth') {
           const startDate = roundTo30(new Date(info.start))
-          clearTimeout(window._dateClickTimer)
-          window._dateClickTimer = setTimeout(() => {
-            openFormWithDate(startDate)
-          }, 350)
+          openFormWithDate(startDate)
         }
       },
       eventClick: function(info) {
@@ -1450,8 +1470,8 @@ async function unsubscribeFromPushNotifications() {
     }
 
     function updateModes() { ['month', 'week', 'day'].forEach(v => { const element = document.getElementById('mode-' + v); if (element) element.classList.toggle('active', v === currentView) }) }
-    function prev() { clearTimeout(window._dateClickTimer); calendar.prev(); updateHeader() }
-    function next() { clearTimeout(window._dateClickTimer); calendar.next(); updateHeader() }
+    function prev() { calendar.prev(); updateHeader(); setTimeout(calculateScrollerHeight, 100) }
+    function next() { calendar.next(); updateHeader(); setTimeout(calculateScrollerHeight, 100) }
 
     function updateHeader() {
       const d = calendar.getDate()
@@ -2054,6 +2074,7 @@ async function unsubscribeFromPushNotifications() {
 
       checkSyncMode()
       checkAppVersion()
+      checkFirstTimeTour()
       requestNotificationPermission()
       startNotificationSystem()
       showIosWarning()
@@ -2339,6 +2360,144 @@ async function unsubscribeFromPushNotifications() {
       document.getElementById('sheet').classList.remove('active')
       showToast(`✅ Удалено уроков: ${_pendingDeletes.length}`, true)
       _pendingDeletes = []
+    }
+
+    // ===== ТУР ОБУЧЕНИЯ =====
+    const TOUR_STEPS = [
+      {
+        title: '👋 Добро пожаловать!',
+        text: 'Это приложение для расписания уроков. Для закрытия любого открытого окна — нажмите на затемнённую область вне него.',
+        target: null,
+        position: 'center'
+      },
+      {
+        title: '📅 Режимы просмотра',
+        text: 'Переключайте между Месяцем, Неделей и Днём внизу экрана. Свайп влево — следующий период, вправо — предыдущий. Кнопка 🏠 возвращает к сегодняшней дате.',
+        target: '.bottom-bar',
+        position: 'top'
+      },
+      {
+        title: '➕ Создание урока',
+        text: 'Кнопка + создаёт урок с текущим временем. В режимах Неделя и День — нажмите на нужную строку в сетке, и урок создастся с уже заполненным временем.',
+        target: '.add-btn',
+        position: 'top'
+      },
+      {
+        title: '✏️ Редактирование урока',
+        text: 'Нажмите на урок в календаре чтобы открыть редактор. Вкладка "Другие" позволяет переносить время или удалять группу уроков одного ученика сразу.',
+        target: '#calendar',
+        position: 'bottom'
+      },
+      {
+        title: '☁️ Облако и синхронизация',
+        text: 'Уроки сохраняются автоматически при наличии интернета. Изменения с любого устройства появляются мгновенно — войдите под одним аккаунтом на всех устройствах.',
+        target: null,
+        position: 'center'
+      },
+      {
+        title: '🔔 Уведомления',
+        text: 'Push-уведомления приходят даже когда приложение полностью закрыто. Настройте за сколько минут напоминать в ⚙️ Настройках. Требуется вход в облако.',
+        target: null,
+        position: 'center'
+      },
+      {
+        title: '🗑️ Автоудаление',
+        text: 'Кнопка 🗑️ в настройках включает автоматическое удаление уроков прошлого месяца. Срабатывает в первые дни нового месяца.',
+        target: null,
+        position: 'center'
+      }
+    ]
+
+    let _tourStep = 0
+
+    function startTour() {
+      // Закрываем настройки если открыты
+      const settingsSheet = document.getElementById('settingsSheet')
+      if (settingsSheet) settingsSheet.classList.remove('active')
+      _tourStep = 0
+      _showTourStep()
+    }
+
+    function skipTour() {
+      _hideTour()
+      localStorage.setItem('tour_done', '1')
+    }
+
+    function tourNext() {
+      if (_tourStep >= TOUR_STEPS.length - 1) {
+        skipTour()
+        return
+      }
+      _tourStep++
+      _showTourStep()
+    }
+
+    function _hideTour() {
+      document.getElementById('tourCard').style.display = 'none'
+      document.getElementById('tourHighlight').style.display = 'none'
+    }
+
+    function _showTourStep() {
+      const step = TOUR_STEPS[_tourStep]
+      const total = TOUR_STEPS.length
+      const card = document.getElementById('tourCard')
+      const highlight = document.getElementById('tourHighlight')
+
+      document.getElementById('tourStepLabel').textContent = `${_tourStep + 1} из ${total}`
+      document.getElementById('tourTitle').textContent = step.title
+      document.getElementById('tourText').textContent = step.text
+      document.getElementById('tourNextBtn').textContent = _tourStep === total - 1 ? 'Готово' : 'Далее'
+
+      // Dots
+      document.getElementById('tourDots').innerHTML = TOUR_STEPS.map((_, i) =>
+        `<div class="tour-dot${i === _tourStep ? ' active' : ''}"></div>`
+      ).join('')
+
+      // Подсветка целевого элемента
+      if (step.target) {
+        const el = document.querySelector(step.target)
+        if (el) {
+          const r = el.getBoundingClientRect()
+          const p = 6
+          highlight.style.cssText = `display:block;left:${r.left-p}px;top:${r.top-p}px;width:${r.width+p*2}px;height:${r.height+p*2}px;`
+        } else {
+          highlight.style.display = 'none'
+        }
+      } else {
+        highlight.style.display = 'none'
+      }
+
+      // Позиция карточки
+      card.style.display = 'block'
+      card.style.top = 'auto'
+      card.style.bottom = 'auto'
+
+      if (step.position === 'top') {
+        // Карточка сверху — над элементом или вверху экрана
+        const el = step.target ? document.querySelector(step.target) : null
+        if (el) {
+          const r = el.getBoundingClientRect()
+          const topPos = Math.max(12, r.top - card.offsetHeight - 20)
+          card.style.top = topPos + 'px'
+        } else {
+          card.style.top = '80px'
+        }
+      } else if (step.position === 'bottom') {
+        card.style.top = '120px'
+      } else {
+        // center — посередине по вертикали
+        card.style.top = '50%'
+        card.style.transform = 'translateX(-50%) translateY(-50%)'
+        return
+      }
+      card.style.transform = 'translateX(-50%)'
+    }
+
+    // Запуск тура при первом входе
+    function checkFirstTimeTour() {
+      if (!localStorage.getItem('tour_done')) {
+        setTimeout(startTour, 800)
+      }
     }
 
     // Функция для тестирования уведомлений
