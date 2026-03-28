@@ -2367,7 +2367,7 @@ async function unsubscribeFromPushNotifications() {
       {
         title: '👋 Добро пожаловать!',
         text: 'Это приложение для расписания уроков. Для закрытия любого открытого окна — нажмите на затемнённую область вне него.',
-        target: null,
+        target: 'body',
         position: 'center'
       },
       {
@@ -2396,7 +2396,7 @@ async function unsubscribeFromPushNotifications() {
       },
       {
         title: '🔔 Уведомления',
-        text: 'Push-уведомления приходят даже когда приложение полностью закрыто. Настройте за сколько минут напоминать в ⚙️ Настройках. Требуется вход в облако.',
+        text: 'Push-уведомления приходят даже когда приложение полностью закрыто. Настройте за какое время напоминать в ⚙️ Настройках. Требуется вход в облако.',
         target: null,
         position: 'center'
       },
@@ -2457,22 +2457,29 @@ async function unsubscribeFromPushNotifications() {
       if (step.target) {
         const el = document.querySelector(step.target)
         if (el) {
-          const r = el.getBoundingClientRect()
-          const p = 6
-          highlight.style.cssText = `display:block;left:${r.left-p}px;top:${r.top-p}px;width:${r.width+p*2}px;height:${r.height+p*2}px;`
+            const r = el.getBoundingClientRect()
+            const p = 6
+            highlight.style.cssText = `display:block;left:${r.left-p}px;top:${r.top-p}px;width:${r.width+p*2}px;height:${r.height+p*2}px;`
         } else {
-          highlight.style.display = 'none'
+            highlight.style.display = 'none'
         }
+      } else if (step.position === 'center' && !step.target) {
+        // Если target = null и позиция center — создаём "пустую" подсветку, которая затемнит весь экран
+        highlight.style.cssText = `display:block;left:0;top:0;width:100vw;height:100vh;border-radius:0;box-shadow:0 0 0 0 rgba(0,0,0,0.75), 0 0 0 9999px rgba(0,0,0,0.75);`
       } else {
         highlight.style.display = 'none'
-      }
+    }
 
       // Позиция карточки
       card.style.display = 'block'
       card.style.top = 'auto'
       card.style.bottom = 'auto'
 
-      if (step.position === 'top') {
+       if (step.position === 'center') {
+        card.style.top = '50%'
+        card.style.transform = 'translateX(-50%) translateY(-50%)'
+        return
+      } else if (step.position === 'top') {
         // Карточка сверху — над элементом или вверху экрана
         const el = step.target ? document.querySelector(step.target) : null
         if (el) {
