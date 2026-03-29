@@ -516,6 +516,7 @@
     let workHours = { from: "09:00", to: "22:00" }
     let editingLessonId = null
     let lessons = []
+    const MAX_TAP_TIME = 300 // максимальное время для тапа (мс) - для различения тапа и свайпа
 
     // ===== КОНФИГУРАЦИЯ ХРАНЕНИЯ =====
     const STORAGE_KEYS = {
@@ -2268,28 +2269,187 @@ async function unsubscribeFromPushNotifications() {
       })
     }
 
-    // ===== СВАЙПЫ =====
-    ;(function() {
-      let touchStartX = 0
-      let touchStartY = 0
-      const calendarEl = document.getElementById('calendar')
-      if (!calendarEl) return
+    // ===== СВАЙПЫ С РАЗЛИЧЕНИЕМ ТАПА И СВАЙПА =====
+;(function() {
+  let touchStartX = 0
+  let touchStartY = 0
+  let touchStartTime = 0
+  let isSwiping = false
+  const SWIPE_THRESHOLD = 50 // минимальное расстояние для свайпа (px)
+  const MAX_TAP_TIME = 300 // максимальное время для тапа (мс)
+  
+  const calendarEl = document.getElementById('calendar')
+  if (!calendarEl) return
 
-      calendarEl.addEventListener('touchstart', e => {
-        touchStartX = e.touches[0].clientX
-        touchStartY = e.touches[0].clientY
-      }, { passive: true })
+  // Функция для проверки, можно ли создавать занятие в текущем режиме
+  function canCreateLessonOnTap() {
+    const viewType = calendar.view.type
+    // В режимах Неделя (timeGridWeek) и День (timeGridDay) тап создаёт занятие
+    return viewType === 'timeGridWeek' || viewType === 'timeGridDay'
+  }
 
-      calendarEl.addEventListener('touchend', e => {
-        const dx = e.changedTouches[0].clientX - touchStartX
-        const dy = e.changedTouches[0].clientY - touchStartY
-        // Только горизонтальный свайп (горизонталь > вертикаль и > 50px)
-        if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 50) {
-          if (dx < 0) next()   // влево → вперёд
-          else        prev()   // вправо → назад
+  calendarEl.addEventListener('touchstart', e => {
+    touchStartX = e.touches[0].clientX
+    touchStartY = e.touches[0].clientY
+    touchStartTime = Date.now()
+    isSwiping = false
+  }, { passive: true })
+
+  calendarEl.addEventListener('touchmove', e => {
+    if (!touchStartX) return
+    
+    const dx = Math.abs(e.touches[0].clientX - touchStartX)
+    const dy = Math.abs(e.touches[0].clientY - touchStartY)
+    
+    // Если движение больше порога, считаем что это свайп
+    if (dx > SWIPE_THRESHOLD || dy > SWIPE_THRESHOLD) {
+      isSwiping = true
+    }
+  }, { passive: true })
+
+  calendarEl.addEventListener('touchend', e => {
+    if (!touchStartX) return
+    
+    const dx = e.changedTouches[0].clientX - touchStartX
+    const dy = e.changedTouches[0].clientY - touchStartY
+    const touchDuration = Date.now() - touchStartTime
+    
+    // Сброс координат
+    touchStartX = 0
+    touchStartY = 0
+    
+    // Если это был свайп (движение больше порога) или слишком долгое касание (> MAX_TAP_TIME)
+    if (Math.abs(dx) > SWIPE_THRESHOLD || Math.abs(dy) > SWIPE_THRESHOLD || touchDuration > MAX_TAP_TIME) {
+      // Это свайп или долгое нажатие - обрабатываем навигацию
+      const isHorizontalSwipe = Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > SWIPE_THRESHOLD
+      
+      if (isHorizontalSwipe) {
+        // Только горизонтальный свайп меняет дату
+        if (dx < 0) {
+          // Влево → вперёд (следующий период)
+          next()
+        } else if (dx > 0) {
+          // Вправо → назад (предыдущий период)
+          prev()
         }
-      }, { passive: true })
-    })()
+      }
+      return
+    }
+    
+    // Это был короткий тап (не свайп) - проверяем, нужно ли создавать занятие
+    if (canCreateLessonOnTap()) {
+      // В режимах Неделя и День тап открывает форму создания занятия
+      // Нужно получить координаты и найти ячейку времени, на которую нажали
+      const touch = e.changedTouches[0]
+      const target = document.elementFromPoint(touch.clientX, touch.clientY)
+      
+      // Ищем ближайший элемент ячейки времени
+      const timeSlot = target?.closest('.fc-timegrid-slot, .fc-timegrid-col')
+      
+      if (timeSlot) {
+        // Получаем время из атрибута data-time или из текста
+        const timeAttr = timeSlot.getAttribute('data-time')
+        if (timeAttr) {
+          // Создаём занятие с выбранным временем
+          const now = new Date()
+          const dateStr = calendar.getDate().toISOString().slice(0, 10)
+          const roundedTime = roundTo30(new Date(`${dateStr}T${timeAttr}`))
+          openFormWithDate(roundedTime)
+        } else {
+          // Если не удалось получить время, используем текущее
+          openAdd()
+        }
+      } else {
+        // Если кликнули не по ячейке времени, открываем форму с текущим временем
+        openAdd()
+      }
+    }
+    
+    // Сброс флага свайпа
+    isSwiping = false
+  }, { passive: true })
+})()
+
+    // ===== ОБРАБОТЧИК ДЛЯ МЫШИ (ДЕСКТОП) =====
+;(function() {
+  let mouseDownX = 0
+  let mouseDownY = 0
+  let mouseDownTime = 0
+  let isDragging = false
+  const DRAG_THRESHOLD = 10 // минимальное расстояние для перетаскивания (px)
+  
+  const calendarEl = document.getElementById('calendar')
+  if (!calendarEl) return
+
+  function canCreateLessonOnClick() {
+    const viewType = calendar.view.type
+    return viewType === 'timeGridWeek' || viewType === 'timeGridDay'
+  }
+
+  calendarEl.addEventListener('mousedown', e => {
+    // Только левая кнопка мыши
+    if (e.button !== 0) return
+    
+    mouseDownX = e.clientX
+    mouseDownY = e.clientY
+    mouseDownTime = Date.now()
+    isDragging = false
+  })
+
+  calendarEl.addEventListener('mousemove', e => {
+    if (!mouseDownX) return
+    
+    const dx = Math.abs(e.clientX - mouseDownX)
+    const dy = Math.abs(e.clientY - mouseDownY)
+    
+    if (dx > DRAG_THRESHOLD || dy > DRAG_THRESHOLD) {
+      isDragging = true
+    }
+  })
+
+  calendarEl.addEventListener('mouseup', e => {
+    if (!mouseDownX) return
+    
+    const dx = e.clientX - mouseDownX
+    const dy = e.clientY - mouseDownY
+    const clickDuration = Date.now() - mouseDownTime
+    
+    // Сброс координат
+    mouseDownX = 0
+    mouseDownY = 0
+    
+    // Если было перетаскивание (движение мыши) - не обрабатываем как клик
+    if (isDragging) {
+      isDragging = false
+      return
+    }
+    
+    // Если это долгий клик (> 300мс) - не обрабатываем как тап
+    if (clickDuration > MAX_TAP_TIME) {
+      return
+    }
+    
+    // Это был короткий клик - проверяем, нужно ли создавать занятие
+    if (canCreateLessonOnClick()) {
+      const target = document.elementFromPoint(e.clientX, e.clientY)
+      const timeSlot = target?.closest('.fc-timegrid-slot, .fc-timegrid-col')
+      
+      if (timeSlot) {
+        const timeAttr = timeSlot.getAttribute('data-time')
+        if (timeAttr) {
+          const now = new Date()
+          const dateStr = calendar.getDate().toISOString().slice(0, 10)
+          const roundedTime = roundTo30(new Date(`${dateStr}T${timeAttr}`))
+          openFormWithDate(roundedTime)
+        } else {
+          openAdd()
+        }
+      } else {
+        openAdd()
+      }
+    }
+  })
+})()
 
     // ===== КНОПКА ДОМОЙ =====
     function goHome() {
