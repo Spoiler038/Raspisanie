@@ -872,72 +872,100 @@ async function unsubscribeFromPushNotifications() {
     }
 
     async function checkAuthOnLoad() {
+  try {
+    const { data: { session }, error } = await supabaseClient.auth.getSession()
+    if (error) throw error
+    if (session) {
+      const wasLoggedIn = !!currentUser
+      currentUser = { id: session.user.id, email: session.user.email }
+      localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(currentUser))
+      updateCloudUI()
+
+      // Загружаем настройки из облака и применяем
       try {
-        const { data: { session }, error } = await supabaseClient.auth.getSession()
-        if (error) throw error
-        if (session) {
-          currentUser = { id: session.user.id, email: session.user.email }
-          localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(currentUser))
-          updateCloudUI()
+        const { data: cloudSettings } = await supabaseClient
+          .from('user_settings')
+          .select('*')
+          .eq('user_id', currentUser.id)
+          .maybeSingle()
 
-          // Загружаем ВСЕ настройки из облака и применяем
-          try {
-            const { data: cloudSettings } = await supabaseClient
-              .from('user_settings')
-              .select('*')
-              .eq('user_id', currentUser.id)
-              .maybeSingle()
-
-            if (cloudSettings) {
-              // Тема
-              if (cloudSettings.theme) {
-                document.body.className = cloudSettings.theme
-                localStorage.setItem('teacher_theme', cloudSettings.theme)
-                const themeEl = document.getElementById('themeSelect')
-                if (themeEl) themeEl.value = cloudSettings.theme
-              }
-              // Режим работы
-              if (cloudSettings.work_from && cloudSettings.work_to) {
-                if (validateWorkHours(cloudSettings.work_from, cloudSettings.work_to)) {
-                  workHours = { from: cloudSettings.work_from, to: cloudSettings.work_to }
-                  saveSettingsToStorage()
-                  calendar.setOption('slotMinTime', workHours.from)
-                  calendar.setOption('slotMaxTime', workHours.to)
-                  const wfEl = document.getElementById('workFrom')
-                  const wtEl = document.getElementById('workTo')
-                  if (wfEl) wfEl.value = workHours.from
-                  if (wtEl) wtEl.value = workHours.to
-                }
-              }
-              // Уведомления
-              if (cloudSettings.notification_default) {
-                const notif = cloudSettings.notification_default
-                localStorage.setItem('teacher_notification', notif)
-                const notifEl = document.getElementById('notificationSelect')
-                if (notifEl) notifEl.value = notif
-                if (notif !== 'Не оповещать') {
-                  setTimeout(() => subscribeToPushNotifications(), 1500)
-                }
-              }
-              // Автоудаление
-              if (cloudSettings.auto_delete_old !== undefined && cloudSettings.auto_delete_old !== null) {
-                const autoDelete = cloudSettings.auto_delete_old === true
-                localStorage.setItem('auto_delete_old', autoDelete ? '1' : '0')
-                updateAutoDeleteBtn()
-                if (autoDelete) setTimeout(runAutoDelete, 500)
-              }
-              showToast('✅ Настройки загружены из облака', true)
+        if (cloudSettings) {
+          let settingsChanged = false
+          
+          // Тема
+          if (cloudSettings.theme) {
+            const currentTheme = localStorage.getItem('teacher_theme') || 'dark'
+            if (currentTheme !== cloudSettings.theme) {
+              document.body.className = cloudSettings.theme
+              localStorage.setItem('teacher_theme', cloudSettings.theme)
+              const themeEl = document.getElementById('themeSelect')
+              if (themeEl) themeEl.value = cloudSettings.theme
+              settingsChanged = true
             }
-          } catch (e) { console.log('Ошибка загрузки настроек из облака:', e) }
-
-        } else {
-          // Нет активной сессии — показываем форму входа если режим облако
-          if (currentSyncMode === SYNC_MODES.CLOUD) {
-            setTimeout(() => showAuthModal(), 500)
+          }
+          
+          // Режим работы
+          if (cloudSettings.work_from && cloudSettings.work_to) {
+            if (validateWorkHours(cloudSettings.work_from, cloudSettings.work_to)) {
+              if (workHours.from !== cloudSettings.work_from || workHours.to !== cloudSettings.work_to) {
+                workHours = { from: cloudSettings.work_from, to: cloudSettings.work_to }
+                saveSettingsToStorage()
+                calendar.setOption('slotMinTime', workHours.from)
+                calendar.setOption('slotMaxTime', workHours.to)
+                const wfEl = document.getElementById('workFrom')
+                const wtEl = document.getElementById('workTo')
+                if (wfEl) wfEl.value = workHours.from
+                if (wtEl) wtEl.value = workHours.to
+                settingsChanged = true
+              }
+            }
+          }
+          
+          // Уведомления
+          if (cloudSettings.notification_default) {
+            const currentNotif = localStorage.getItem('teacher_notification') || 'Не оповещать'
+            if (currentNotif !== cloudSettings.notification_default) {
+              const notif = cloudSettings.notification_default
+              localStorage.setItem('teacher_notification', notif)
+              const notifEl = document.getElementById('notificationSelect')
+              if (notifEl) notifEl.value = notif
+              if (notif !== 'Не оповещать') {
+                setTimeout(() => subscribeToPushNotifications(), 1500)
+              }
+              settingsChanged = true
+            }
+          }
+          
+          // Автоудаление
+          if (cloudSettings.auto_delete_old !== undefined && cloudSettings.auto_delete_old !== null) {
+            const currentAutoDelete = localStorage.getItem('auto_delete_old') === '1'
+            const autoDelete = cloudSettings.auto_delete_old === true
+            if (currentAutoDelete !== autoDelete) {
+              localStorage.setItem('auto_delete_old', autoDelete ? '1' : '0')
+              updateAutoDeleteBtn()
+              if (autoDelete) setTimeout(runAutoDelete, 500)
+              settingsChanged = true
+            }
+          }
+          
+          // Показываем уведомление ТОЛЬКО если настройки реально изменились И это не первый вход
+          if (settingsChanged && wasLoggedIn) {
+            showToast('✅ Настройки обновлены из облака', true)
+          } else if (settingsChanged && !wasLoggedIn) {
+            // При первом входе не показываем уведомление о настройках
+            console.log('Настройки загружены из облака')
           }
         }
-      } catch (error) { console.log('Ошибка проверки сессии:', error) }
+      } catch (e) { console.log('Ошибка загрузки настроек из облака:', e) }
+
+    } else {
+      // Нет активной сессии — показываем форму входа если режим облако
+      if (currentSyncMode === SYNC_MODES.CLOUD) {
+        setTimeout(() => showAuthModal(), 500)
+      }
     }
+  } catch (error) { console.log('Ошибка проверки сессии:', error) }
+}
 
     function setSyncMode(mode) {
       currentSyncMode = mode
@@ -1014,7 +1042,7 @@ async function unsubscribeFromPushNotifications() {
     showToast(`✅ Вход выполнен: ${data.user.email}`, true)
     setTimeout(() => subscribeToPushNotifications(), 1000)
     
-    // ========== НОВЫЙ КОД: ЗАГРУЗКА НАСТРОЕК ПОСЛЕ ВХОДА ==========
+    // Загружаем настройки из облака (без показа уведомления, т.к. это первый вход)
     try {
       const { data: cloudSettings } = await supabaseClient
         .from('user_settings')
@@ -1023,14 +1051,13 @@ async function unsubscribeFromPushNotifications() {
         .maybeSingle()
 
       if (cloudSettings) {
-        // Тема
+        // Применяем настройки без уведомления
         if (cloudSettings.theme) {
           document.body.className = cloudSettings.theme
           localStorage.setItem('teacher_theme', cloudSettings.theme)
           const themeEl = document.getElementById('themeSelect')
           if (themeEl) themeEl.value = cloudSettings.theme
         }
-        // Режим работы
         if (cloudSettings.work_from && cloudSettings.work_to) {
           if (validateWorkHours(cloudSettings.work_from, cloudSettings.work_to)) {
             workHours = { from: cloudSettings.work_from, to: cloudSettings.work_to }
@@ -1043,7 +1070,6 @@ async function unsubscribeFromPushNotifications() {
             if (wtEl) wtEl.value = workHours.to
           }
         }
-        // Уведомления
         if (cloudSettings.notification_default) {
           const notif = cloudSettings.notification_default
           localStorage.setItem('teacher_notification', notif)
@@ -1053,17 +1079,15 @@ async function unsubscribeFromPushNotifications() {
             setTimeout(() => subscribeToPushNotifications(), 1500)
           }
         }
-        // Автоудаление
         if (cloudSettings.auto_delete_old !== undefined && cloudSettings.auto_delete_old !== null) {
           const autoDelete = cloudSettings.auto_delete_old === true
           localStorage.setItem('auto_delete_old', autoDelete ? '1' : '0')
           updateAutoDeleteBtn()
           if (autoDelete) setTimeout(runAutoDelete, 500)
         }
-        showToast('✅ Настройки загружены из облака', true)
+        // Убираем уведомление "Настройки загружены из облака" при первом входе
       }
     } catch (e) { console.log('Ошибка загрузки настроек из облака:', e) }
-    // ========== КОНЕЦ НОВОГО КОДА ==========
     
     loginBtn.textContent = originalText
     loginBtn.disabled = false
