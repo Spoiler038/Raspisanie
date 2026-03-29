@@ -2177,8 +2177,8 @@ async function unsubscribeFromPushNotifications() {
         if (now.getDate() <= 3) runAutoDelete() // первые 3 дня месяца
       }, 2000)
 
-      window.addEventListener('resize', function() { setTimeout(recalculateScrollerHeight, 100) })
-      window.addEventListener('orientationchange', function() { setTimeout(recalculateScrollerHeight, 200) })
+      window.addEventListener('resize', function() { setTimeout(calculateScrollerHeight, 100) })
+      window.addEventListener('orientationchange', function() { setTimeout(calculateScrollerHeight, 200) })
 
       setTimeout(() => { updateCloudUI() }, 500)
     })
