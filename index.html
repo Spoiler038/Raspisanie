@@ -2619,55 +2619,83 @@ async function unsubscribeFromPushNotifications() {
     }
 
     function _showTourStep() {
-      const step = TOUR_STEPS[_tourStep]
-      const total = TOUR_STEPS.length
+  const step = TOUR_STEPS[_tourStep]
+  const total = TOUR_STEPS.length
 
-      // Вызываем before-колбэк (например открыть настройки)
-      if (step.before) step.before()
+  // Вызываем before-колбэк (например открыть настройки)
+  if (step.before) step.before()
 
-      // Даём время DOM обновиться после before()
-      setTimeout(() => {
-        const card = document.getElementById('tourCard')
-        const highlight = document.getElementById('tourHighlight')
+  // Даём время DOM обновиться после before()
+  setTimeout(() => {
+    const card = document.getElementById('tourCard')
+    const highlight = document.getElementById('tourHighlight')
 
-        document.getElementById('tourStepLabel').textContent = `${_tourStep + 1} из ${total}`
-        document.getElementById('tourTitle').textContent = step.title
-        document.getElementById('tourText').textContent = step.text
-        document.getElementById('tourNextBtn').textContent = _tourStep === total - 1 ? 'Готово' : 'Далее'
+    document.getElementById('tourStepLabel').textContent = `${_tourStep + 1} из ${total}`
+    document.getElementById('tourTitle').textContent = step.title
+    document.getElementById('tourText').textContent = step.text
+    document.getElementById('tourNextBtn').textContent = _tourStep === total - 1 ? 'Готово' : 'Далее'
 
-        document.getElementById('tourDots').innerHTML = TOUR_STEPS.map((_, i) =>
-          `<div class="tour-dot${i === _tourStep ? ' active' : ''}"></div>`
-        ).join('')
+    document.getElementById('tourDots').innerHTML = TOUR_STEPS.map((_, i) =>
+      `<div class="tour-dot${i === _tourStep ? ' active' : ''}"></div>`
+    ).join('')
 
-        card.style.display = 'block'
-        highlight.style.display = 'none'
-        card.style.top = 'auto'
-        card.style.bottom = 'auto'
+    card.style.display = 'block'
+    card.style.top = 'auto'
+    card.style.bottom = 'auto'
+    card.style.transform = 'translateX(-50%)'
 
-        if (step.target) {
-          const el = document.querySelector(step.target)
-          if (el) {
-            const r = el.getBoundingClientRect()
-            const p = 8
-            highlight.style.cssText = `display:block;left:${r.left-p}px;top:${r.top-p}px;width:${r.width+p*2}px;height:${r.height+p*2}px;`
-            // Карточка: если места снизу мало — ставим выше элемента, иначе ниже
-            const spaceBelow = window.innerHeight - r.bottom
-            if (spaceBelow < 220 || step.position === 'top') {
-              card.style.bottom = (window.innerHeight - r.top + 12) + 'px'
-              card.style.top = 'auto'
-            } else {
-              card.style.top = (r.bottom + 12) + 'px'
-              card.style.bottom = 'auto'
-            }
-            card.style.transform = 'translateX(-50%)'
+    // Если есть целевой элемент — подсвечиваем его
+    if (step.target) {
+      const el = document.querySelector(step.target)
+      if (el) {
+        const r = el.getBoundingClientRect()
+        const p = 8
+        highlight.style.cssText = `display:block;left:${r.left-p}px;top:${r.top-p}px;width:${r.width+p*2}px;height:${r.height+p*2}px;`
+        
+        // Вычисляем оптимальную позицию для карточки
+        const cardHeight = card.offsetHeight
+        const spaceAbove = r.top
+        const spaceBelow = window.innerHeight - r.bottom
+        
+        // Для календаря (#calendar) при position: 'bottom' показываем карточку над элементом,
+        // так как под ним места нет
+        const isCalendarTarget = step.target === '#calendar'
+        
+        // Если указана позиция 'bottom' или элемент внизу экрана, пытаемся поставить карточку над ним
+        if (step.position === 'bottom' || (isCalendarTarget && spaceBelow < cardHeight + 20)) {
+          // Ставим карточку над элементом
+          if (spaceAbove > cardHeight + 20) {
+            card.style.bottom = (window.innerHeight - r.top + 12) + 'px'
+            card.style.top = 'auto'
           } else {
+            // Если и сверху нет места — центрируем
             _centerCard(card)
           }
         } else {
-          _centerCard(card)
+          // Ставим карточку под элементом
+          if (spaceBelow > cardHeight + 20) {
+            card.style.top = (r.bottom + 12) + 'px'
+            card.style.bottom = 'auto'
+          } else {
+            // Если места снизу нет — ставим сверху
+            if (spaceAbove > cardHeight + 20) {
+              card.style.bottom = (window.innerHeight - r.top + 12) + 'px'
+              card.style.top = 'auto'
+            } else {
+              _centerCard(card)
+            }
+          }
         }
-      }, step.before ? 250 : 0)
+      } else {
+        highlight.style.display = 'none'
+        _centerCard(card)
+      }
+    } else {
+      highlight.style.display = 'none'
+      _centerCard(card)
     }
+  }, step.before ? 250 : 0)
+}
 
     function _centerCard(card) {
       card.style.top = '50%'
