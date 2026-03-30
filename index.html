@@ -356,7 +356,7 @@
           <span id="appVersionLabel" style="font-size: 11px; color: #475569;"></span>
         </div>
         <div style="display: flex; gap: 6px; align-items: center;">
-          <button onclick="startTour()" title="Обучение"
+          <button id="tourHelpButton" onclick="startTour()" title="Обучение"
             style="background:#475569;color:white;border:none;border-radius:8px;padding:6px 10px;font-size:15px;cursor:pointer;">❓</button>
           <button id="autoDeleteBtn" onclick="toggleAutoDelete()" title="Автоудаление старых уроков"
             style="background: #475569; color: white; border: none; border-radius: 8px; padding: 6px 10px; font-size: 15px; cursor: pointer;">🗑️</button>
@@ -2624,8 +2624,14 @@ async function unsubscribeFromPushNotifications() {
       {
         title: '❓ Повторное обучение',
         text: 'Для повторного просмотра как здесь и что, откройте ⚙️ Настройки и нажмите кнопку ❓ — обучение запустится снова.',
-        target: null,
-        position: 'center'
+         target: '#tourHelpButton',
+  before: () => {
+    // Убеждаемся, что настройки открыты (они уже открыты после шага с облаком, но на всякий случай)
+    const settingsSheet = document.getElementById('settingsSheet')
+    if (settingsSheet && !settingsSheet.classList.contains('active')) {
+      openSettings()
+          }
+        }
       }
     ]
 
