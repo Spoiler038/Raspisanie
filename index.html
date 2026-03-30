@@ -224,8 +224,6 @@
   <!-- ТУР ОБУЧЕНИЯ -->
     <div id="tourHighlight" class="tour-highlight" style="display:none;"></div>
     <div id="tourCard" class="tour-card" style="display:none;">
-    <!-- Затемняющий фон во время тура -->
-    <div id="tourOverlay" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:transparent; z-index:9001;"></div>
     <div class="tour-step-label" id="tourStepLabel"></div>
     <div class="tour-title" id="tourTitle"></div>
     <div class="tour-text" id="tourText"></div>
@@ -236,6 +234,9 @@
       <button onclick="tourNext()" id="tourNextBtn" style="background:#2563eb;color:white;border:none;border-radius:10px;padding:8px 18px;font-size:14px;font-weight:500;cursor:pointer;flex-shrink:0;">Далее</button>
     </div>
   </div>
+
+  <!-- Затемняющий фон во время тура (теперь вне карточки) -->
+  <div id="tourOverlay" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.7); z-index:9001;"></div>
 
   <div id="toast" class="toast"></div>
 
