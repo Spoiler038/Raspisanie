@@ -284,7 +284,10 @@
       <!-- ПАНЕЛЬ 1: поля занятия (всегда видна при новом, скрывается только при переключении) -->
       <div id="editPanel1">
         <div class="space-y-3">
-          <h2 class="font-semibold" id="formTitle">Новое занятие</h2>
+          <div style="display:flex; align-items:center; justify-content:space-between;">
+            <h2 class="font-semibold" id="formTitle" style="margin:0;">Новое занятие</h2>
+            <button id="copyLessonBtn" onclick="copyLesson()" style="display:none; background:#475569; color:white; border:none; border-radius:8px; padding:5px 10px; font-size:13px; cursor:pointer;">📋 Копировать</button>
+          </div>
           <input id="dateInput" type="date">
           <input id="timeInput" type="time">
           <input id="studentInput" placeholder="Имя ученика">
@@ -751,8 +754,8 @@ async function unsubscribeFromPushNotifications() {
       if (Notification.permission === 'granted') {
         try {
           const isPageVisible = document.visibilityState === 'visible'
-          const iconPath = '/Raspisanie/icons/android/icon-192x192.png'
-          const badgePath = '/Raspisanie/icons/android/icon-72x72.png'
+          const iconPath = 'https://spoiler038.github.io/Raspisanie/icons/android/icon-192x192.png'
+          const badgePath = 'https://spoiler038.github.io/Raspisanie/icons/android/icon-72x72.png'
           if ('serviceWorker' in navigator && !isPageVisible) {
             navigator.serviceWorker.ready.then(registration => {
               registration.showNotification(title, {
@@ -1599,6 +1602,7 @@ async function unsubscribeFromPushNotifications() {
       editingLessonId = lesson.id
       document.getElementById('formTitle').textContent = 'Редактировать занятие'
       document.getElementById('deleteSection').style.display = 'block'
+      document.getElementById('copyLessonBtn').style.display = 'block'
       const dateInput = document.getElementById('dateInput')
       const timeInput = document.getElementById('timeInput')
       const studentInput = document.getElementById('studentInput')
@@ -1624,6 +1628,7 @@ async function unsubscribeFromPushNotifications() {
       editingLessonId = null
       document.getElementById('formTitle').textContent = 'Новое занятие'
       document.getElementById('deleteSection').style.display = 'none'
+      document.getElementById('copyLessonBtn').style.display = 'none'
       document.getElementById('editTabsBar').style.display = 'none'
       document.getElementById('editPanel1').style.display = 'block'
       document.getElementById('editPanel2').style.display = 'none'
@@ -1646,6 +1651,44 @@ async function unsubscribeFromPushNotifications() {
     }
 
     function cancelForm() { const sheet = document.getElementById('sheet'); if (sheet) sheet.classList.remove('active') }
+
+    function copyLesson() {
+      const studentInput = document.getElementById('studentInput')
+      const timeInput = document.getElementById('timeInput')
+      const durationInput = document.getElementById('durationInput')
+      const notesInput = document.getElementById('notesInput')
+      const dateInput = document.getElementById('dateInput')
+
+      // Сохраняем данные текущего урока
+      const copiedStudent = studentInput ? studentInput.value : ''
+      const copiedTime = timeInput ? timeInput.value : ''
+      const copiedDuration = durationInput ? durationInput.value : '60'
+      const copiedNotes = notesInput ? notesInput.value : ''
+
+      // Открываем форму создания нового урока
+      editingLessonId = null
+      document.getElementById('formTitle').textContent = 'Новое занятие'
+      document.getElementById('deleteSection').style.display = 'none'
+      document.getElementById('copyLessonBtn').style.display = 'none'
+      document.getElementById('editTabsBar').style.display = 'none'
+      document.getElementById('editPanel1').style.display = 'block'
+      document.getElementById('editPanel2').style.display = 'none'
+
+      // Заполняем поля — дата остаётся прежней, выделяем её
+      if (studentInput) studentInput.value = copiedStudent
+      if (timeInput) timeInput.value = copiedTime
+      if (durationInput) durationInput.value = copiedDuration
+      if (notesInput) { notesInput.value = copiedNotes; setTimeout(autoResizeNotes, 0) }
+
+      // Выделяем поле даты чтобы пользователь сразу видел что нужно выбрать
+      if (dateInput) {
+        dateInput.style.outline = '2px solid #2563eb'
+        dateInput.style.outlineOffset = '2px'
+        setTimeout(() => { dateInput.style.outline = ''; dateInput.style.outlineOffset = '' }, 3000)
+      }
+
+      showToast('📋 Урок скопирован — выберите дату', true)
+    }
 
     function autoResizeNotes() {
       const el = document.getElementById('notesInput')
@@ -2578,6 +2621,13 @@ async function unsubscribeFromPushNotifications() {
         target: '#autoDeleteBtn',
         position: 'bottom',
         before: () => { openSettings() }
+      },
+      {
+        title: '❓ Повторное обучение',
+        text: 'Для повторного просмотра обучения откройте ⚙️ Настройки и нажмите кнопку ❓ — тур запустится снова.',
+        target: null,
+        position: 'center',
+        before: () => { const s = document.getElementById('settingsSheet'); if(s) s.classList.remove('active') }
       }
     ]
 
