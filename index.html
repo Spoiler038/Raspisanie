@@ -1550,8 +1550,7 @@ async function unsubscribeFromPushNotifications() {
     calendar.render()
     updateHeader()
     calculateScrollerHeight()
-    calendar.refetchEvents()
-    setTimeout(() => { calendar.refetchEvents(); calculateScrollerHeight() }, 200)
+    setTimeout(() => calculateScrollerHeight(), 200)
     calendar.on('eventsSet', calculateScrollerHeight)
     calendar.on('datesSet', calculateScrollerHeight)
     calendar.on('windowResize', calculateScrollerHeight)
@@ -2626,8 +2625,7 @@ async function unsubscribeFromPushNotifications() {
         title: '❓ Повторное обучение',
         text: 'Для повторного просмотра как здесь и что, откройте ⚙️ Настройки и нажмите кнопку ❓ — обучение запустится снова.',
         target: null,
-        position: 'center',
-        before: () => { const s = document.getElementById('settingsSheet'); if(s) s.classList.remove('active') }
+        position: 'center'
       }
     ]
 
