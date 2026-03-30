@@ -1550,6 +1550,7 @@ async function unsubscribeFromPushNotifications() {
     calendar.render()
     updateHeader()
     calculateScrollerHeight()
+    calendar.refetchEvents()
     setTimeout(() => calculateScrollerHeight(), 200)
     calendar.on('eventsSet', calculateScrollerHeight)
     calendar.on('datesSet', calculateScrollerHeight)
