@@ -1981,7 +1981,7 @@ async function unsubscribeFromPushNotifications() {
               user_id: currentUser.id,
               work_from: workHours.from,
               work_to: workHours.to,
-              them  e: localStorage.getItem('teacher_theme') || 'dark',
+              theme: localStorage.getItem('teacher_theme') || 'dark',
               notification_default: localStorage.getItem('teacher_notification') || 'Не оповещать',
               auto_delete_old: localStorage.getItem('auto_delete_old') === '1',
               updated_at: new Date().toISOString()
