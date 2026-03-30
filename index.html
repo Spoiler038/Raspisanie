@@ -516,10 +516,12 @@
   <script>
     let currentView = 'month'
     let lastClickInfo = null
-    let workHours = { from: "09:00", to: "22:00" }
+    let workHours = { from: "09:00", to: "23:59" }
     let editingLessonId = null
     let lessons = []
+    let _layoutCache = null
     const MAX_TAP_TIME = 300 // максимальное время для тапа (мс) - для различения тапа и свайпа
+
 
     // ===== КОНФИГУРАЦИЯ ХРАНЕНИЯ =====
     const STORAGE_KEYS = {
@@ -918,6 +920,7 @@ async function unsubscribeFromPushNotifications() {
                 calendar.setOption('slotMaxTime', workHours.to)
                 const wfEl = document.getElementById('workFrom')
                 const wtEl = document.getElementById('workTo')
+                calculateScrollerHeight();
                 if (wfEl) wfEl.value = workHours.from
                 if (wtEl) wtEl.value = workHours.to
                 settingsChanged = true
@@ -1002,126 +1005,127 @@ async function unsubscribeFromPushNotifications() {
     }
 
     async function handleLogin() {
-  const email = document.getElementById('authEmail').value
-  const password = document.getElementById('authPassword').value
-  const authMessage = document.getElementById('authMessage')
+      const email = document.getElementById('authEmail').value
+      const password = document.getElementById('authPassword').value
+      const authMessage = document.getElementById('authMessage')
   
-  if (!email || !password) {
-    showToast('❌ Введите email и пароль', false)
-    return
-  }
-  
-  showToast('⏳ Выполняется вход...', false)
-  
-  const loginBtn = document.querySelector('#authModal .btn-primary')
-  const originalText = loginBtn.textContent
-  loginBtn.textContent = '⏳ Вход...'
-  loginBtn.disabled = true
-  
-  try {
-    const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password })
-    
-    if (error) {
-      const errorMessages = {
-        'Invalid login credentials': '❌ Неверный email или пароль',
-        'Email not confirmed': '❌ Email не подтвержден. Проверьте почту',
-        'Invalid email': '❌ Неверный формат email',
-        'Failed to fetch': '❌ Проверьте подключение к интернету'
+      if (!email || !password) {
+        showToast('❌ Введите email и пароль', false)
+        return
       }
-      const userMessage = errorMessages[error.message] || `❌ Ошибка: ${error.message}`
-      if (authMessage) { authMessage.textContent = userMessage; authMessage.style.color = '#ef4444' } 
-      else { showToast(userMessage, false) }
-      
-      loginBtn.textContent = originalText
-      loginBtn.disabled = false
-      return
-    }
-    
-    currentUser = { id: data.user.id, email: data.user.email, lastSignIn: new Date().toISOString() }
-    localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(currentUser))
-    
-    if (authMessage) authMessage.textContent = ''
-    closeAuthModal()
-    updateCloudUI()
-    showToast(`✅ Вход выполнен: ${data.user.email}`, true)
-    setTimeout(() => subscribeToPushNotifications(), 1000)
-    
-    // Загружаем настройки из облака (без показа уведомления, т.к. это первый вход)
-    try {
-      const { data: cloudSettings } = await supabaseClient
-        .from('user_settings')
-        .select('*')
-        .eq('user_id', currentUser.id)
-        .maybeSingle()
-
-      if (cloudSettings) {
-        // Применяем настройки без уведомления
-        if (cloudSettings.theme) {
-          document.body.className = cloudSettings.theme
-          localStorage.setItem('teacher_theme', cloudSettings.theme)
-          const themeEl = document.getElementById('themeSelect')
-          if (themeEl) themeEl.value = cloudSettings.theme
-        }
-        if (cloudSettings.work_from && cloudSettings.work_to) {
-          if (validateWorkHours(cloudSettings.work_from, cloudSettings.work_to)) {
-            workHours = { from: cloudSettings.work_from, to: cloudSettings.work_to }
-            saveSettingsToStorage()
-            calendar.setOption('slotMinTime', workHours.from)
-            calendar.setOption('slotMaxTime', workHours.to)
-            const wfEl = document.getElementById('workFrom')
-            const wtEl = document.getElementById('workTo')
-            if (wfEl) wfEl.value = workHours.from
-            if (wtEl) wtEl.value = workHours.to
-          }
-        }
-        if (cloudSettings.notification_default) {
-          const notif = cloudSettings.notification_default
-          localStorage.setItem('teacher_notification', notif)
-          const notifEl = document.getElementById('notificationSelect')
-          if (notifEl) notifEl.value = notif
-          if (notif !== 'Не оповещать') {
-            setTimeout(() => subscribeToPushNotifications(), 1500)
-          }
-        }
-        if (cloudSettings.auto_delete_old !== undefined && cloudSettings.auto_delete_old !== null) {
-          const autoDelete = cloudSettings.auto_delete_old === true
-          localStorage.setItem('auto_delete_old', autoDelete ? '1' : '0')
-          updateAutoDeleteBtn()
-          if (autoDelete) setTimeout(runAutoDelete, 500)
-        }
-        // Убираем уведомление "Настройки загружены из облака" при первом входе
-      }
-    } catch (e) { console.log('Ошибка загрузки настроек из облака:', e) }
-    
-    loginBtn.textContent = originalText
-    loginBtn.disabled = false
-    
-    setTimeout(async () => {
+  
+      showToast('⏳ Выполняется вход...', false)
+  
+      const loginBtn = document.querySelector('#authModal .btn-primary')
+      const originalText = loginBtn.textContent
+      loginBtn.textContent = '⏳ Вход...'
+      loginBtn.disabled = true
+  
       try {
-        const { data: cloudLessons, error } = await supabaseClient
-          .from('lessons')
-          .select('*')
-          .eq('user_id', currentUser.id)
-        
-        if (cloudLessons && cloudLessons.length > 0) {
-          if (lessons.length === 0) {
-            lessons = cloudLessons.map(l => ({
-              id: l.lesson_id,
-              date: l.date,
-              time: l.time,
-              student: l.student,
-              duration: l.duration,
-              notes: l.notes || ''
-            }))
-            saveLessonsToStorage()
-            calendar.refetchEvents()
-            showToast(`✅ Загружено ${lessons.length} уроков из облака`, true)
-          } else {
-            showConfirmModal(
-              '📥 Загрузка из облака',
-              `В облаке найдено ${cloudLessons.length} уроков.\n\nУ вас также есть ${lessons.length} локальных уроков.\n\nЗагрузить данные из облака? Локальные данные будут заменены.`,
-              async () => {
+        const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password })
+    
+        if (error) {
+          const errorMessages = {
+            'Invalid login credentials': '❌ Неверный email или пароль',
+            'Email not confirmed': '❌ Email не подтвержден. Проверьте почту',
+            'Invalid email': '❌ Неверный формат email',
+            'Failed to fetch': '❌ Проверьте подключение к интернету'
+          }
+          const userMessage = errorMessages[error.message] || `❌ Ошибка: ${error.message}`
+          if (authMessage) { authMessage.textContent = userMessage; authMessage.style.color = '#ef4444' } 
+          else { showToast(userMessage, false) }
+
+          loginBtn.textContent = originalText
+          loginBtn.disabled = false
+          return
+        }
+    
+        currentUser = { id: data.user.id, email: data.user.email, lastSignIn: new Date().toISOString() }
+        localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(currentUser))
+    
+        if (authMessage) authMessage.textContent = ''
+        closeAuthModal()
+        updateCloudUI()
+        showToast(`✅ Вход выполнен: ${data.user.email}`, true)
+        setTimeout(() => subscribeToPushNotifications(), 1000)
+    
+        // Загружаем настройки из облака (без показа уведомления, т.к. это первый вход)
+        try {
+          const { data: cloudSettings } = await supabaseClient
+            .from('user_settings')
+            .select('*')
+            .eq('user_id', currentUser.id)
+            .maybeSingle()
+
+          if (cloudSettings) {
+            // Применяем настройки без уведомления
+            if (cloudSettings.theme) {
+              document.body.className = cloudSettings.theme
+              localStorage.setItem('teacher_theme', cloudSettings.theme)
+              const themeEl = document.getElementById('themeSelect')
+              if (themeEl) themeEl.value = cloudSettings.theme
+            }
+            if (cloudSettings.work_from && cloudSettings.work_to) {
+              if (validateWorkHours(cloudSettings.work_from, cloudSettings.work_to)) {
+                workHours = { from: cloudSettings.work_from, to: cloudSettings.work_to }
+                saveSettingsToStorage()
+                calendar.setOption('slotMinTime', workHours.from)
+                calendar.setOption('slotMaxTime', workHours.to)
+                calculateScrollerHeight()
+                const wfEl = document.getElementById('workFrom')
+                const wtEl = document.getElementById('workTo')
+                if (wfEl) wfEl.value = workHours.from
+                if (wtEl) wtEl.value = workHours.to
+              }
+            }
+            if (cloudSettings.notification_default) {
+              const notif = cloudSettings.notification_default
+              localStorage.setItem('teacher_notification', notif)
+              const notifEl = document.getElementById('notificationSelect')
+              if (notifEl) notifEl.value = notif
+              if (notif !== 'Не оповещать') {
+                setTimeout(() => subscribeToPushNotifications(), 1500)
+              }
+            }
+            if (cloudSettings.auto_delete_old !== undefined && cloudSettings.auto_delete_old !== null) {
+              const autoDelete = cloudSettings.auto_delete_old === true
+              localStorage.setItem('auto_delete_old', autoDelete ? '1' : '0')
+              updateAutoDeleteBtn()
+              if (autoDelete) setTimeout(runAutoDelete, 500)
+            }
+            // Убираем уведомление "Настройки загружены из облака" при первом входе
+          }
+        } catch (e) { console.log('Ошибка загрузки настроек из облака:', e) }
+    
+        loginBtn.textContent = originalText
+        loginBtn.disabled = false
+    
+        setTimeout(async () => {
+          try {
+            const { data: cloudLessons, error } = await supabaseClient
+              .from('lessons')
+              .select('*')
+              .eq('user_id', currentUser.id)
+
+            if (cloudLessons && cloudLessons.length > 0) {
+              if (lessons.length === 0) {
                 lessons = cloudLessons.map(l => ({
+                id: l.lesson_id,
+                date: l.date,
+                time: l.time,
+                student: l.student,
+                duration: l.duration,
+                notes: l.notes || ''
+              }))
+              saveLessonsToStorage()
+              calendar.refetchEvents()
+              showToast(`✅ Загружено ${lessons.length} уроков из облака`, true)
+            } else {
+              showConfirmModal(
+                '📥 Загрузка из облака',
+                `В облаке найдено ${cloudLessons.length} уроков.\n\nУ вас также есть ${lessons.length} локальных уроков.\n\nЗагрузить данные из облака? Локальные данные будут заменены.`,
+                async () => {
+                  lessons = cloudLessons.map(l => ({
                   id: l.lesson_id,
                   date: l.date,
                   time: l.time,
@@ -1129,23 +1133,23 @@ async function unsubscribeFromPushNotifications() {
                   duration: l.duration,
                   notes: l.notes || ''
                 }))
-                saveLessonsToStorage()
-                calendar.refetchEvents()
-                showToast(`✅ Загружено ${lessons.length} уроков из облака`, true)
-              }
-            )
+                  saveLessonsToStorage()
+                  calendar.refetchEvents()
+                  showToast(`✅ Загружено ${lessons.length} уроков из облака`, true)
+                }
+              )
+            }
           }
-        }
-      } catch (syncError) { console.error('Ошибка при проверке облака:', syncError) }
-    }, 1000)
+        } catch (syncError) { console.error('Ошибка при проверке облака:', syncError) }
+      }, 1000)
     
-  } catch (unexpectedError) {
-    console.error('Неожиданная ошибка:', unexpectedError)
-    showToast('❌ Произошла ошибка при входе', false)
-    loginBtn.textContent = originalText
-    loginBtn.disabled = false
+    } catch (unexpectedError) {
+      console.error('Неожиданная ошибка:', unexpectedError)
+      showToast('❌ Произошла ошибка при входе', false)
+      loginBtn.textContent = originalText
+      loginBtn.disabled = false
+    }
   }
-}
 
     async function handleRegister() {
   const email = document.getElementById('authEmail').value
@@ -1473,33 +1477,64 @@ async function unsubscribeFromPushNotifications() {
     }
 
     function calculateScrollerHeight() {
-      const header = document.querySelector('header')
-      const bottomBar = document.querySelector('.bottom-bar')
-      const calendarEl = document.getElementById('calendar')
-      if (!header || !bottomBar || !calendarEl) return
-      const headerHeight = header.offsetHeight
-      const bottomBarHeight = bottomBar.offsetHeight
-      const viewportHeight = window.innerHeight
-      const availableHeight = viewportHeight - headerHeight - bottomBarHeight - 5
-      calendarEl.style.setProperty('height', availableHeight + 'px', 'important')
-      if (window.scrollerTimer) clearTimeout(window.scrollerTimer)
-      window.scrollerTimer = setTimeout(() => {
-        const dayHeader = document.querySelector('.fc-col-header')
-        const dayHeaderHeight = dayHeader ? dayHeader.offsetHeight : 40
-        const scrollers = document.querySelectorAll('.fc-timeGridWeek-view .fc-scroller, .fc-timeGridDay-view .fc-scroller, .fc-dayGridMonth-view .fc-scroller')
+      const header = document.querySelector('header');
+      const bottomBar = document.querySelector('.bottom-bar');
+      const calendarEl = document.getElementById('calendar');
+      if (!header || !bottomBar || !calendarEl) return;
+
+      const headerHeight = header.offsetHeight;
+      const bottomBarHeight = bottomBar.offsetHeight;
+      const viewportHeight = window.innerHeight;
+      const dayHeader = document.querySelector('.fc-col-header');
+      const dayHeaderHeight = dayHeader ? dayHeader.offsetHeight : 40;
+      const viewType = calendar.view.type;
+
+      let availableHeight;
+      let needsGeometryUpdate = false;
+
+      // Проверка кеша
+      if (_layoutCache &&
+          _layoutCache.headerHeight === headerHeight &&
+          _layoutCache.bottomBarHeight === bottomBarHeight &&
+          _layoutCache.viewportHeight === viewportHeight &&
+          _layoutCache.dayHeaderHeight === dayHeaderHeight) {
+        availableHeight = _layoutCache.availableHeight;
+      } else {
+        // Пересчёт геометрии
+        availableHeight = viewportHeight - headerHeight - bottomBarHeight - 5;
+        needsGeometryUpdate = true;
+        _layoutCache = {
+          headerHeight,
+          bottomBarHeight,
+          viewportHeight,
+          dayHeaderHeight,
+          availableHeight
+        };
+      }
+
+      if (needsGeometryUpdate) {
+        calendarEl.style.setProperty('height', availableHeight + 'px', 'important');
+
+        const scrollers = document.querySelectorAll('.fc-timeGridWeek-view .fc-scroller, .fc-timeGridDay-view .fc-scroller, .fc-dayGridMonth-view .fc-scroller');
         scrollers.forEach(scroller => {
           if (scroller.closest('.fc-timeGridWeek-view') || scroller.closest('.fc-timeGridDay-view')) {
-            const scrollHeight = availableHeight - dayHeaderHeight - 5
-            scroller.style.setProperty('max-height', scrollHeight + 'px', 'important')
+            const scrollHeight = availableHeight - dayHeaderHeight - 5;
+            scroller.style.setProperty('max-height', scrollHeight + 'px', 'important');
           } else {
-            scroller.style.setProperty('max-height', availableHeight + 'px', 'important')
+            scroller.style.setProperty('max-height', availableHeight + 'px', 'important');
           }
-          scroller.style.setProperty('overflow-y', 'auto', 'important')
-          scroller.style.setProperty('overflow-x', 'hidden', 'important')
-        })
-        if (calendar.view.type === 'dayGridMonth') normalizeMonthHeights()
-      }, 50)
+          scroller.style.setProperty('overflow-y', 'auto', 'important');
+          scroller.style.setProperty('overflow-x', 'hidden', 'important');
+        });
+      }
+
+      // Всегда обновляем высоту ячеек в месячном виде (зависит от количества событий)
+      if (viewType === 'dayGridMonth') {
+        normalizeMonthHeights();
+      }
     }
+
+    
 
     const calendar = new FullCalendar.Calendar(document.getElementById('calendar'), {
       locale: 'ru', firstDay: 1, initialView: 'dayGridMonth', headerToolbar: false,
@@ -1809,6 +1844,7 @@ async function unsubscribeFromPushNotifications() {
       }
       
       calendar.refetchEvents()
+      calculateScrollerHeight()
       document.getElementById('sheet').classList.remove('active')
       editingLessonId = null
       showToast('Занятие сохранено', true)
@@ -1850,6 +1886,7 @@ async function unsubscribeFromPushNotifications() {
         }
         
         calendar.refetchEvents()
+        calculateScrollerHeight()
         document.getElementById('sheet').classList.remove('active')
         editingLessonId = null
         showToast('Занятие удалено', true)
@@ -1924,6 +1961,7 @@ async function unsubscribeFromPushNotifications() {
         calendar.setOption('slotMinTime', workHours.from)
         calendar.setOption('slotMaxTime', workHours.to)
         calendar.render()
+        calculateScrollerHeight();
         settingsChanged = true
       }
     }
@@ -2460,6 +2498,7 @@ async function unsubscribeFromPushNotifications() {
       lessons = lessons.filter(l => l.date >= cutoffDate)
       saveLessonsToStorage()
       calendar.refetchEvents()
+      calculateScrollerHeight()
 
       if (currentUser) {
         toDelete.forEach(async lesson => {
@@ -2539,6 +2578,7 @@ async function unsubscribeFromPushNotifications() {
       }
       saveLessonsToStorage()
       calendar.refetchEvents()
+      calculateScrollerHeight()
       document.getElementById('sheet').classList.remove('active')
       showToast(`✅ Обновлено уроков: ${_pendingTimeChanges.length}`, true)
       _pendingTimeChanges = []
@@ -2569,6 +2609,7 @@ async function unsubscribeFromPushNotifications() {
       }
       saveLessonsToStorage()
       calendar.refetchEvents()
+      calculateScrollerHeight()
       document.getElementById('sheet').classList.remove('active')
       showToast(`✅ Удалено уроков: ${_pendingDeletes.length}`, true)
       _pendingDeletes = []
