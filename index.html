@@ -222,13 +222,16 @@
 
   <!-- Toast для уведомлений -->
   <!-- ТУР ОБУЧЕНИЯ -->
-  <div id="tourHighlight" class="tour-highlight" style="display:none;"></div>
-  <div id="tourCard" class="tour-card" style="display:none;">
+    <div id="tourHighlight" class="tour-highlight" style="display:none;"></div>
+    <div id="tourCard" class="tour-card" style="display:none;">
+    <!-- Затемняющий фон во время тура -->
+    <div id="tourOverlay" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:transparent; z-index:9001;"></div>
     <div class="tour-step-label" id="tourStepLabel"></div>
     <div class="tour-title" id="tourTitle"></div>
     <div class="tour-text" id="tourText"></div>
     <div class="tour-buttons">
       <div class="tour-dots" id="tourDots"></div>
+      <button id="tourPrevBtn" onclick="tourPrev()" style="background:transparent;border:none;color:#64748b;font-size:13px;cursor:pointer;padding:6px 4px;flex-shrink:0; display:none;">Назад</button>
       <button onclick="skipTour()" style="background:transparent;border:none;color:#64748b;font-size:13px;cursor:pointer;padding:6px 4px;flex-shrink:0;">Пропустить</button>
       <button onclick="tourNext()" id="tourNextBtn" style="background:#2563eb;color:white;border:none;border-radius:10px;padding:8px 18px;font-size:14px;font-weight:500;cursor:pointer;flex-shrink:0;">Далее</button>
     </div>
@@ -1738,6 +1741,17 @@ async function unsubscribeFromPushNotifications() {
       if (notesEl) notesEl.addEventListener('input', autoResizeNotes)
     })
 
+    // Подсветка поля с ошибкой (красная рамка на 3 секунды)
+    function highlightInvalidField(fieldElement) {
+      if (!fieldElement) return;
+      fieldElement.style.outline = '2px solid #ef4444';
+      fieldElement.style.outlineOffset = '2px';
+      setTimeout(() => {
+        fieldElement.style.outline = '';
+        fieldElement.style.outlineOffset = '';
+      }, 3000);
+    }
+
     function hasLessonConflict(newLesson, editMode = false) {
       const lessonStart = new Date(`${newLesson.date}T${newLesson.time}`)
       const lessonEnd = new Date(lessonStart.getTime() + newLesson.duration * 60000)
@@ -1915,29 +1929,72 @@ async function unsubscribeFromPushNotifications() {
     }
 
     async function closeSettings() {
-      const settingsSheet = document.getElementById('settingsSheet')
-      settingsSheet.classList.remove('active')
-      if (!settingsChanged || !currentUser) {
-        settingsChanged = false
-        return
+      const settingsSheet = document.getElementById('settingsSheet');
+      const workFromEl = document.getElementById('workFrom');
+      const workToEl = document.getElementById('workTo');
+
+      // Получаем текущие значения из полей ввода
+      const fromTime = workFromEl.value;
+      const toTime = workToEl.value;
+
+      // Проверяем валидность времени работы
+      if (!validateWorkHours(fromTime, toTime)) {
+        const fromDate = new Date(`2000-01-01T${fromTime}`);
+        const toDate = new Date(`2000-01-01T${toTime}`);
+        if (fromDate >= toDate) {
+          highlightInvalidField(workToEl);
+          highlightInvalidField(workFromEl);
+          showToast('⚠️ Время окончания работы должно быть позже времени начала', false);
+        } else if (!fromTime || !toTime) {
+          if (!fromTime) highlightInvalidField(workFromEl);
+          if (!toTime) highlightInvalidField(workToEl);
+          showToast('⚠️ Заполните оба поля времени', false);
+        } else {
+          highlightInvalidField(workFromEl);
+          highlightInvalidField(workToEl);
+          showToast('⚠️ Проверьте правильность времени работы', false);
+        }
+        // Не закрываем окно настроек
+        return;
       }
-      try {
-        await supabaseClient
-          .from('user_settings')
-          .upsert({
-            user_id: currentUser.id,
-            work_from: workHours.from,
-            work_to: workHours.to,
-            theme: localStorage.getItem('teacher_theme') || 'dark',
-            notification_default: localStorage.getItem('teacher_notification') || 'Не оповещать',
-            auto_delete_old: localStorage.getItem('auto_delete_old') === '1',
-            updated_at: new Date().toISOString()
-          }, { onConflict: 'user_id' })
-        showToast('✅ Настройки сохранены в облаке', true)
-      } catch (error) {
-        showToast('⚠️ Настройки сохранены локально', false)
+  
+      // Валидация пройдена – обновляем глобальные настройки, если они изменились
+      if (workHours.from !== fromTime || workHours.to !== toTime) {
+        workHours = { from: fromTime, to: toTime };
+        saveSettingsToStorage();
+        calendar.setOption('slotMinTime', workHours.from);
+        calendar.setOption('slotMaxTime', workHours.to);
+        calendar.render();
+        calculateScrollerHeight();
+        settingsChanged = true;
       }
-      settingsChanged = false
+  
+      // Закрываем окно настроек
+      settingsSheet.classList.remove('active');
+  
+      // Сохраняем в облако, если есть пользователь и настройки были изменены
+      if (settingsChanged && currentUser) {
+        try {
+          await supabaseClient
+            .from('user_settings')
+            .upsert({
+              user_id: currentUser.id,
+              work_from: workHours.from,
+              work_to: workHours.to,
+              them  e: localStorage.getItem('teacher_theme') || 'dark',
+              notification_default: localStorage.getItem('teacher_notification') || 'Не оповещать',
+              auto_delete_old: localStorage.getItem('auto_delete_old') === '1',
+              updated_at: new Date().toISOString()
+            }, { onConflict: 'user_id' });
+          showToast('✅ Настройки сохранены в облаке', true);
+        } catch (error) {
+          showToast('⚠️ Настройки сохранены локально', false);
+        }
+        settingsChanged = false;
+      } else if (settingsChanged && !currentUser) {
+        showToast('✅ Настройки сохранены локально', true);
+        settingsChanged = false;
+      }
     }
 
     function resetSaveButton() {}
@@ -1947,21 +2004,6 @@ async function unsubscribeFromPushNotifications() {
       themeSelect.onchange = function() {
         document.body.className = this.value
         localStorage.setItem('teacher_theme', this.value)
-        settingsChanged = true
-      }
-    }
-
-    function saveWorkHours() {
-      const workFrom = document.getElementById('workFrom')
-      const workTo = document.getElementById('workTo')
-      if (workFrom && workTo) {
-        if (!validateWorkHours(workFrom.value, workTo.value)) return
-        workHours = { from: workFrom.value, to: workTo.value }
-        saveSettingsToStorage()
-        calendar.setOption('slotMinTime', workHours.from)
-        calendar.setOption('slotMaxTime', workHours.to)
-        calendar.render()
-        calculateScrollerHeight();
         settingsChanged = true
       }
     }
@@ -1976,9 +2018,7 @@ async function unsubscribeFromPushNotifications() {
 
     const workFromEl = document.getElementById('workFrom')
     const workToEl = document.getElementById('workTo')
-    if (workFromEl) workFromEl.addEventListener('change', saveWorkHours)
-    if (workToEl) workToEl.addEventListener('change', saveWorkHours)
-
+    
     const notificationSelect = document.getElementById('notificationSelect')
     if (notificationSelect) {
       const savedNotification = localStorage.getItem('teacher_notification') || 'Не оповещать'
@@ -2687,6 +2727,13 @@ async function unsubscribeFromPushNotifications() {
       _showTourStep()
     }
 
+    function tourPrev() {
+       if (_tourStep > 0) {
+        _tourStep--;
+        _showTourStep();
+      }
+    }
+
     function skipTour() {
       _hideTour()
       const isFirstTime = !localStorage.getItem('tour_done')
@@ -2709,41 +2756,50 @@ async function unsubscribeFromPushNotifications() {
     function _hideTour() {
       document.getElementById('tourCard').style.display = 'none'
       document.getElementById('tourHighlight').style.display = 'none'
+      document.getElementById('tourOverlay').style.display = 'none'
       // Закрываем настройки если были открыты туром
       const settingsSheet = document.getElementById('settingsSheet')
       if (settingsSheet) settingsSheet.classList.remove('active')
     }
 
     function _showTourStep() {
-  const step = TOUR_STEPS[_tourStep]
-  const total = TOUR_STEPS.length
+      const step = TOUR_STEPS[_tourStep]
+      const total = TOUR_STEPS.length
 
-  // Вызываем before-колбэк (например открыть настройки)
-  if (step.before) step.before()
+    // Вызываем before-колбэк (например открыть настройки)
+      if (step.before) step.before()
 
-  // Даём время DOM обновиться после before()
-  setTimeout(() => {
-    const card = document.getElementById('tourCard')
-    const highlight = document.getElementById('tourHighlight')
+    // Даём время DOM обновиться после before()
+      setTimeout(() => {
+        const card = document.getElementById('tourCard')
+        const highlight = document.getElementById('tourHighlight')
 
-    document.getElementById('tourStepLabel').textContent = `${_tourStep + 1} из ${total}`
-    document.getElementById('tourTitle').textContent = step.title
-    document.getElementById('tourText').textContent = step.text
-    document.getElementById('tourNextBtn').textContent = _tourStep === total - 1 ? 'Готово' : 'Далее'
+        document.getElementById('tourStepLabel').textContent = `${_tourStep + 1} из ${total}`
+        document.getElementById('tourTitle').textContent = step.title
+        document.getElementById('tourText').textContent = step.text
+        document.getElementById('tourNextBtn').textContent = _tourStep === total - 1 ? 'Готово' : 'Далее'
+        const prevBtn = document.getElementById('tourPrevBtn');
+          if (prevBtn) {
+            if (_tourStep === 0) {
+             prevBtn.style.display = 'none';
+           } else {
+             prevBtn.style.display = 'inline-block';
+            }
+         }
+        document.getElementById('tourDots').innerHTML = TOUR_STEPS.map((_, i) =>
+          `<div class="tour-dot${i === _tourStep ? ' active' : ''}"></div>`
+        ).join('')
 
-    document.getElementById('tourDots').innerHTML = TOUR_STEPS.map((_, i) =>
-      `<div class="tour-dot${i === _tourStep ? ' active' : ''}"></div>`
-    ).join('')
-
-    card.style.display = 'block'
-    card.style.top = 'auto'
-    card.style.bottom = 'auto'
-    card.style.transform = 'translateX(-50%)'
+        document.getElementById('tourOverlay').style.display = 'block';
+        card.style.display = 'block'
+        card.style.top = 'auto'
+        card.style.bottom = 'auto'
+        card.style.transform = 'translateX(-50%)'
 
     // Если есть целевой элемент — подсвечиваем его
-    if (step.target) {
-      const el = document.querySelector(step.target)
-      if (el) {
+        if (step.target) {
+        const el = document.querySelector(step.target)
+        if (el) {
         const r = el.getBoundingClientRect()
         const p = 8
         highlight.style.cssText = `display:block;left:${r.left-p}px;top:${r.top-p}px;width:${r.width+p*2}px;height:${r.height+p*2}px;`
@@ -2782,16 +2838,16 @@ async function unsubscribeFromPushNotifications() {
             }
           }
         }
-      } else {
-        highlight.style.display = 'none'
-        _centerCard(card)
-      }
-    } else {
-      highlight.style.display = 'none'
-      _centerCard(card)
+        } else {
+         highlight.style.display = 'none'
+          _centerCard(card)
+         }
+        } else {
+         highlight.style.display = 'none'
+         _centerCard(card)
+       }
+      }, step.before ? 250 : 0)
     }
-  }, step.before ? 250 : 0)
-}
 
     function _centerCard(card) {
       card.style.top = '50%'
