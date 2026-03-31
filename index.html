@@ -236,7 +236,7 @@
   </div>
 
   <!-- Затемняющий фон во время тура (теперь вне карточки) -->
-  <div id="tourOverlay" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.7); z-index:9001;"></div>
+  <div id="tourOverlay" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:transparent; z-index:9001;"></div>
 
   <div id="toast" class="toast"></div>
 
@@ -2660,13 +2660,13 @@ async function unsubscribeFromPushNotifications() {
     const TOUR_STEPS = [
       {
         title: '👋 Добро пожаловать!',
-        text: 'Это приложение для расписания уроков. Для закрытия любого открытого окна — нажмите на затемнённую область вне него. Это окно можно закрыть при помощи кнопки Пропустить',
+        text: 'Это приложение для расписания уроков. Для закрытия любого открытого окна — нажмите на затемнённую область вне него. Это окно можно закрыть при помощи кнопки Пропустить.',
         target: null,
         position: 'center'
       },
       {
         title: '📅 Режимы просмотра',
-        text: 'Переключайте вид между Месяцем, Неделей и Днём внизу экрана. Кнопка ← или свайп влево — следующий период, кнопка → или свайп вправо — предыдущий. Кнопка 🏠 возвращает к сегодняшней дате.',
+        text: 'Переключайте вид между Месяцем, Неделей и Днём внизу экрана.\nКнопка ← или свайп влево — следующий период, кнопка → или свайп вправо — предыдущий. Кнопка 🏠 возвращает к сегодняшней дате.',
         target: '.bottom-bar',
         position: 'top',
         before: () => { const s = document.getElementById('settingsSheet'); if(s) s.classList.remove('active') }
