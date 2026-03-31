@@ -328,7 +328,7 @@
   </div>
 
   <!-- Подтверждение переноса времени -->
-  <div id="applyTimeModal" class="modal-overlay" style="display:none; z-index:3000;">
+  <div id="applyTimeModal" class="modal-overlay" style="display:none; z-index:3000;" onclick="if(event.target.id==='applyTimeModal') this.style.display='none'">
   <div class="modal" style="max-width:320px;">
     <div class="modal-title">⏰ Подтвердите перенос</div>
     <div class="modal-content" id="applyTimeList" style="white-space:pre-line; max-height:200px; overflow-y:auto;"></div>
@@ -340,7 +340,7 @@
 </div>
   
   <!-- Подтверждение группового удаления -->
-  <div id="deleteCheckedModal" class="modal-overlay" style="display:none; z-index:3000;">
+  <div id="deleteCheckedModal" class="modal-overlay" style="display:none; z-index:3000;" onclick="if(event.target.id==='deleteCheckedModal') this.style.display='none'">
     <div class="modal" style="max-width:320px;">
       <div class="modal-title" style="color:#ef4444;">🗑️ Удалить отмеченные</div>
       <div class="modal-content" id="deleteCheckedList" style="white-space:pre-line; max-height:200px; overflow-y:auto;"></div>
