@@ -378,7 +378,7 @@
           </select>
         </div>
         <div style="flex: 1;">
-          <div class="text-xs mb-1">Оповещение (⏰ ±3 мин)</div>
+          <div class="text-xs mb-1">Уведомления (⏰ ±3 мин)</div>
           <select id="notificationSelect" style="padding: 8px; font-size: 14px;" disabled>
             <option>Не оповещать</option>
             <option>За 30 мин</option>
@@ -2110,7 +2110,7 @@ async function unsubscribeFromPushNotifications() {
 
     function handleCloudAction() {
       if (currentUser) {
-        showConfirmModal('⚠️ Отключить облако', 'Вы действительно хотите отключить облако?\n\nДанные останутся в облаке, но режим переключится на локальный.', logoutCloud)
+        showConfirmModal('⚠️ Отключить облако', 'Вы действительно хотите отключить облако?\n\nДанные останутся в облаке, но режим переключится на локальный.\nPush-уведомления поступать не будут.', logoutCloud)
       } else { showAuthModal() }
     }
 
@@ -2692,7 +2692,7 @@ async function unsubscribeFromPushNotifications() {
       },
       {
         title: '🔔 Уведомления',
-        text: 'Push-уведомления приходят даже когда приложение полностью закрыто. Выберите за сколько минут напоминать в поле "Оповещение". Требуется вход в облако.',
+        text: 'Push-уведомления приходят даже когда приложение полностью закрыто. Выберите за сколько минут напоминать в поле "Уведомления". Требуется вход в облако.',
         target: '#notificationSelect',
         position: 'bottom',
         before: () => { openSettings() }
