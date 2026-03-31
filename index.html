@@ -2418,11 +2418,8 @@ async function unsubscribeFromPushNotifications() {
 
   calendarEl.addEventListener('touchmove', e => {
     if (!touchStartX) return
-    
     const dx = Math.abs(e.touches[0].clientX - touchStartX)
     const dy = Math.abs(e.touches[0].clientY - touchStartY)
-    
-    // Если движение больше порога, считаем что это свайп
     if (dx > SWIPE_THRESHOLD || dy > SWIPE_THRESHOLD) {
       isSwiping = true
     }
@@ -2441,56 +2438,59 @@ async function unsubscribeFromPushNotifications() {
     
     // Если это был свайп (движение больше порога) или слишком долгое касание (> MAX_TAP_TIME)
     if (Math.abs(dx) > SWIPE_THRESHOLD || Math.abs(dy) > SWIPE_THRESHOLD || touchDuration > MAX_TAP_TIME) {
-      // Это свайп или долгое нажатие - обрабатываем навигацию
       const isHorizontalSwipe = Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > SWIPE_THRESHOLD
-      
       if (isHorizontalSwipe) {
-        // Только горизонтальный свайп меняет дату
-        if (dx < 0) {
-          // Влево → вперёд (следующий период)
-          next()
-        } else if (dx > 0) {
-          // Вправо → назад (предыдущий период)
-          prev()
-        }
+        if (dx < 0) next()      // влево → следующий период
+        else if (dx > 0) prev() // вправо → предыдущий период
       }
       return
     }
     
-    // Это был короткий тап (не свайп) - проверяем, нужно ли создавать занятие
+    // Короткий тап (не свайп)
     if (canCreateLessonOnTap()) {
-      // В режимах Неделя и День тап открывает форму создания занятия
-      // Нужно получить координаты и найти ячейку времени, на которую нажали
       const touch = e.changedTouches[0]
-      const target = document.elementFromPoint(touch.clientX, touch.clientY)
+      let target = document.elementFromPoint(touch.clientX, touch.clientY)
       
-      // Ищем ближайший элемент ячейки времени
+      // Проверяем, не нажали ли на существующее событие (урок)
+      let isEvent = false
+      let el = target
+      while (el && el !== calendarEl) {
+        if (el.classList && (
+            el.classList.contains('fc-event') ||
+            el.classList.contains('fc-timegrid-event') ||
+            el.classList.contains('fc-event-main') ||
+            el.closest('.fc-event')
+        )) {
+          isEvent = true
+          break
+        }
+        el = el.parentElement
+      }
+      
+      if (isEvent) {
+        // Если кликнули по уроку — ничего не делаем, даём сработать штатному eventClick
+        return
+      }
+      
+      // Иначе — создаём новое занятие (как при нажатии на +)
       const timeSlot = target?.closest('.fc-timegrid-slot, .fc-timegrid-col')
-      
       if (timeSlot) {
-        // Получаем время из атрибута data-time или из текста
         const timeAttr = timeSlot.getAttribute('data-time')
         if (timeAttr) {
-          // Создаём занятие с выбранным временем
           const now = new Date()
           const dateStr = calendar.getDate().toISOString().slice(0, 10)
           const roundedTime = roundTo30(new Date(`${dateStr}T${timeAttr}`))
           openFormWithDate(roundedTime)
         } else {
-          // Если не удалось получить время, используем текущее
           openAdd()
         }
       } else {
-        // Если кликнули не по ячейке времени, открываем форму с текущим временем
         openAdd()
       }
     }
-    
-    // Сброс флага свайпа
-    isSwiping = false
   }, { passive: true })
 })()
-
+    
     // ===== КНОПКА ДОМОЙ =====
     function goHome() {
       calendar.today()
