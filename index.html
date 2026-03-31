@@ -329,16 +329,16 @@
 
   <!-- Подтверждение переноса времени -->
   <div id="applyTimeModal" class="modal-overlay" style="display:none; z-index:3000;">
-    <div class="modal" style="max-width:320px;">
-      <div class="modal-title">⏰ Подтвердите перенос</div>
-      <div class="modal-content" id="applyTimeList" style="white-space:pre-line; max-height:200px; overflow-y:auto;"></div>
-      <div class="modal-buttons" style="display:flex; gap:12px;">
-        <button id="applyTimeConfirmBtn" class="btn-primary" style="flex:1;" onclick="confirmApplyTime()">Применить</button>
-        <button class="btn-secondary" style="flex:1;" onclick="document.getElementById('applyTimeModal').style.display='none'">Отмена</button>
-      </div>
+  <div class="modal" style="max-width:320px;">
+    <div class="modal-title">⏰ Подтвердите перенос</div>
+    <div class="modal-content" id="applyTimeList" style="white-space:pre-line; max-height:200px; overflow-y:auto;"></div>
+    <div class="modal-buttons" style="display: flex; flex-direction: column; gap: 8px;">
+      <button id="applyTimeConfirmBtn" class="btn-primary" style="width: 100%;" onclick="confirmApplyTime()">Копировать не конфликтные</button>
+      <button class="btn-secondary" style="width: 100%;" onclick="document.getElementById('applyTimeModal').style.display='none'">Отмена</button>
     </div>
   </div>
-
+</div>
+  
   <!-- Подтверждение группового удаления -->
   <div id="deleteCheckedModal" class="modal-overlay" style="display:none; z-index:3000;">
     <div class="modal" style="max-width:320px;">
