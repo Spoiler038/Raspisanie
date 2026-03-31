@@ -333,7 +333,7 @@
       <div class="modal-title">⏰ Подтвердите перенос</div>
       <div class="modal-content" id="applyTimeList" style="white-space:pre-line; max-height:200px; overflow-y:auto;"></div>
       <div class="modal-buttons" style="display:flex; gap:12px;">
-        <button class="btn-primary" style="flex:1;" onclick="confirmApplyTime()">Применить</button>
+        <button id="applyTimeConfirmBtn" class="btn-primary" style="flex:1;" onclick="confirmApplyTime()">Применить</button>
         <button class="btn-secondary" style="flex:1;" onclick="document.getElementById('applyTimeModal').style.display='none'">Отмена</button>
       </div>
     </div>
@@ -1480,7 +1480,7 @@ async function unsubscribeFromPushNotifications() {
       }, 30)
     }
 
-    function calculateScrollerHeight() {
+    function calculateScrollerHeight(forceApplyScrollers = false) {
       const header = document.querySelector('header');
       const bottomBar = document.querySelector('.bottom-bar');
       const calendarEl = document.getElementById('calendar');
@@ -1496,7 +1496,6 @@ async function unsubscribeFromPushNotifications() {
       let availableHeight;
       let needsGeometryUpdate = false;
 
-      // Проверка кеша
       if (_layoutCache &&
           _layoutCache.headerHeight === headerHeight &&
           _layoutCache.bottomBarHeight === bottomBarHeight &&
@@ -1504,26 +1503,21 @@ async function unsubscribeFromPushNotifications() {
           _layoutCache.dayHeaderHeight === dayHeaderHeight) {
         availableHeight = _layoutCache.availableHeight;
       } else {
-        // Пересчёт геометрии
         availableHeight = viewportHeight - headerHeight - bottomBarHeight - 5;
         needsGeometryUpdate = true;
-        _layoutCache = {
-          headerHeight,
-          bottomBarHeight,
-          viewportHeight,
-          dayHeaderHeight,
-          availableHeight
-        };
+        _layoutCache = { headerHeight, bottomBarHeight, viewportHeight, dayHeaderHeight, availableHeight };
       }
 
       if (needsGeometryUpdate) {
         calendarEl.style.setProperty('height', availableHeight + 'px', 'important');
+      }
 
+      // Скроллеры применяем всегда при смене вида или при изменении геометрии
+      if (needsGeometryUpdate || forceApplyScrollers) {
         const scrollers = document.querySelectorAll('.fc-timeGridWeek-view .fc-scroller, .fc-timeGridDay-view .fc-scroller, .fc-dayGridMonth-view .fc-scroller');
         scrollers.forEach(scroller => {
           if (scroller.closest('.fc-timeGridWeek-view') || scroller.closest('.fc-timeGridDay-view')) {
-            const scrollHeight = availableHeight - dayHeaderHeight - 5;
-            scroller.style.setProperty('max-height', scrollHeight + 'px', 'important');
+            scroller.style.setProperty('max-height', (availableHeight - dayHeaderHeight - 5) + 'px', 'important');
           } else {
             scroller.style.setProperty('max-height', availableHeight + 'px', 'important');
           }
@@ -1532,7 +1526,6 @@ async function unsubscribeFromPushNotifications() {
         });
       }
 
-      // Всегда обновляем высоту ячеек в месячном виде (зависит от количества событий)
       if (viewType === 'dayGridMonth') {
         normalizeMonthHeights();
       }
@@ -1600,7 +1593,12 @@ async function unsubscribeFromPushNotifications() {
       calendar.changeView(v === 'month' ? 'dayGridMonth' : v === 'week' ? 'timeGridWeek' : 'timeGridDay')
       updateModes()
       updateHeader()
-      setTimeout(() => { calendar.refetchEvents(); calculateScrollerHeight(); const scroller = document.querySelector('.fc-timeGridDay-view .fc-scroller, .fc-timeGridWeek-view .fc-scroller'); if (scroller) scroller.scrollTop = 0 }, 150)
+      setTimeout(() => {
+        calendar.refetchEvents()
+        calculateScrollerHeight(true)  // принудительно применяем скроллеры
+        const scroller = document.querySelector('.fc-timeGridDay-view .fc-scroller, .fc-timeGridWeek-view .fc-scroller')
+        if (scroller) scroller.scrollTop = 0
+      }, 150)
     }
 
     function updateModes() { ['month', 'week', 'day'].forEach(v => { const element = document.getElementById('mode-' + v); if (element) element.classList.toggle('active', v === currentView) }) }
@@ -2596,17 +2594,80 @@ async function unsubscribeFromPushNotifications() {
       if (!newTime) { showToast('Укажите новое время', false); return }
       const checked = document.querySelectorAll('.other-lesson-cb:checked')
       if (checked.length === 0) { showToast('Отметьте хотя бы один урок', false); return }
+
       _pendingTimeChanges = Array.from(checked).map(cb => ({
         id: cb.dataset.id, date: cb.dataset.date, oldTime: cb.dataset.time, newTime
       }))
-      document.getElementById('applyTimeList').textContent =
-        _pendingTimeChanges.map(r => `${r.date}  ${r.oldTime} → ${r.newTime}`).join('\n')
+
+      // Проверяем конфликты с другими уроками
+      const conflicts = []
+      for (const item of _pendingTimeChanges) {
+        const lesson = lessons.find(l => l.id === item.id)
+        if (!lesson) continue
+        // Ищем конфликт: другие уроки в тот же день с пересечением по времени
+        const newStart = new Date(`${lesson.date}T${item.newTime}`)
+        const newEnd = new Date(newStart.getTime() + lesson.duration * 60000)
+        for (const other of lessons) {
+          // Пропускаем сам урок и уроки которые тоже переносим
+          if (other.id === lesson.id) continue
+          if (_pendingTimeChanges.find(p => p.id === other.id)) continue
+          if (other.date !== lesson.date) continue
+          const otherStart = new Date(`${other.date}T${other.time}`)
+          const otherEnd = new Date(otherStart.getTime() + other.duration * 60000)
+          if (newStart < otherEnd && newEnd > otherStart) {
+            conflicts.push({
+              moving: lesson,
+              newTime: item.newTime,
+              conflict: other
+            })
+          }
+        }
+      }
+
+      if (conflicts.length > 0) {
+        // Показываем конфликты с предложением исправить
+        const conflictText = conflicts.map(c =>
+          `⚠️ ${c.moving.date} ${c.newTime} (${c.moving.student})\n   пересекается с: ${c.conflict.time} — ${c.conflict.student}`
+        ).join('\n\n')
+        document.getElementById('applyTimeList').textContent =
+          `Обнаружены конфликты:\n\n${conflictText}\n\n──────────\nОстальные уроки без конфликтов:\n` +
+          _pendingTimeChanges
+            .filter(r => !conflicts.find(c => c.moving.id === r.id))
+            .map(r => `${r.date}  ${r.oldTime} → ${r.newTime}`)
+            .join('\n') || '(нет)'
+        // Скрываем основную кнопку Применить — показываем кнопку "Применить без конфликтов"
+        document.getElementById('applyTimeConfirmBtn').textContent = 'Применить без конфликтов'
+        document.getElementById('applyTimeConfirmBtn').style.background = '#d97706'
+      } else {
+        document.getElementById('applyTimeList').textContent =
+          _pendingTimeChanges.map(r => `${r.date}  ${r.oldTime} → ${r.newTime}`).join('\n')
+        document.getElementById('applyTimeConfirmBtn').textContent = 'Применить'
+        document.getElementById('applyTimeConfirmBtn').style.background = ''
+      }
       document.getElementById('applyTimeModal').style.display = 'flex'
     }
 
     async function confirmApplyTime() {
       document.getElementById('applyTimeModal').style.display = 'none'
-      for (const item of _pendingTimeChanges) {
+
+      // Если были конфликты — применяем только уроки без конфликтов
+      const toApply = _pendingTimeChanges.filter(item => {
+        const lesson = lessons.find(l => l.id === item.id)
+        if (!lesson) return false
+        const newStart = new Date(`${lesson.date}T${item.newTime}`)
+        const newEnd = new Date(newStart.getTime() + lesson.duration * 60000)
+        for (const other of lessons) {
+          if (other.id === lesson.id) continue
+          if (_pendingTimeChanges.find(p => p.id === other.id)) continue
+          if (other.date !== lesson.date) continue
+          const otherStart = new Date(`${other.date}T${other.time}`)
+          const otherEnd = new Date(otherStart.getTime() + other.duration * 60000)
+          if (newStart < otherEnd && newEnd > otherStart) return false
+        }
+        return true
+      })
+
+      for (const item of toApply) {
         const idx = lessons.findIndex(l => l.id === item.id)
         if (idx !== -1) lessons[idx].time = item.newTime
         if (currentUser) {
@@ -2617,11 +2678,16 @@ async function unsubscribeFromPushNotifications() {
           } catch(e) { console.error('Ошибка обновления времени:', e) }
         }
       }
+
+      const skipped = _pendingTimeChanges.length - toApply.length
       saveLessonsToStorage()
       calendar.refetchEvents()
-      calculateScrollerHeight()
       document.getElementById('sheet').classList.remove('active')
-      showToast(`✅ Обновлено уроков: ${_pendingTimeChanges.length}`, true)
+      if (skipped > 0) {
+        showToast(`✅ Обновлено: ${toApply.length}, пропущено конфликтов: ${skipped}`, true)
+      } else {
+        showToast(`✅ Обновлено уроков: ${toApply.length}`, true)
+      }
       _pendingTimeChanges = []
     }
 
