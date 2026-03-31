@@ -2636,7 +2636,7 @@ async function unsubscribeFromPushNotifications() {
             .map(r => `${r.date}  ${r.oldTime} → ${r.newTime}`)
             .join('\n') || '(нет)'
         // Скрываем основную кнопку Применить — показываем кнопку "Применить без конфликтов"
-        document.getElementById('applyTimeConfirmBtn').textContent = 'Применить без конфликтов'
+        document.getElementById('applyTimeConfirmBtn').textContent = 'Копировать не конфликтные'
         document.getElementById('applyTimeConfirmBtn').style.background = '#d97706'
       } else {
         document.getElementById('applyTimeList').textContent =
