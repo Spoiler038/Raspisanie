@@ -2246,61 +2246,63 @@ async function unsubscribeFromPushNotifications() {
     function hideLoadDataModal() { document.getElementById('loadDataModal').style.display = 'none' }
 
     // ИНИЦИАЛИЗАЦИЯ ПРИ ЗАГРУЗКЕ
-    document.addEventListener('DOMContentLoaded', function() {
-      try {
+   document.addEventListener('DOMContentLoaded', function() {
+    try {
         const savedTheme = localStorage.getItem('teacher_theme') || 'dark'
         document.body.className = savedTheme
         if (themeSelect) themeSelect.value = savedTheme
-      } catch (e) { document.body.className = 'dark' }
-      
-      try {
+        } catch (e) { document.body.className = 'dark' }
+  
+    try {
         const savedSettings = localStorage.getItem('teacher_settings')
-        if (savedSettings) {
-          const settings = JSON.parse(savedSettings)
-          if (settings.workHours) {
-            if (validateWorkHours(settings.workHours.from, settings.workHours.to)) {
-              workHours = settings.workHours
-            }
-            calendar.setOption('slotMinTime', workHours.from)
-            calendar.setOption('slotMaxTime', workHours.to)
-            if (workFromEl) workFromEl.value = workHours.from
-            if (workToEl) workToEl.value = workHours.to
-          }
+    if (savedSettings) {
+        const settings = JSON.parse(savedSettings)
+        if (settings.workHours) {
+        if (validateWorkHours(settings.workHours.from, settings.workHours.to)) {
+          workHours = settings.workHours
         }
-      } catch (e) { console.log('Ошибка загрузки настроек работы') }
-      
-      try {
-        const savedNotification = localStorage.getItem('teacher_notification') || 'Не оповещать'
-        if (notificationSelect) notificationSelect.value = savedNotification
+        calendar.setOption('slotMinTime', workHours.from)
+        calendar.setOption('slotMaxTime', workHours.to)
+        if (workFromEl) workFromEl.value = workHours.from
+        if (workToEl) workToEl.value = workHours.to
+        }
+      }
+    } catch (e) { console.log('Ошибка загрузки настроек работы') }
+  
+    try {
+      const savedNotification = localStorage.getItem('teacher_notification') || 'Не оповещать'
+      if (notificationSelect) notificationSelect.value = savedNotification
       } catch (e) { console.log('Ошибка загрузки настроек оповещений') }
 
-      // Инициализация кнопки автоудаления
-      try { updateAutoDeleteBtn() } catch(e) {}
+    try { updateAutoDeleteBtn() } catch(e) {}
 
-      if (calendar) {
-        calendar.render()
-        updateHeader()
-        updateModes()
-        setTimeout(calculateScrollerHeight, 300)
-      }
+    if (calendar) {
+      // Рендерим календарь один раз
+      calendar.render()
+      updateHeader()
+      updateModes()
+      // Загружаем события и обновляем высоту
+      calendar.refetchEvents()
+      // Небольшая задержка для завершения DOM-обновлений, принудительно применяем скроллеры
+      setTimeout(() => calculateScrollerHeight(true), 300)
+    }
 
-      checkAppVersion()
-      checkFirstTimeTour()  // вызывает checkSyncMode внутри если тур уже был
-      requestNotificationPermission()
-      startNotificationSystem()
-      showIosWarning()
+    checkAppVersion()
+    checkFirstTimeTour()
+    requestNotificationPermission()
+    startNotificationSystem()
+    showIosWarning()
 
-      // Запуск автоудаления при старте (в начале месяца)
-      setTimeout(() => {
-        const now = new Date()
-        if (now.getDate() <= 3) runAutoDelete() // первые 3 дня месяца
-      }, 2000)
+    setTimeout(() => {
+      const now = new Date()
+      if (now.getDate() <= 3) runAutoDelete()
+    }, 2000)
 
-      window.addEventListener('resize', function() { setTimeout(calculateScrollerHeight, 100) })
-      window.addEventListener('orientationchange', function() { setTimeout(calculateScrollerHeight, 200) })
+    window.addEventListener('resize', function() { setTimeout(calculateScrollerHeight, 100) })
+    window.addEventListener('orientationchange', function() { setTimeout(calculateScrollerHeight, 200) })
 
-      setTimeout(() => { updateCloudUI() }, 500)
-    })
+    setTimeout(() => { updateCloudUI() }, 500)
+  })
 
     // ===== ВЕРСИЯ ПРИЛОЖЕНИЯ =====
     // Версия берётся из Supabase app_config — менять код не нужно
