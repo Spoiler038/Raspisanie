@@ -2395,18 +2395,33 @@ async function unsubscribeFromPushNotifications() {
   let touchStartX = 0
   let touchStartY = 0
   let touchStartTime = 0
+  let touchStartOnEvent = false   // флаг, что начальное касание было на уроке
   let isSwiping = false
-  const SWIPE_THRESHOLD = 50 // минимальное расстояние для свайпа (px)
-  const MAX_TAP_TIME = 300 // максимальное время для тапа (мс)
+  const SWIPE_THRESHOLD = 40      // немного уменьшили для лучшего распознавания свайпов
+  const MAX_TAP_TIME = 300
   
   const calendarEl = document.getElementById('calendar')
   if (!calendarEl) return
 
-  // Функция для проверки, можно ли создавать занятие в текущем режиме
   function canCreateLessonOnTap() {
     const viewType = calendar.view.type
-    // В режимах Неделя (timeGridWeek) и День (timeGridDay) тап создаёт занятие
     return viewType === 'timeGridWeek' || viewType === 'timeGridDay'
+  }
+
+  // Функция проверки, является ли элемент или его родитель событием (уроком)
+  function isEventElement(el) {
+    while (el && el !== calendarEl) {
+      if (el.classList && (
+          el.classList.contains('fc-event') ||
+          el.classList.contains('fc-timegrid-event') ||
+          el.classList.contains('fc-event-main') ||
+          el.closest('.fc-event')
+      )) {
+        return true
+      }
+      el = el.parentElement
+    }
+    return false
   }
 
   calendarEl.addEventListener('touchstart', e => {
@@ -2414,6 +2429,10 @@ async function unsubscribeFromPushNotifications() {
     touchStartY = e.touches[0].clientY
     touchStartTime = Date.now()
     isSwiping = false
+
+    // Определяем, было ли касание на уроке
+    const target = document.elementFromPoint(touchStartX, touchStartY)
+    touchStartOnEvent = isEventElement(target)
   }, { passive: true })
 
   calendarEl.addEventListener('touchmove', e => {
@@ -2443,36 +2462,29 @@ async function unsubscribeFromPushNotifications() {
         if (dx < 0) next()      // влево → следующий период
         else if (dx > 0) prev() // вправо → предыдущий период
       }
+      // Сбрасываем флаг касания на уроке
+      touchStartOnEvent = false
       return
     }
     
     // Короткий тап (не свайп)
     if (canCreateLessonOnTap()) {
-      const touch = e.changedTouches[0]
-      let target = document.elementFromPoint(touch.clientX, touch.clientY)
-      
-      // Проверяем, не нажали ли на существующее событие (урок)
-      let isEvent = false
-      let el = target
-      while (el && el !== calendarEl) {
-        if (el.classList && (
-            el.classList.contains('fc-event') ||
-            el.classList.contains('fc-timegrid-event') ||
-            el.classList.contains('fc-event-main') ||
-            el.closest('.fc-event')
-        )) {
-          isEvent = true
-          break
-        }
-        el = el.parentElement
-      }
-      
-      if (isEvent) {
-        // Если кликнули по уроку — ничего не делаем, даём сработать штатному eventClick
+      // Если начальное касание было на уроке — не создаём новое занятие
+      if (touchStartOnEvent) {
+        touchStartOnEvent = false
         return
       }
       
-      // Иначе — создаём новое занятие (как при нажатии на +)
+      const touch = e.changedTouches[0]
+      let target = document.elementFromPoint(touch.clientX, touch.clientY)
+      
+      // Проверяем, не нажали ли на существующее событие (урок) в конечной точке
+      if (isEventElement(target)) {
+        touchStartOnEvent = false
+        return
+      }
+      
+      // Иначе — создаём новое занятие
       const timeSlot = target?.closest('.fc-timegrid-slot, .fc-timegrid-col')
       if (timeSlot) {
         const timeAttr = timeSlot.getAttribute('data-time')
@@ -2488,6 +2500,8 @@ async function unsubscribeFromPushNotifications() {
         openAdd()
       }
     }
+    
+    touchStartOnEvent = false
   }, { passive: true })
 })()
     
