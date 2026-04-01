@@ -2517,7 +2517,7 @@ async function unsubscribeFromPushNotifications() {
       const btn = document.getElementById('autoDeleteBtn')
       if (!btn) return
       const enabled = localStorage.getItem('auto_delete_old') === '1'
-      btn.style.background = enabled ? '#dc2626' : '#475569'
+      btn.style.background = enabled ? '#dc2626' : '#64748b'
       btn.title = enabled ? 'Автоудаление: включено' : 'Автоудаление: отключено'
     }
 
