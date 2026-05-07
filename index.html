@@ -44,7 +44,6 @@
   </script>
 
   <!-- Локальные файлы -->
-  <script src="js/supabase.js"></script>
   <script src="js/fullcalendar.js"></script>
   <script src="js/fullcalendar-locales.js"></script>
 
@@ -554,91 +553,80 @@
       try { pendingChanges = JSON.parse(savedPending) } catch (e) { console.log('Ошибка загрузки ожидающих изменений') }
     }
 
-    // ===== WEB PUSH =====
-const VAPID_PUBLIC_KEY = 'BO5mDuU0D0DbYXwwHi_Q6XeuwobMS3G9eRX4NwlOKoDNGC4EXFx8k1Hn4L47rDuImr8dKSjlhQEo53vvEj5Feog';
+    // ===== GAS API — замена Supabase =====
+    const GAS_URL = 'https://script.google.com/macros/s/AKfycbzdqy8H_pAMnuZaFElGfBhVfN-aRPkIPMsyStPvaTInVR4uUfakXXGrnR1iHAWGsaHETA/exec'
+    // ↑ После публикации GAS (Deploy → New Deployment → Web App)
+    //   вставьте сюда URL вида https://script.google.com/macros/s/.../exec
 
-function urlBase64ToUint8Array(base64String) {
-  const padding = '='.repeat((4 - base64String.length % 4) % 4);
-  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
-  const rawData = atob(base64);
-  return Uint8Array.from([...rawData].map(char => char.charCodeAt(0)));
-}
-
-async function subscribeToPushNotifications() {
-  if (!currentUser) return;
-  if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
-  try {
-    const permission = await Notification.requestPermission();
-    if (permission !== 'granted') return;
-    const registration = await navigator.serviceWorker.ready;
-    let subscription = await registration.pushManager.getSubscription();
-    if (!subscription) {
-      subscription = await registration.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
-      });
-    }
-    const subJson = subscription.toJSON();
-    await supabaseClient
-      .from('push_subscriptions')
-      .upsert({
-        user_id: currentUser.id,
-        endpoint: subJson.endpoint,
-        p256dh: subJson.keys.p256dh,
-        auth: subJson.keys.auth,
-        updated_at: new Date().toISOString()
-      }, { onConflict: 'user_id, endpoint' });
-    console.log('✅ Push-подписка сохранена');
-  } catch (error) {
-    console.error('Ошибка подписки на push:', error);
-  }
-}
-
-async function unsubscribeFromPushNotifications() {
-  if (!('serviceWorker' in navigator)) return;
-  try {
-    const registration = await navigator.serviceWorker.ready;
-    const subscription = await registration.pushManager.getSubscription();
-    if (subscription) {
-      const endpoint = subscription.endpoint;
-      await subscription.unsubscribe();
-      if (currentUser) {
-        await supabaseClient
-          .from('push_subscriptions')
-          .delete()
-          .eq('user_id', currentUser.id)
-          .eq('endpoint', endpoint);
-      }
-      console.log('✅ Отписка выполнена');
-    }
-  } catch (error) {
-    console.error('Ошибка отписки:', error);
-  }
-}
-    
-    // ===== SUPABASE КОНФИГУРАЦИЯ =====
-    const SUPABASE_URL = 'https://dbhqxfaennimfqephxat.supabase.co'
-    const SUPABASE_KEY = 'sb_publishable_t3Q_kfvFl0kbwtoxdswMaw_Y0vdlaTQ'
-
-    let supabaseClient = null
-
-    if (typeof supabase !== 'undefined' && supabase.createClient) {
-      supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY)
-      console.log('Supabase client initialized')
-    } else {
-      console.log('Supabase client not loaded, using mock')
-      supabaseClient = {
-        auth: {
-          signInWithPassword: async () => ({ data: { user: { id: 'mock-user-id', email: 'mock@email.com' } }, error: null }),
-          signUp: async () => ({ data: { user: { id: 'mock-user-id', email: 'mock@email.com' } }, error: null })
-        },
-        from: () => ({
-          select: () => ({ eq: () => ({ single: async () => ({ data: null, error: null }), order: () => Promise.resolve({ data: [], error: null }) }) }),
-          upsert: async () => ({ error: null }),
-          insert: async () => ({ error: null }),
-          update: () => ({ eq: () => ({ eq: async () => ({ error: null }) }) }),
-          delete: () => ({ eq: () => ({ eq: async () => ({ error: null }) }) })
+    async function gasCall(params) {
+      try {
+        const resp = await fetch(GAS_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(params)
         })
+        const data = await resp.json()
+        if (data.error) throw new Error(data.error)
+        return { data, error: null }
+      } catch (err) {
+        return { data: null, error: err }
+      }
+    }
+
+    // ===== WEB PUSH (через GAS) =====
+    const VAPID_PUBLIC_KEY = 'BO5mDuU0D0DbYXwwHi_Q6XeuwobMS3G9eRX4NwlOKoDNGC4EXFx8k1Hn4L47rDuImr8dKSjlhQEo53vvEj5Feog'
+
+    function urlBase64ToUint8Array(base64String) {
+      const padding = '='.repeat((4 - base64String.length % 4) % 4)
+      const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/')
+      const rawData = atob(base64)
+      return Uint8Array.from([...rawData].map(char => char.charCodeAt(0)))
+    }
+
+    async function subscribeToPushNotifications() {
+      if (!currentUser) return
+      if (!('serviceWorker' in navigator) || !('PushManager' in window)) return
+      try {
+        const permission = await Notification.requestPermission()
+        if (permission !== 'granted') return
+        const registration = await navigator.serviceWorker.ready
+        let subscription = await registration.pushManager.getSubscription()
+        if (!subscription) {
+          subscription = await registration.pushManager.subscribe({
+            userVisibleOnly: true,
+            applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
+          })
+        }
+        const subJson = subscription.toJSON()
+        const token = localStorage.getItem('teacher_jwt')
+        await gasCall({
+          action: 'save_push_sub', token,
+          endpoint: subJson.endpoint,
+          p256dh: subJson.keys.p256dh,
+          auth: subJson.keys.auth
+        })
+        console.log('✅ Push-подписка сохранена в GAS')
+      } catch (error) {
+        console.error('Ошибка подписки на push:', error)
+      }
+    }
+
+    async function unsubscribeFromPushNotifications() {
+      if (!('serviceWorker' in navigator)) return
+      try {
+        const registration = await navigator.serviceWorker.ready
+        const subscription = await registration.pushManager.getSubscription()
+        if (subscription) {
+          const endpoint = subscription.endpoint
+          await subscription.unsubscribe()
+          if (currentUser) {
+            const token = localStorage.getItem('teacher_jwt')
+            await gasCall({ action: 'delete_push_sub', token, endpoint })
+          }
+          console.log('✅ Отписка выполнена')
+        }
+      } catch (error) {
+        console.error('Ошибка отписки:', error)
       }
     }
 
@@ -884,27 +872,27 @@ async function unsubscribeFromPushNotifications() {
     }
 
     async function checkAuthOnLoad() {
-  try {
-    const { data: { session }, error } = await supabaseClient.auth.getSession()
-    if (error) throw error
-    if (session) {
-      const wasLoggedIn = !!currentUser
-      currentUser = { id: session.user.id, email: session.user.email }
-      localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(currentUser))
-      updateCloudUI()
-
-      // Загружаем настройки из облака и применяем
       try {
-        const { data: cloudSettings } = await supabaseClient
-          .from('user_settings')
-          .select('*')
-          .eq('user_id', currentUser.id)
-          .maybeSingle()
-
+        const token = localStorage.getItem('teacher_jwt')
+        if (!token) {
+          if (currentSyncMode === SYNC_MODES.CLOUD) setTimeout(() => showAuthModal(), 500)
+          return
+        }
+        // Проверяем токен через попытку загрузить настройки
+        const { data, error } = await gasCall({ action: 'get_settings', token })
+        if (error) {
+          // Токен недействителен — сброс
+          localStorage.removeItem('teacher_jwt')
+          localStorage.removeItem(STORAGE_KEYS.USER)
+          currentUser = null
+          if (currentSyncMode === SYNC_MODES.CLOUD) setTimeout(() => showAuthModal(), 500)
+          return
+        }
+        const wasLoggedIn = !!currentUser
+        updateCloudUI()
+        const cloudSettings = data.settings
         if (cloudSettings) {
           let settingsChanged = false
-          
-          // Тема
           if (cloudSettings.theme) {
             const currentTheme = localStorage.getItem('teacher_theme') || 'dark'
             if (currentTheme !== cloudSettings.theme) {
@@ -915,8 +903,6 @@ async function unsubscribeFromPushNotifications() {
               settingsChanged = true
             }
           }
-          
-          // Режим работы
           if (cloudSettings.work_from && cloudSettings.work_to) {
             if (validateWorkHours(cloudSettings.work_from, cloudSettings.work_to)) {
               if (workHours.from !== cloudSettings.work_from || workHours.to !== cloudSettings.work_to) {
@@ -924,17 +910,15 @@ async function unsubscribeFromPushNotifications() {
                 saveSettingsToStorage()
                 calendar.setOption('slotMinTime', workHours.from)
                 calendar.setOption('slotMaxTime', workHours.to)
+                calculateScrollerHeight()
                 const wfEl = document.getElementById('workFrom')
                 const wtEl = document.getElementById('workTo')
-                calculateScrollerHeight();
                 if (wfEl) wfEl.value = workHours.from
                 if (wtEl) wtEl.value = workHours.to
                 settingsChanged = true
               }
             }
           }
-          
-          // Уведомления
           if (cloudSettings.notification_default) {
             const currentNotif = localStorage.getItem('teacher_notification') || 'Не оповещать'
             if (currentNotif !== cloudSettings.notification_default) {
@@ -942,17 +926,13 @@ async function unsubscribeFromPushNotifications() {
               localStorage.setItem('teacher_notification', notif)
               const notifEl = document.getElementById('notificationSelect')
               if (notifEl) notifEl.value = notif
-              if (notif !== 'Не оповещать') {
-                setTimeout(() => subscribeToPushNotifications(), 1500)
-              }
+              if (notif !== 'Не оповещать') setTimeout(() => subscribeToPushNotifications(), 1500)
               settingsChanged = true
             }
           }
-          
-          // Автоудаление
           if (cloudSettings.auto_delete_old !== undefined && cloudSettings.auto_delete_old !== null) {
             const currentAutoDelete = localStorage.getItem('auto_delete_old') === '1'
-            const autoDelete = cloudSettings.auto_delete_old === true
+            const autoDelete = cloudSettings.auto_delete_old === true || cloudSettings.auto_delete_old === 'true'
             if (currentAutoDelete !== autoDelete) {
               localStorage.setItem('auto_delete_old', autoDelete ? '1' : '0')
               updateAutoDeleteBtn()
@@ -960,25 +940,11 @@ async function unsubscribeFromPushNotifications() {
               settingsChanged = true
             }
           }
-          
-          // Показываем уведомление ТОЛЬКО если настройки реально изменились И это не первый вход
-          if (settingsChanged && wasLoggedIn) {
-            showToast('✅ Настройки обновлены из облака', true)
-          } else if (settingsChanged && !wasLoggedIn) {
-            // При первом входе не показываем уведомление о настройках
-            console.log('Настройки загружены из облака')
-          }
+          if (settingsChanged && wasLoggedIn) showToast('✅ Настройки обновлены из облака', true)
+          else if (settingsChanged && !wasLoggedIn) console.log('Настройки загружены из облака')
         }
-      } catch (e) { console.log('Ошибка загрузки настроек из облака:', e) }
-
-    } else {
-      // Нет активной сессии — показываем форму входа если режим облако
-      if (currentSyncMode === SYNC_MODES.CLOUD) {
-        setTimeout(() => showAuthModal(), 500)
-      }
+      } catch (error) { console.log('Ошибка проверки сессии:', error) }
     }
-  } catch (error) { console.log('Ошибка проверки сессии:', error) }
-}
 
     function setSyncMode(mode) {
       currentSyncMode = mode
@@ -1014,235 +980,125 @@ async function unsubscribeFromPushNotifications() {
       const email = document.getElementById('authEmail').value
       const password = document.getElementById('authPassword').value
       const authMessage = document.getElementById('authMessage')
-  
-      if (!email || !password) {
-        showToast('❌ Введите email и пароль', false)
-        return
-      }
-  
+      if (!email || !password) { showToast('❌ Введите email и пароль', false); return }
       showToast('⏳ Выполняется вход...', false)
-  
       const loginBtn = document.querySelector('#authModal .btn-primary')
       const originalText = loginBtn.textContent
-      loginBtn.textContent = '⏳ Вход...'
-      loginBtn.disabled = true
-  
+      loginBtn.textContent = '⏳ Вход...'; loginBtn.disabled = true
       try {
-        const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password })
-    
+        const { data, error } = await gasCall({ action: 'login', email, password })
         if (error) {
-          const errorMessages = {
-            'Invalid login credentials': '❌ Неверный email или пароль',
-            'Email not confirmed': '❌ Email не подтвержден. Проверьте почту',
-            'Invalid email': '❌ Неверный формат email',
-            'Failed to fetch': '❌ Проверьте подключение к интернету'
-          }
-          const userMessage = errorMessages[error.message] || `❌ Ошибка: ${error.message}`
-          if (authMessage) { authMessage.textContent = userMessage; authMessage.style.color = '#ef4444' } 
-          else { showToast(userMessage, false) }
-
-          loginBtn.textContent = originalText
-          loginBtn.disabled = false
+          const userMessage = error.message === 'Неверный email или пароль'
+            ? '❌ Неверный email или пароль' : '❌ Ошибка: ' + error.message
+          if (authMessage) { authMessage.textContent = userMessage; authMessage.style.color = '#ef4444' }
+          else showToast(userMessage, false)
+          loginBtn.textContent = originalText; loginBtn.disabled = false
           return
         }
-    
+        // Сохраняем токен и пользователя
+        localStorage.setItem('teacher_jwt', data.token)
         currentUser = { id: data.user.id, email: data.user.email, lastSignIn: new Date().toISOString() }
         localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(currentUser))
-    
         if (authMessage) authMessage.textContent = ''
         closeAuthModal()
         updateCloudUI()
-        showToast(`✅ Вход выполнен: ${data.user.email}`, true)
+        showToast('✅ Вход выполнен: ' + data.user.email, true)
         setTimeout(() => subscribeToPushNotifications(), 1000)
-    
-        // Загружаем настройки из облака (без показа уведомления, т.к. это первый вход)
+        // Загружаем настройки
         try {
-          const { data: cloudSettings } = await supabaseClient
-            .from('user_settings')
-            .select('*')
-            .eq('user_id', currentUser.id)
-            .maybeSingle()
-
-          if (cloudSettings) {
-            // Применяем настройки без уведомления
-            if (cloudSettings.theme) {
-              document.body.className = cloudSettings.theme
-              localStorage.setItem('teacher_theme', cloudSettings.theme)
-              const themeEl = document.getElementById('themeSelect')
-              if (themeEl) themeEl.value = cloudSettings.theme
+          const { data: settingsData } = await gasCall({ action: 'get_settings', token: data.token })
+          if (settingsData && settingsData.settings) {
+            const cs = settingsData.settings
+            if (cs.theme) { document.body.className = cs.theme; localStorage.setItem('teacher_theme', cs.theme); const themeEl = document.getElementById('themeSelect'); if (themeEl) themeEl.value = cs.theme }
+            if (cs.work_from && cs.work_to && validateWorkHours(cs.work_from, cs.work_to)) {
+              workHours = { from: cs.work_from, to: cs.work_to }; saveSettingsToStorage()
+              calendar.setOption('slotMinTime', workHours.from); calendar.setOption('slotMaxTime', workHours.to); calculateScrollerHeight()
+              const wfEl = document.getElementById('workFrom'); const wtEl = document.getElementById('workTo')
+              if (wfEl) wfEl.value = workHours.from; if (wtEl) wtEl.value = workHours.to
             }
-            if (cloudSettings.work_from && cloudSettings.work_to) {
-              if (validateWorkHours(cloudSettings.work_from, cloudSettings.work_to)) {
-                workHours = { from: cloudSettings.work_from, to: cloudSettings.work_to }
-                saveSettingsToStorage()
-                calendar.setOption('slotMinTime', workHours.from)
-                calendar.setOption('slotMaxTime', workHours.to)
-                calculateScrollerHeight()
-                const wfEl = document.getElementById('workFrom')
-                const wtEl = document.getElementById('workTo')
-                if (wfEl) wfEl.value = workHours.from
-                if (wtEl) wtEl.value = workHours.to
-              }
+            if (cs.notification_default) {
+              localStorage.setItem('teacher_notification', cs.notification_default)
+              const notifEl = document.getElementById('notificationSelect'); if (notifEl) notifEl.value = cs.notification_default
+              if (cs.notification_default !== 'Не оповещать') setTimeout(() => subscribeToPushNotifications(), 1500)
             }
-            if (cloudSettings.notification_default) {
-              const notif = cloudSettings.notification_default
-              localStorage.setItem('teacher_notification', notif)
-              const notifEl = document.getElementById('notificationSelect')
-              if (notifEl) notifEl.value = notif
-              if (notif !== 'Не оповещать') {
-                setTimeout(() => subscribeToPushNotifications(), 1500)
-              }
-            }
-            if (cloudSettings.auto_delete_old !== undefined && cloudSettings.auto_delete_old !== null) {
-              const autoDelete = cloudSettings.auto_delete_old === true
-              localStorage.setItem('auto_delete_old', autoDelete ? '1' : '0')
-              updateAutoDeleteBtn()
+            if (cs.auto_delete_old !== undefined) {
+              const autoDelete = cs.auto_delete_old === true || cs.auto_delete_old === 'true'
+              localStorage.setItem('auto_delete_old', autoDelete ? '1' : '0'); updateAutoDeleteBtn()
               if (autoDelete) setTimeout(runAutoDelete, 500)
             }
-            // Убираем уведомление "Настройки загружены из облака" при первом входе
           }
         } catch (e) { console.log('Ошибка загрузки настроек из облака:', e) }
-    
-        loginBtn.textContent = originalText
-        loginBtn.disabled = false
-    
+        loginBtn.textContent = originalText; loginBtn.disabled = false
+        // Загружаем уроки
         setTimeout(async () => {
           try {
-            const { data: cloudLessons, error } = await supabaseClient
-              .from('lessons')
-              .select('*')
-              .eq('user_id', currentUser.id)
-
-            if (cloudLessons && cloudLessons.length > 0) {
+            const { data: lessonsData, error: le } = await gasCall({ action: 'get_lessons', token: localStorage.getItem('teacher_jwt') })
+            if (le) throw le
+            const cloudLessons = lessonsData.lessons || []
+            if (cloudLessons.length > 0) {
               if (lessons.length === 0) {
-                lessons = cloudLessons.map(l => ({
-                id: l.lesson_id,
-                date: l.date,
-                time: l.time,
-                student: l.student,
-                duration: l.duration,
-                notes: l.notes || ''
-              }))
-              saveLessonsToStorage()
-              calendar.refetchEvents()
-              showToast(`✅ Загружено ${lessons.length} уроков из облака`, true)
-            } else {
-              showConfirmModal(
-                '📥 Загрузка из облака',
-                `В облаке найдено ${cloudLessons.length} уроков.\n\nУ вас также есть ${lessons.length} локальных уроков.\n\nЗагрузить данные из облака? Локальные данные будут заменены.`,
-                async () => {
-                  lessons = cloudLessons.map(l => ({
-                  id: l.lesson_id,
-                  date: l.date,
-                  time: l.time,
-                  student: l.student,
-                  duration: l.duration,
-                  notes: l.notes || ''
-                }))
-                  saveLessonsToStorage()
-                  calendar.refetchEvents()
-                  showToast(`✅ Загружено ${lessons.length} уроков из облака`, true)
-                }
-              )
+                lessons = cloudLessons.map(l => ({ id: l.lesson_id, date: l.date, time: l.time, student: l.student, duration: Number(l.duration), notes: l.notes || '' }))
+                saveLessonsToStorage(); calendar.refetchEvents()
+                showToast('✅ Загружено ' + lessons.length + ' уроков из облака', true)
+              } else {
+                showConfirmModal('📥 Загрузка из облака', 'В облаке найдено ' + cloudLessons.length + ' уроков.\n\nУ вас также есть ' + lessons.length + ' локальных уроков.\n\nЗагрузить данные из облака? Локальные данные будут заменены.', async () => {
+                  lessons = cloudLessons.map(l => ({ id: l.lesson_id, date: l.date, time: l.time, student: l.student, duration: Number(l.duration), notes: l.notes || '' }))
+                  saveLessonsToStorage(); calendar.refetchEvents()
+                  showToast('✅ Загружено ' + lessons.length + ' уроков из облака', true)
+                })
+              }
             }
-          }
-        } catch (syncError) { console.error('Ошибка при проверке облака:', syncError) }
-      }, 1000)
-    
-    } catch (unexpectedError) {
-      console.error('Неожиданная ошибка:', unexpectedError)
-      showToast('❌ Произошла ошибка при входе', false)
-      loginBtn.textContent = originalText
-      loginBtn.disabled = false
+          } catch (syncError) { console.error('Ошибка при проверке облака:', syncError) }
+        }, 1000)
+      } catch (unexpectedError) {
+        console.error('Неожиданная ошибка:', unexpectedError)
+        showToast('❌ Произошла ошибка при входе', false)
+        loginBtn.textContent = originalText; loginBtn.disabled = false
+      }
     }
-  }
 
     async function handleRegister() {
-  const email = document.getElementById('authEmail').value
-  const password = document.getElementById('authPassword').value
-  const authMessage = document.getElementById('authMessage')
-  
-  if (!email || !password) {
-    showToast('❌ Введите email и пароль', false)
-    return
-  }
-  if (password.length < 6) {
-    showToast('❌ Пароль должен быть не менее 6 символов', false)
-    return
-  }
-  
-  showToast('⏳ Регистрация...', false)
-  
-  const registerBtn = document.querySelector('#authModal .btn-secondary')
-  const originalText = registerBtn.textContent
-  registerBtn.textContent = '⏳ Регистрация...'
-  registerBtn.disabled = true
-  
-  try {
-    const siteUrl = window.location.origin + window.location.pathname
-    const { data, error } = await supabaseClient.auth.signUp({
-      email, password,
-      options: { emailRedirectTo: siteUrl, data: { registered_at: new Date().toISOString() } }
-    })
-    
-    if (error) {
-      const errorMessages = {
-        'User already registered': '❌ Пользователь с таким email уже существует',
-        'Password should be at least 6 characters': '❌ Пароль должен быть не менее 6 символов'
-      }
-      const userMessage = errorMessages[error.message] || `❌ Ошибка: ${error.message}`
-      if (authMessage) { authMessage.textContent = userMessage; authMessage.style.color = '#ef4444' }
-      else { showToast(userMessage, false) }
-      
-      registerBtn.textContent = originalText
-      registerBtn.disabled = false
-      return
-    }
-    
-    if (data.user && data.user.identities && data.user.identities.length === 0) {
-      showToast('❌ Этот email уже зарегистрирован', false)
-      if (authMessage) { authMessage.textContent = '❌ Этот email уже зарегистрирован'; authMessage.style.color = '#ef4444' }
-      registerBtn.textContent = originalText
-      registerBtn.disabled = false
-      return
-    }
-    
-    if (authMessage) { authMessage.textContent = '✅ Регистрация успешна! Проверьте email для подтверждения'; authMessage.style.color = '#10b981' }
-    showToast('✅ Регистрация успешна! Проверьте почту', true)
-    
-    if (data.session) {
-      currentUser = { id: data.session.user.id, email: data.session.user.email, lastSignIn: new Date().toISOString() }
-      localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(currentUser))
-      updateCloudUI()
-      
-      // ========== НОВЫЙ КОД: СОХРАНЕНИЕ ТЕКУЩИХ НАСТРОЕК В ОБЛАКО ПРИ РЕГИСТРАЦИИ ==========
+      const email = document.getElementById('authEmail').value
+      const password = document.getElementById('authPassword').value
+      const authMessage = document.getElementById('authMessage')
+      if (!email || !password) { showToast('❌ Введите email и пароль', false); return }
+      if (password.length < 6) { showToast('❌ Пароль должен быть не менее 6 символов', false); return }
+      showToast('⏳ Регистрация...', false)
+      const registerBtn = document.querySelector('#authModal .btn-secondary')
+      const originalText = registerBtn.textContent
+      registerBtn.textContent = '⏳ Регистрация...'; registerBtn.disabled = true
       try {
-        await supabaseClient
-          .from('user_settings')
-          .upsert({
-            user_id: currentUser.id,
-            work_from: workHours.from,
-            work_to: workHours.to,
+        const { data, error } = await gasCall({ action: 'register', email, password })
+        if (error) {
+          const userMessage = '❌ ' + error.message
+          if (authMessage) { authMessage.textContent = userMessage; authMessage.style.color = '#ef4444' }
+          else showToast(userMessage, false)
+          registerBtn.textContent = originalText; registerBtn.disabled = false
+          return
+        }
+        localStorage.setItem('teacher_jwt', data.token)
+        currentUser = { id: data.user.id, email: data.user.email, lastSignIn: new Date().toISOString() }
+        localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(currentUser))
+        if (authMessage) { authMessage.textContent = '✅ Регистрация успешна!'; authMessage.style.color = '#10b981' }
+        showToast('✅ Регистрация успешна!', true)
+        updateCloudUI()
+        // Сохраняем текущие настройки в облако
+        try {
+          await gasCall({ action: 'save_settings', token: data.token, settings: {
+            work_from: workHours.from, work_to: workHours.to,
             theme: localStorage.getItem('teacher_theme') || 'dark',
             notification_default: localStorage.getItem('teacher_notification') || 'Не оповещать',
-            auto_delete_old: localStorage.getItem('auto_delete_old') === '1',
-            updated_at: new Date().toISOString()
-          }, { onConflict: 'user_id' })
-      } catch (e) { console.log('Ошибка сохранения настроек при регистрации:', e) }
-      // ========== КОНЕЦ НОВОГО КОДА ==========
+            auto_delete_old: localStorage.getItem('auto_delete_old') === '1'
+          }})
+        } catch (e) { console.log('Ошибка сохранения настроек при регистрации:', e) }
+        registerBtn.textContent = originalText; registerBtn.disabled = false
+        setTimeout(() => closeAuthModal(), 2000)
+      } catch (unexpectedError) {
+        console.error('Неожиданная ошибка:', unexpectedError)
+        showToast('❌ Произошла ошибка при регистрации', false)
+        registerBtn.textContent = originalText; registerBtn.disabled = false
+      }
     }
-    
-    setTimeout(() => closeAuthModal(), 3000)
-    registerBtn.textContent = originalText
-    registerBtn.disabled = false
-    
-  } catch (unexpectedError) {
-    console.error('Неожиданная ошибка:', unexpectedError)
-    showToast('❌ Произошла ошибка при регистрации', false)
-    registerBtn.textContent = originalText
-    registerBtn.disabled = false
-  }
-}
 
     function forgotPassword() {
       closeAuthModal()
@@ -1254,21 +1110,15 @@ async function unsubscribeFromPushNotifications() {
     function closeResetModal() { document.getElementById('resetPasswordModal').style.display = 'none' }
 
     async function sendResetPassword() {
-      const email = document.getElementById('resetEmail').value
-      if (!email) { showToast('Введите email', false); return }
-      showToast('Отправка...', false)
-      
-      try {
-        const { error } = await supabaseClient.auth.resetPasswordForEmail(email, { redirectTo: window.location.origin })
-        if (error) throw error
-        document.getElementById('resetMessage').textContent = 'Ссылка для сброса пароля отправлена на email'
-        document.getElementById('resetMessage').style.color = '#10b981'
-        showToast('Письмо отправлено! Проверьте почту', true)
-        setTimeout(() => closeResetModal(), 3000)
-      } catch (error) {
-        document.getElementById('resetMessage').textContent = 'Ошибка: ' + error.message
-        document.getElementById('resetMessage').style.color = '#ef4444'
+      // Сброс пароля требует email-сервис.
+      // Реализация: обратитесь к администратору или измените пароль через прямой доступ к таблице.
+      const msgEl = document.getElementById('resetMessage')
+      if (msgEl) {
+        msgEl.textContent = 'Для сброса пароля обратитесь к администратору системы.'
+        msgEl.style.color = '#f59e0b'
       }
+      showToast('Сброс пароля через email не поддерживается в этой версии', false)
+      setTimeout(() => closeResetModal(), 4000)
     }
 
     function checkCloudAuth() {
@@ -1289,42 +1139,28 @@ async function unsubscribeFromPushNotifications() {
     function importLocal() { document.getElementById('importFile').click() }
 
     async function exportCloud() {
-      if (!currentUser) { showToast('Войдите в облако для синхронизации', false); showAuthModal(); return }
+      const token = localStorage.getItem('teacher_jwt')
+      if (!token || !currentUser) { showToast('Войдите в облако для синхронизации', false); showAuthModal(); return }
       showToast('Сохранение в облако...', false)
-      
       try {
-        const lessonsToUpload = lessons.map(lesson => ({
-          user_id: currentUser.id,
-          lesson_id: lesson.id,
-          student: lesson.student,
-          date: lesson.date,
-          time: lesson.time,
-          duration: lesson.duration,
-          notes: lesson.notes || '',
-          updated_at: new Date().toISOString()
-        }))
-        
-        const { error: lessonsError } = await supabaseClient
-          .from('lessons')
-          .upsert(lessonsToUpload, { onConflict: 'user_id, lesson_id' })
-        
-        if (lessonsError) throw lessonsError
-        
-        const { error: settingsError } = await supabaseClient
-          .from('user_settings')
-          .upsert({
-            user_id: currentUser.id,
-            work_from: workHours.from,
-            work_to: workHours.to,
-            theme: localStorage.getItem('teacher_theme') || 'dark',
-            notification_default: localStorage.getItem('teacher_notification') || 'Не оповещать',
-            updated_at: new Date().toISOString()
-          }, { onConflict: 'user_id' })
-        
-        if (settingsError) throw settingsError
-        
+        // Сохраняем уроки
+        for (const lesson of lessons) {
+          const { error } = await gasCall({ action: 'save_lesson', token, lesson: {
+            lesson_id: lesson.id, student: lesson.student, date: lesson.date,
+            time: lesson.time, duration: lesson.duration, notes: lesson.notes || ''
+          }})
+          if (error) throw error
+        }
+        // Сохраняем настройки
+        const { error: se } = await gasCall({ action: 'save_settings', token, settings: {
+          work_from: workHours.from, work_to: workHours.to,
+          theme: localStorage.getItem('teacher_theme') || 'dark',
+          notification_default: localStorage.getItem('teacher_notification') || 'Не оповещать',
+          auto_delete_old: localStorage.getItem('auto_delete_old') === '1'
+        }})
+        if (se) throw se
         localStorage.setItem(STORAGE_KEYS.LAST_SYNC, new Date().toISOString())
-        showToast(`✅ Данные сохранены в облаке. Уроков: ${lessons.length}`, true)
+        showToast('✅ Данные сохранены в облаке. Уроков: ' + lessons.length, true)
       } catch (error) {
         console.log('Ошибка при сохранении в облако:', error)
         showToast('❌ Ошибка при сохранении в облако', false)
@@ -1332,53 +1168,33 @@ async function unsubscribeFromPushNotifications() {
     }
 
     async function importCloud() {
-      if (!currentUser) { showToast('Войдите в облако для синхронизации', false); showAuthModal(); return }
+      const token = localStorage.getItem('teacher_jwt')
+      if (!token || !currentUser) { showToast('Войдите в облако для синхронизации', false); showAuthModal(); return }
       showToast('Загрузка из облака...', false)
-      
       try {
-        const { data: cloudLessons, error: lessonsError } = await supabaseClient
-          .from('lessons')
-          .select('*')
-          .eq('user_id', currentUser.id)
-        
-        if (lessonsError) throw lessonsError
-        
-        const { data: cloudSettings, error: settingsError } = await supabaseClient
-          .from('user_settings')
-          .select('*')
-          .eq('user_id', currentUser.id)
-          .maybeSingle()
-        
-        if (settingsError && settingsError.code !== 'PGRST116') throw settingsError
-        
-        if (cloudLessons && cloudLessons.length > 0) {
-          lessons = cloudLessons.map(l => ({
-            id: l.lesson_id,
-            date: l.date,
-            time: l.time,
-            student: l.student,
-            duration: l.duration,
-            notes: l.notes || ''
-          }))
-          saveLessonsToStorage()
-          calendar.refetchEvents()
+        const { data: lessonsData, error: le } = await gasCall({ action: 'get_lessons', token })
+        if (le) throw le
+        const { data: settingsData, error: se } = await gasCall({ action: 'get_settings', token })
+        if (se) throw se
+        const cloudLessons = lessonsData.lessons || []
+        if (cloudLessons.length > 0) {
+          lessons = cloudLessons.map(l => ({ id: l.lesson_id, date: l.date, time: l.time, student: l.student, duration: Number(l.duration), notes: l.notes || '' }))
+          saveLessonsToStorage(); calendar.refetchEvents()
           setTimeout(() => { calculateScrollerHeight(); if (calendar.view.type === 'dayGridMonth') normalizeMonthHeights() }, 100)
         }
-        
-        if (cloudSettings) {
-          workHours = { from: cloudSettings.work_from || '09:00', to: cloudSettings.work_to || '18:00' }
+        if (settingsData && settingsData.settings) {
+          const cs = settingsData.settings
+          workHours = { from: cs.work_from || '09:00', to: cs.work_to || '23:59' }
           saveSettingsToStorage()
-          document.body.className = cloudSettings.theme || 'dark'
-          if (themeSelect) themeSelect.value = cloudSettings.theme || 'dark'
-          if (notificationSelect) notificationSelect.value = cloudSettings.notification_default || 'Не оповещать'
-          localStorage.setItem('teacher_theme', cloudSettings.theme || 'dark')
-          localStorage.setItem('teacher_notification', cloudSettings.notification_default || 'Не оповещать')
-          calendar.setOption('slotMinTime', workHours.from)
-          calendar.setOption('slotMaxTime', workHours.to)
+          document.body.className = cs.theme || 'dark'
+          if (themeSelect) themeSelect.value = cs.theme || 'dark'
+          if (notificationSelect) notificationSelect.value = cs.notification_default || 'Не оповещать'
+          localStorage.setItem('teacher_theme', cs.theme || 'dark')
+          localStorage.setItem('teacher_notification', cs.notification_default || 'Не оповещать')
+          calendar.setOption('slotMinTime', workHours.from); calendar.setOption('slotMaxTime', workHours.to)
         }
-        
         localStorage.setItem(STORAGE_KEYS.LAST_SYNC, new Date().toISOString())
-        showToast(`✅ Данные загружены из облака. Уроков: ${lessons.length}`, true)
+        showToast('✅ Данные загружены из облака. Уроков: ' + lessons.length, true)
       } catch (error) {
         console.log('Ошибка при загрузке из облака:', error)
         showToast('❌ Ошибка при загрузке из облака', false)
@@ -1777,75 +1593,34 @@ async function unsubscribeFromPushNotifications() {
       const studentInput = document.getElementById('studentInput')
       const durationInput = document.getElementById('durationInput')
       const notesInput = document.getElementById('notesInput')
-      
       if (!dateInput.value || !timeInput.value || !studentInput.value.trim()) {
-        showToast('Пожалуйста, заполните все обязательные поля')
-        return
+        showToast('Пожалуйста, заполните все обязательные поля'); return
       }
-      
       const duration = parseInt(durationInput.value)
-      if (isNaN(duration) || duration < 30) {
-        showToast('Длительность должна быть не менее 30 минут')
-        return
-      }
-      
+      if (isNaN(duration) || duration < 30) { showToast('Длительность должна быть не менее 30 минут'); return }
       const lesson = {
         id: editingLessonId || generateId(),
-        date: dateInput.value,
-        time: timeInput.value,
-        student: studentInput.value.trim(),
-        duration: duration,
+        date: dateInput.value, time: timeInput.value,
+        student: studentInput.value.trim(), duration: duration,
         notes: notesInput.value.trim()
       }
-      
       const conflict = hasLessonConflict(lesson, !!editingLessonId)
-      if (conflict.conflict) {
-        showToast(conflict.message, false)
-        return
-      }
-      
+      if (conflict.conflict) { showToast(conflict.message, false); return }
       if (editingLessonId) {
         const index = lessons.findIndex(l => l.id === editingLessonId)
         if (index !== -1) lessons[index] = lesson
-      } else {
-        lessons.push(lesson)
-      }
-      
+      } else { lessons.push(lesson) }
       saveLessonsToStorage()
-      
       if (currentUser) {
-        console.log('💾 Сохраняем в Supabase, user:', currentUser.id)
+        const token = localStorage.getItem('teacher_jwt')
         try {
-          const lessonData = {
-            user_id: currentUser.id,
-            lesson_id: lesson.id,
-            student: lesson.student,
-            date: lesson.date,
-            time: lesson.time,
-            duration: lesson.duration,
-            notes: lesson.notes || '',
-            updated_at: new Date().toISOString(),
-            notified: false
-          }
-          console.log('📤 lessonData:', JSON.stringify(lessonData))
-          
-          if (editingLessonId) {
-            const { error } = await supabaseClient
-              .from('lessons')
-              .update(lessonData)
-              .eq('user_id', currentUser.id)
-              .eq('lesson_id', lesson.id)
-            if (error) throw error
-          } else {
-            const { error } = await supabaseClient
-              .from('lessons')
-              .insert([lessonData])
-            if (error) throw error
-          }
-          console.log('✅ Supabase сохранил успешно')
+          const { error } = await gasCall({ action: 'save_lesson', token, lesson: {
+            lesson_id: lesson.id, student: lesson.student, date: lesson.date,
+            time: lesson.time, duration: lesson.duration, notes: lesson.notes || ''
+          }, is_update: !!editingLessonId })
+          if (error) throw error
           showToast('✅ Данные синхронизированы с облаком', true)
         } catch (error) {
-          console.error('❌ Ошибка Supabase:', error.message, error)
           if (error.message && error.message.includes('Failed to fetch')) {
             showToast('⚠️ Урок сохранен локально. Будет синхронизирован при подключении', false)
           } else {
@@ -1854,12 +1629,8 @@ async function unsubscribeFromPushNotifications() {
           pendingChanges.push({ action: editingLessonId ? 'update' : 'insert', lesson, timestamp: new Date().toISOString() })
           localStorage.setItem(STORAGE_KEYS.PENDING_CHANGES, JSON.stringify(pendingChanges))
         }
-      } else {
-        console.warn('⚠️ currentUser = null, сохранение только локально. syncMode:', currentSyncMode)
       }
-      
-      calendar.refetchEvents()
-      calculateScrollerHeight()
+      calendar.refetchEvents(); calculateScrollerHeight()
       document.getElementById('sheet').classList.remove('active')
       editingLessonId = null
       showToast('Занятие сохранено', true)
@@ -1867,46 +1638,37 @@ async function unsubscribeFromPushNotifications() {
 
     async function deleteLesson() {
       if (!editingLessonId) return
-      
       const modal = document.getElementById('deleteLessonModal')
       const confirmBtn = document.getElementById('deleteLessonConfirm')
       const cancelBtn = document.getElementById('deleteLessonCancel')
       const messageEl = document.getElementById('deleteLessonMessage')
       const lesson = lessons.find(l => l.id === editingLessonId)
-      
-      messageEl.innerHTML = `Вы уверены, что хотите удалить занятие?<br><br><b>${lesson.student}</b><br>${lesson.date} в ${lesson.time}<br>Длительность: ${formatDuration(lesson.duration)}`
-      
+      messageEl.innerHTML = 'Вы уверены, что хотите удалить занятие?<br><br><b>' + lesson.student + '</b><br>' + lesson.date + ' в ' + lesson.time + '<br>Длительность: ' + formatDuration(lesson.duration)
       const newConfirmBtn = confirmBtn.cloneNode(true)
       const newCancelBtn = cancelBtn.cloneNode(true)
       confirmBtn.parentNode.replaceChild(newConfirmBtn, confirmBtn)
       cancelBtn.parentNode.replaceChild(newCancelBtn, cancelBtn)
-      
       newConfirmBtn.addEventListener('click', async () => {
         modal.style.display = 'none'
-        lessons = lessons.filter(l => l.id !== editingLessonId)
+        const lessonIdToDelete = editingLessonId
+        lessons = lessons.filter(l => l.id !== lessonIdToDelete)
         saveLessonsToStorage()
-        
         if (currentUser) {
+          const token = localStorage.getItem('teacher_jwt')
           try {
-            await supabaseClient
-              .from('lessons')
-              .delete()
-              .eq('user_id', currentUser.id)
-              .eq('lesson_id', editingLessonId)
+            const { error } = await gasCall({ action: 'delete_lesson', token, lesson_id: lessonIdToDelete })
+            if (error) throw error
           } catch (error) {
-            pendingChanges.push({ action: 'delete', lesson_id: editingLessonId, timestamp: new Date().toISOString() })
+            pendingChanges.push({ action: 'delete', lesson_id: lessonIdToDelete, timestamp: new Date().toISOString() })
             localStorage.setItem(STORAGE_KEYS.PENDING_CHANGES, JSON.stringify(pendingChanges))
             showToast('⚠️ Будет удалено при следующей синхронизации', false)
           }
         }
-        
-        calendar.refetchEvents()
-        calculateScrollerHeight()
+        calendar.refetchEvents(); calculateScrollerHeight()
         document.getElementById('sheet').classList.remove('active')
         editingLessonId = null
         showToast('Занятие удалено', true)
       })
-      
       newCancelBtn.addEventListener('click', () => { modal.style.display = 'none' })
       modal.onclick = function(e) { if (e.target === modal) modal.style.display = 'none' }
       modal.style.display = 'flex'
@@ -1930,71 +1692,39 @@ async function unsubscribeFromPushNotifications() {
     }
 
     async function closeSettings() {
-      const settingsSheet = document.getElementById('settingsSheet');
-      const workFromEl = document.getElementById('workFrom');
-      const workToEl = document.getElementById('workTo');
-
-      // Получаем текущие значения из полей ввода
-      const fromTime = workFromEl.value;
-      const toTime = workToEl.value;
-
-      // Проверяем валидность времени работы
+      const settingsSheet = document.getElementById('settingsSheet')
+      const workFromEl = document.getElementById('workFrom')
+      const workToEl = document.getElementById('workTo')
+      const fromTime = workFromEl.value
+      const toTime = workToEl.value
       if (!validateWorkHours(fromTime, toTime)) {
-        const fromDate = new Date(`2000-01-01T${fromTime}`);
-        const toDate = new Date(`2000-01-01T${toTime}`);
-        if (fromDate >= toDate) {
-          highlightInvalidField(workToEl);
-          highlightInvalidField(workFromEl);
-          showToast('⚠️ Время окончания работы должно быть позже времени начала', false);
-        } else if (!fromTime || !toTime) {
-          if (!fromTime) highlightInvalidField(workFromEl);
-          if (!toTime) highlightInvalidField(workToEl);
-          showToast('⚠️ Заполните оба поля времени', false);
-        } else {
-          highlightInvalidField(workFromEl);
-          highlightInvalidField(workToEl);
-          showToast('⚠️ Проверьте правильность времени работы', false);
-        }
-        // Не закрываем окно настроек
-        return;
+        const fromDate = new Date('2000-01-01T' + fromTime)
+        const toDate = new Date('2000-01-01T' + toTime)
+        if (fromDate >= toDate) { highlightInvalidField(workToEl); highlightInvalidField(workFromEl); showToast('⚠️ Время окончания работы должно быть позже времени начала', false) }
+        else if (!fromTime || !toTime) { if (!fromTime) highlightInvalidField(workFromEl); if (!toTime) highlightInvalidField(workToEl); showToast('⚠️ Заполните оба поля времени', false) }
+        else { highlightInvalidField(workFromEl); highlightInvalidField(workToEl); showToast('⚠️ Проверьте правильность времени работы', false) }
+        return
       }
-  
-      // Валидация пройдена – обновляем глобальные настройки, если они изменились
       if (workHours.from !== fromTime || workHours.to !== toTime) {
-        workHours = { from: fromTime, to: toTime };
-        saveSettingsToStorage();
-        calendar.setOption('slotMinTime', workHours.from);
-        calendar.setOption('slotMaxTime', workHours.to);
-        calendar.render();
-        calculateScrollerHeight();
-        settingsChanged = true;
+        workHours = { from: fromTime, to: toTime }; saveSettingsToStorage()
+        calendar.setOption('slotMinTime', workHours.from); calendar.setOption('slotMaxTime', workHours.to)
+        calendar.render(); calculateScrollerHeight(); settingsChanged = true
       }
-  
-      // Закрываем окно настроек
-      settingsSheet.classList.remove('active');
-  
-      // Сохраняем в облако, если есть пользователь и настройки были изменены
+      settingsSheet.classList.remove('active')
       if (settingsChanged && currentUser) {
+        const token = localStorage.getItem('teacher_jwt')
         try {
-          await supabaseClient
-            .from('user_settings')
-            .upsert({
-              user_id: currentUser.id,
-              work_from: workHours.from,
-              work_to: workHours.to,
-              theme: localStorage.getItem('teacher_theme') || 'dark',
-              notification_default: localStorage.getItem('teacher_notification') || 'Не оповещать',
-              auto_delete_old: localStorage.getItem('auto_delete_old') === '1',
-              updated_at: new Date().toISOString()
-            }, { onConflict: 'user_id' });
-          showToast('✅ Настройки сохранены в облаке', true);
-        } catch (error) {
-          showToast('⚠️ Настройки сохранены локально', false);
-        }
-        settingsChanged = false;
+          await gasCall({ action: 'save_settings', token, settings: {
+            work_from: workHours.from, work_to: workHours.to,
+            theme: localStorage.getItem('teacher_theme') || 'dark',
+            notification_default: localStorage.getItem('teacher_notification') || 'Не оповещать',
+            auto_delete_old: localStorage.getItem('auto_delete_old') === '1'
+          }})
+          showToast('✅ Настройки сохранены в облаке', true)
+        } catch (error) { showToast('⚠️ Настройки сохранены локально', false) }
+        settingsChanged = false
       } else if (settingsChanged && !currentUser) {
-        showToast('✅ Настройки сохранены локально', true);
-        settingsChanged = false;
+        showToast('✅ Настройки сохранены локально', true); settingsChanged = false
       }
     }
 
@@ -2115,10 +1845,11 @@ async function unsubscribeFromPushNotifications() {
     }
 
     async function logoutCloud() {
-      // Отписываем устройство от push перед выходом
       await unsubscribeFromPushNotifications()
-      await supabaseClient.auth.signOut()
+      const token = localStorage.getItem('teacher_jwt')
+      // Просто очищаем локальные данные сессии
       currentUser = null
+      localStorage.removeItem('teacher_jwt')
       localStorage.removeItem(STORAGE_KEYS.USER)
       localStorage.removeItem(STORAGE_KEYS.LAST_SYNC)
       currentSyncMode = SYNC_MODES.LOCAL
@@ -2155,36 +1886,31 @@ async function unsubscribeFromPushNotifications() {
       }
     }
 
-    async function deleteProfile() {
+    function deleteProfile() {
       if (!currentUser) { showToast('❌ Нет активного профиля', false); return }
-      
       showConfirmModal('⚠️ ПОЛНОСТЬЮ УДАЛИТЬ ПРОФИЛЬ',
         'Вы действительно хотите ПОЛНОСТЬЮ УДАЛИТЬ свой профиль?\n\n• Удалит ваш email из системы\n• Удалит все данные в облаке\n• Отключит облачный режим\n\nЭто действие НЕЛЬЗЯ отменить!',
         async () => {
           showConfirmModal('⚠️ ПОСЛЕДНЕЕ ПРЕДУПРЕЖДЕНИЕ', 'Вы уверены, что хотите удалить профиль навсегда?', async () => {
             showToast('⏳ Удаление профиля...', false)
             try {
-              const { error } = await supabaseClient.rpc('delete_my_account')
+              const token = localStorage.getItem('teacher_jwt')
+              const { error } = await gasCall({ action: 'delete_account', token })
               if (error) throw error
-              await supabaseClient.auth.signOut()
               currentUser = null
+              localStorage.removeItem('teacher_jwt')
               localStorage.removeItem(STORAGE_KEYS.USER)
               localStorage.removeItem(STORAGE_KEYS.LAST_SYNC)
               localStorage.removeItem(STORAGE_KEYS.PENDING_CHANGES)
               currentSyncMode = SYNC_MODES.LOCAL
               localStorage.setItem(STORAGE_KEYS.SYNC_MODE, SYNC_MODES.LOCAL)
-              lessons = []
-              saveLessonsToStorage()
-              calendar.refetchEvents()
+              lessons = []; saveLessonsToStorage(); calendar.refetchEvents()
               updateCloudUI()
               showToast('✅ Профиль полностью удален', true)
               document.getElementById('settingsSheet').classList.remove('active')
             } catch (error) {
               console.error('Ошибка удаления профиля:', error)
-              let errorMessage = error.message
-              if (errorMessage.includes('permission denied')) errorMessage = 'Ошибка прав доступа. Проверьте SQL функцию.'
-              else if (errorMessage.includes('JWT')) errorMessage = 'Ошибка авторизации. Попробуйте войти заново.'
-              showToast(`❌ Ошибка: ${errorMessage}`, false)
+              showToast('❌ Ошибка: ' + error.message, false)
             }
           })
         }
@@ -2214,16 +1940,14 @@ async function unsubscribeFromPushNotifications() {
 
     function clearCloudData() {
       if (!currentUser) { showToast('❌ Нет подключения к облаку', false); return }
-      
       showConfirmModal('⚠️ Очистить данные в облаке',
         'Вы действительно хотите удалить ВСЕ данные в облаке?\n\nУроки и настройки будут удалены.\nПрофиль (email) останется.',
         async () => {
           showToast('⏳ Очистка облака...', false)
           try {
-            const { error: lessonsError } = await supabaseClient.from('lessons').delete().eq('user_id', currentUser.id)
-            if (lessonsError) throw lessonsError
-            const { error: settingsError } = await supabaseClient.from('user_settings').delete().eq('user_id', currentUser.id)
-            if (settingsError && settingsError.code !== 'PGRST116') throw settingsError
+            const token = localStorage.getItem('teacher_jwt')
+            const { error } = await gasCall({ action: 'clear_cloud_data', token })
+            if (error) throw error
             if (confirm('Очистить также локальные данные?')) { lessons = []; saveLessonsToStorage() }
             calendar.refetchEvents()
             showToast('✅ Данные в облаке очищены', true)
@@ -2312,29 +2036,22 @@ async function unsubscribeFromPushNotifications() {
     async function checkAppVersion() {
       const vLabel = document.getElementById('appVersionLabel')
       try {
-        const { data, error } = await supabaseClient
-          .from('app_config')
-          .select('value')
-          .eq('key', 'version')
-          .maybeSingle()
-
+        const { data, error } = await gasCall({ action: 'get_app_config', key: 'version' })
         if (error || !data) return
         const serverVersion = data.value
         if (!serverVersion) return
-
         const knownVersion = localStorage.getItem('app_known_version')
-        if (vLabel) vLabel.textContent = `v${serverVersion}`
-
+        if (vLabel) vLabel.textContent = 'v' + serverVersion
         if (!knownVersion) {
           localStorage.setItem('app_known_version', serverVersion)
         } else if (knownVersion !== serverVersion) {
-          console.log(`🆕 Новая версия: ${serverVersion} (у вас: ${knownVersion})`)
+          console.log('🆕 Новая версия: ' + serverVersion + ' (у вас: ' + knownVersion + ')')
           showUpdateBanner()
         }
       } catch (e) {
         console.log('Ошибка проверки версии:', e)
         const knownVersion = localStorage.getItem('app_known_version')
-        if (vLabel && knownVersion) vLabel.textContent = `v${knownVersion}`
+        if (vLabel && knownVersion) vLabel.textContent = 'v' + knownVersion
       }
     }
 
@@ -2542,30 +2259,23 @@ async function unsubscribeFromPushNotifications() {
     function runAutoDelete() {
       const enabled = localStorage.getItem('auto_delete_old') === '1'
       if (!enabled) return
-
       const now = new Date()
-      // Первый день текущего месяца
       const startOfCurrentMonth = new Date(now.getFullYear(), now.getMonth(), 1)
       const cutoffDate = startOfCurrentMonth.toISOString().slice(0, 10)
-
       const toDelete = lessons.filter(l => l.date < cutoffDate)
       if (toDelete.length === 0) return
-
-      console.log(`🗑️ Автоудаление ${toDelete.length} уроков до ${cutoffDate}`)
+      console.log('🗑️ Автоудаление ' + toDelete.length + ' уроков до ' + cutoffDate)
       lessons = lessons.filter(l => l.date >= cutoffDate)
-      saveLessonsToStorage()
-      calendar.refetchEvents()
-      calculateScrollerHeight()
-
+      saveLessonsToStorage(); calendar.refetchEvents(); calculateScrollerHeight()
       if (currentUser) {
+        const token = localStorage.getItem('teacher_jwt')
         toDelete.forEach(async lesson => {
           try {
-            await supabaseClient.from('lessons').delete()
-              .eq('user_id', currentUser.id).eq('lesson_id', lesson.id)
+            await gasCall({ action: 'delete_lesson', token, lesson_id: lesson.id })
           } catch(e) { console.error('Ошибка автоудаления:', e) }
         })
       }
-      showToast(`🗑️ Удалено ${toDelete.length} старых уроков`, true)
+      showToast('🗑️ Удалено ' + toDelete.length + ' старых уроков', true)
     }
 
     // ===== ВКЛАДКИ И ГРУППОВЫЕ ДЕЙСТВИЯ =====
@@ -2690,9 +2400,14 @@ async function unsubscribeFromPushNotifications() {
         if (idx !== -1) lessons[idx].time = item.newTime
         if (currentUser) {
           try {
-            await supabaseClient.from('lessons')
-              .update({ time: item.newTime, notified: false, updated_at: new Date().toISOString() })
-              .eq('user_id', currentUser.id).eq('lesson_id', item.id)
+            await gasCall({ action: 'save_lesson', token: localStorage.getItem('teacher_jwt'), lesson: {
+              lesson_id: item.id,
+              student: lessons.find(l => l.id === item.id)?.student || '',
+              date: lessons.find(l => l.id === item.id)?.date || '',
+              time: item.newTime,
+              duration: lessons.find(l => l.id === item.id)?.duration || 60,
+              notes: lessons.find(l => l.id === item.id)?.notes || ''
+            }, is_update: true })
           } catch(e) { console.error('Ошибка обновления времени:', e) }
         }
       }
@@ -2727,8 +2442,7 @@ async function unsubscribeFromPushNotifications() {
       if (currentUser) {
         for (const item of _pendingDeletes) {
           try {
-            await supabaseClient.from('lessons').delete()
-              .eq('user_id', currentUser.id).eq('lesson_id', item.id)
+            await gasCall({ action: 'delete_lesson', token: localStorage.getItem('teacher_jwt'), lesson_id: item.id })
           } catch(e) { console.error('Ошибка удаления:', e) }
         }
       }
