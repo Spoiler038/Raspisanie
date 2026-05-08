@@ -1303,14 +1303,13 @@ function normalizeLessonFromCloud(lesson) {
       if (error) throw error
     }
     // Сохраняем настройки
-    // В exportCloud, в блоке сохранения настроек:
-const { error: se } = await gasCall({ action: 'save_settings', token, settings: {
-  work_from: timeToExcelTime(workHours.from),  // ← преобразуем в Excel число
-  work_to: timeToExcelTime(workHours.to),      // ← преобразуем в Excel число
-  theme: localStorage.getItem('teacher_theme') || 'dark',
-  notification_default: localStorage.getItem('teacher_notification') || 'Не оповещать',
-  auto_delete_old: localStorage.getItem('auto_delete_old') === '1'
-}})
+    const { error: se } = await gasCall({ action: 'save_settings', token, settings: {
+      work_from: timeToExcelTime(workHours.from),
+      work_to: timeToExcelTime(workHours.to),
+      theme: localStorage.getItem('teacher_theme') || 'dark',
+      notification_default: localStorage.getItem('teacher_notification') || 'Не оповещать',
+      auto_delete_old: localStorage.getItem('auto_delete_old') === '1'
+    }})
     if (se) throw se
     localStorage.setItem(STORAGE_KEYS.LAST_SYNC, new Date().toISOString())
     showToast('✅ Данные сохранены в облаке. Уроков: ' + lessons.length, true)
@@ -1336,20 +1335,19 @@ const { error: se } = await gasCall({ action: 'save_settings', token, settings: 
       setTimeout(() => { calculateScrollerHeight(); if (calendar.view.type === 'dayGridMonth') normalizeMonthHeights() }, 100)
     }
     if (settingsData && settingsData.settings) {
-  const cs = settingsData.settings
-  workHours = { 
-    from: excelTimeToTimeString(cs.work_from) || '09:00', 
-    to: excelTimeToTimeString(cs.work_to) || '23:59' 
-  }
-  saveSettingsToStorage()
-  // ... остальной код
-}
+      const cs = settingsData.settings
+      workHours = { 
+        from: excelTimeToTimeString(cs.work_from) || '09:00', 
+        to: excelTimeToTimeString(cs.work_to) || '23:59' 
+      }
+      saveSettingsToStorage()
       document.body.className = cs.theme || 'dark'
       if (themeSelect) themeSelect.value = cs.theme || 'dark'
       if (notificationSelect) notificationSelect.value = cs.notification_default || 'Не оповещать'
       localStorage.setItem('teacher_theme', cs.theme || 'dark')
       localStorage.setItem('teacher_notification', cs.notification_default || 'Не оповещать')
-      calendar.setOption('slotMinTime', workHours.from); calendar.setOption('slotMaxTime', workHours.to)
+      calendar.setOption('slotMinTime', workHours.from)
+      calendar.setOption('slotMaxTime', workHours.to)
     }
     localStorage.setItem(STORAGE_KEYS.LAST_SYNC, new Date().toISOString())
     showToast('✅ Данные загружены из облака. Уроков: ' + lessons.length, true)
