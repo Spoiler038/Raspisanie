@@ -98,5 +98,43 @@ self.addEventListener('notificationclick', event => {
 self.addEventListener('notificationclose', function() {});
 
 self.addEventListener('message', event => {
-  if (event.data && event.data.action === 'skipWaiting') self.skipWaiting();
-});
+  if (event.data && event.data.action === 'skipWaiting') self.skipWaiting()
+  if (event.data && event.data.action === 'subscribentfy') {
+    ntfyTopic = event.data.topic
+    pollNtfy()
+  }
+})
+
+async function pollNtfy() {
+  if (!ntfyTopic) return
+  try {
+    const response = await fetch('https://ntfy.sh/' + ntfyTopic + '/json', {
+      headers: { 'Accept': 'text/event-stream' }
+    })
+    const reader = response.body.getReader()
+    const decoder = new TextDecoder()
+    
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+      const text = decoder.decode(value)
+      const lines = text.trim().split('\n')
+      for (const line of lines) {
+        try {
+          const msg = JSON.parse(line)
+          if (msg.event === 'message') {
+            self.registration.showNotification(msg.title || '📅 Расписание', {
+              body: msg.message,
+              icon: '/Raspisanie/icons/android/icon-192x192.png',
+              badge: '/Raspisanie/icons/android/icon-72x72.png',
+              vibrate: [200, 100, 200]
+            })
+          }
+        } catch(e) {}
+      }
+    }
+  } catch(e) {
+    // Переподключаемся через 30 секунд
+    setTimeout(pollNtfy, 30000)
+  }
+}
