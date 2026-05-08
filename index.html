@@ -589,6 +589,29 @@ function excelTimeToHHMM(excelTime) {
   return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`
 }
 
+    // ===== ПРЕОБРАЗОВАНИЕ EXCEL TIME ДЛЯ НАСТРОЕК =====
+function excelTimeToTimeString(excelTime) {
+  if (!excelTime && excelTime !== 0) return '09:00'
+  
+  // Если уже строка в формате HH:MM - возвращаем как есть
+  if (typeof excelTime === 'string' && excelTime.match(/^\d{2}:\d{2}$/)) {
+    return excelTime
+  }
+  
+  // Если это число (Excel формат)
+  let timeValue = parseFloat(excelTime)
+  if (isNaN(timeValue)) return '09:00'
+  
+  // Excel time: 0 = 00:00, 0.5 = 12:00
+  let totalMinutes = Math.round(timeValue * 24 * 60)
+  totalMinutes = Math.max(0, Math.min(1439, totalMinutes))
+  
+  const hours = Math.floor(totalMinutes / 60)
+  const minutes = totalMinutes % 60
+  
+  return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`
+}
+
 function timeToExcelTime(timeStr) {
   if (!timeStr) return 0.375 // 09:00 по умолчанию
   const [hours, minutes] = timeStr.split(':').map(Number)
@@ -1008,19 +1031,22 @@ function normalizeLessonFromCloud(lesson) {
         }
       }
       if (cloudSettings.work_from && cloudSettings.work_to) {
-        if (validateWorkHours(cloudSettings.work_from, cloudSettings.work_to)) {
-          workHours = { from: cloudSettings.work_from, to: cloudSettings.work_to }
-          saveSettingsToStorage()
-          calendar.setOption('slotMinTime', workHours.from)
-          calendar.setOption('slotMaxTime', workHours.to)
-          calculateScrollerHeight()
-          const wfEl = document.getElementById('workFrom')
-          const wtEl = document.getElementById('workTo')
-          if (wfEl) wfEl.value = workHours.from
-          if (wtEl) wtEl.value = workHours.to
-          settingsChanged = true
-        }
-      }
+  // Преобразуем время из Excel формата в HH:MM
+  const workFromStr = excelTimeToTimeString(cloudSettings.work_from)
+  const workToStr = excelTimeToTimeString(cloudSettings.work_to)
+  if (validateWorkHours(workFromStr, workToStr)) {
+    workHours = { from: workFromStr, to: workToStr }
+    saveSettingsToStorage()
+    calendar.setOption('slotMinTime', workHours.from)
+    calendar.setOption('slotMaxTime', workHours.to)
+    calculateScrollerHeight()
+    const wfEl = document.getElementById('workFrom')
+    const wtEl = document.getElementById('workTo')
+    if (wfEl) wfEl.value = workHours.from
+    if (wtEl) wtEl.value = workHours.to
+    settingsChanged = true
+  }
+}
       if (cloudSettings.notification_default) {
         localStorage.setItem('teacher_notification', cloudSettings.notification_default)
         const notifEl = document.getElementById('notificationSelect')
@@ -1125,12 +1151,16 @@ function normalizeLessonFromCloud(lesson) {
       if (settingsData && settingsData.settings) {
         const cs = settingsData.settings
         if (cs.theme) { document.body.className = cs.theme; localStorage.setItem('teacher_theme', cs.theme); const themeEl = document.getElementById('themeSelect'); if (themeEl) themeEl.value = cs.theme }
-        if (cs.work_from && cs.work_to && validateWorkHours(cs.work_from, cs.work_to)) {
-          workHours = { from: cs.work_from, to: cs.work_to }; saveSettingsToStorage()
-          calendar.setOption('slotMinTime', workHours.from); calendar.setOption('slotMaxTime', workHours.to); calculateScrollerHeight()
-          const wfEl = document.getElementById('workFrom'); const wtEl = document.getElementById('workTo')
-          if (wfEl) wfEl.value = workHours.from; if (wtEl) wtEl.value = workHours.to
-        }
+        if (cs.work_from && cs.work_to) {
+  const workFromStr = excelTimeToTimeString(cs.work_from)
+  const workToStr = excelTimeToTimeString(cs.work_to)
+  if (validateWorkHours(workFromStr, workToStr)) {
+    workHours = { from: workFromStr, to: workToStr }; saveSettingsToStorage()
+    calendar.setOption('slotMinTime', workHours.from); calendar.setOption('slotMaxTime', workHours.to); calculateScrollerHeight()
+    const wfEl = document.getElementById('workFrom'); const wtEl = document.getElementById('workTo')
+    if (wfEl) wfEl.value = workHours.from; if (wtEl) wtEl.value = workHours.to
+  }
+}
         if (cs.notification_default) {
           localStorage.setItem('teacher_notification', cs.notification_default)
           const notifEl = document.getElementById('notificationSelect'); if (notifEl) notifEl.value = cs.notification_default
@@ -1200,11 +1230,12 @@ function normalizeLessonFromCloud(lesson) {
         // Сохраняем текущие настройки в облако
         try {
           await gasCall({ action: 'save_settings', token: data.token, settings: {
-            work_from: workHours.from, work_to: workHours.to,
-            theme: localStorage.getItem('teacher_theme') || 'dark',
-            notification_default: localStorage.getItem('teacher_notification') || 'Не оповещать',
-            auto_delete_old: localStorage.getItem('auto_delete_old') === '1'
-          }})
+  work_from: timeToExcelTime(workHours.from),
+  work_to: timeToExcelTime(workHours.to),
+  theme: localStorage.getItem('teacher_theme') || 'dark',
+  notification_default: localStorage.getItem('teacher_notification') || 'Не оповещать',
+  auto_delete_old: localStorage.getItem('auto_delete_old') === '1'
+}})
         } catch (e) { console.log('Ошибка сохранения настроек при регистрации:', e) }
         registerBtn.textContent = originalText; registerBtn.disabled = false
         setTimeout(() => closeAuthModal(), 2000)
@@ -1272,12 +1303,14 @@ function normalizeLessonFromCloud(lesson) {
       if (error) throw error
     }
     // Сохраняем настройки
-    const { error: se } = await gasCall({ action: 'save_settings', token, settings: {
-      work_from: workHours.from, work_to: workHours.to,
-      theme: localStorage.getItem('teacher_theme') || 'dark',
-      notification_default: localStorage.getItem('teacher_notification') || 'Не оповещать',
-      auto_delete_old: localStorage.getItem('auto_delete_old') === '1'
-    }})
+    // В exportCloud, в блоке сохранения настроек:
+const { error: se } = await gasCall({ action: 'save_settings', token, settings: {
+  work_from: timeToExcelTime(workHours.from),  // ← преобразуем в Excel число
+  work_to: timeToExcelTime(workHours.to),      // ← преобразуем в Excel число
+  theme: localStorage.getItem('teacher_theme') || 'dark',
+  notification_default: localStorage.getItem('teacher_notification') || 'Не оповещать',
+  auto_delete_old: localStorage.getItem('auto_delete_old') === '1'
+}})
     if (se) throw se
     localStorage.setItem(STORAGE_KEYS.LAST_SYNC, new Date().toISOString())
     showToast('✅ Данные сохранены в облаке. Уроков: ' + lessons.length, true)
@@ -1303,9 +1336,14 @@ function normalizeLessonFromCloud(lesson) {
       setTimeout(() => { calculateScrollerHeight(); if (calendar.view.type === 'dayGridMonth') normalizeMonthHeights() }, 100)
     }
     if (settingsData && settingsData.settings) {
-      const cs = settingsData.settings
-      workHours = { from: cs.work_from || '09:00', to: cs.work_to || '23:59' }
-      saveSettingsToStorage()
+  const cs = settingsData.settings
+  workHours = { 
+    from: excelTimeToTimeString(cs.work_from) || '09:00', 
+    to: excelTimeToTimeString(cs.work_to) || '23:59' 
+  }
+  saveSettingsToStorage()
+  // ... остальной код
+}
       document.body.className = cs.theme || 'dark'
       if (themeSelect) themeSelect.value = cs.theme || 'dark'
       if (notificationSelect) notificationSelect.value = cs.notification_default || 'Не оповещать'
@@ -1849,11 +1887,12 @@ function normalizeLessonFromCloud(lesson) {
         const token = localStorage.getItem('teacher_jwt')
         try {
           await gasCall({ action: 'save_settings', token, settings: {
-            work_from: workHours.from, work_to: workHours.to,
-            theme: localStorage.getItem('teacher_theme') || 'dark',
-            notification_default: localStorage.getItem('teacher_notification') || 'Не оповещать',
-            auto_delete_old: localStorage.getItem('auto_delete_old') === '1'
-          }})
+  work_from: timeToExcelTime(workHours.from),  // ← преобразуем в Excel число
+  work_to: timeToExcelTime(workHours.to),      // ← преобразуем в Excel число
+  theme: localStorage.getItem('teacher_theme') || 'dark',
+  notification_default: localStorage.getItem('teacher_notification') || 'Не оповещать',
+  auto_delete_old: localStorage.getItem('auto_delete_old') === '1'
+}})
           showToast('✅ Настройки сохранены в облаке', true)
         } catch (error) { showToast('⚠️ Настройки сохранены локально', false) }
         settingsChanged = false
