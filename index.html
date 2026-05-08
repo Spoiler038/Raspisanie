@@ -1260,24 +1260,33 @@
     }
 
     function lessonsToEvents() {
-      return lessons.map(lesson => {
-        const start = new Date(lesson.date + 'T' + lesson.time)
-        const end = new Date(start.getTime() + lesson.duration * 60000)
-        const timeStr = lesson.time.substring(0, 5)
-        const endTimeStr = end.toTimeString().substring(0, 5)
-        const durationStr = formatDuration(lesson.duration)
-        return {
-          id: lesson.id,
-          title: '',
-          start: start.toISOString(),
-          end: end.toISOString(),
-          extendedProps: { student: lesson.student, duration: lesson.duration, notes: lesson.notes, time: timeStr, endTime: endTimeStr, durationStr: durationStr },
-          backgroundColor: '#2563eb',
-          borderColor: '#1d4ed8',
-          textColor: '#ffffff'
-        }
-      })
-    }
+  return lessons
+    .filter(lesson => {
+      const start = new Date(lesson.date + 'T' + lesson.time)
+      if (isNaN(start.getTime())) {
+        console.warn('⚠️ Пропущен урок с неверной датой/временем:', lesson)
+        return false
+      }
+      return true
+    })
+    .map(lesson => {
+      const start = new Date(lesson.date + 'T' + lesson.time)
+      const end = new Date(start.getTime() + lesson.duration * 60000)
+      const timeStr = lesson.time.substring(0, 5)
+      const endTimeStr = end.toTimeString().substring(0, 5)
+      const durationStr = formatDuration(lesson.duration)
+      return {
+        id: lesson.id,
+        title: '',
+        start: start.toISOString(),
+        end: end.toISOString(),
+        extendedProps: { student: lesson.student, duration: lesson.duration, notes: lesson.notes, time: timeStr, endTime: endTimeStr, durationStr: durationStr },
+        backgroundColor: '#2563eb',
+        borderColor: '#1d4ed8',
+        textColor: '#ffffff'
+      }
+    })
+}
 
     function normalizeMonthHeights() {
       if (calendar.view.type !== 'dayGridMonth') return
