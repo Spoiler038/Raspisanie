@@ -554,24 +554,44 @@
     }
 
     // ===== GAS API — замена Supabase =====
-    const GAS_URL = 'https://script.google.com/macros/s/AKfycbzdqy8H_pAMnuZaFElGfBhVfN-aRPkIPMsyStPvaTInVR4uUfakXXGrnR1iHAWGsaHETA/exec'
+    const GAS_URL = 'https://script.google.com/macros/s/AKfycbwAG5XNSINLJ9eWgf5bSB2YzS0hksdXIH--xl8mahPpMhFxEXnf0vFb3zaXXRKQ5Vx56A/exec'
     // ↑ После публикации GAS (Deploy → New Deployment → Web App)
     //   вставьте сюда URL вида https://script.google.com/macros/s/.../exec
 
     async function gasCall(params) {
-      try {
-        const resp = await fetch(GAS_URL, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(params)
-        })
-        const data = await resp.json()
-        if (data.error) throw new Error(data.error)
-        return { data, error: null }
-      } catch (err) {
-        return { data: null, error: err }
-      }
+  return new Promise((resolve) => {
+    const callbackName = 'gasCallback_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5)
+    
+    // Кодируем данные в base64
+    const jsonStr = JSON.stringify(params)
+    const encoded = btoa(unescape(encodeURIComponent(jsonStr)))
+    
+    const script = document.createElement('script')
+    const timeout = setTimeout(() => {
+      cleanup()
+      resolve({ data: null, error: new Error('Timeout: GAS не ответил за 15 секунд') })
+    }, 15000)
+
+    function cleanup() {
+      clearTimeout(timeout)
+      delete window[callbackName]
+      if (script.parentNode) script.parentNode.removeChild(script)
     }
+
+    window[callbackName] = function(data) {
+      cleanup()
+      if (data.error) resolve({ data: null, error: new Error(data.error) })
+      else resolve({ data, error: null })
+    }
+
+    script.src = GAS_URL + '?callback=' + callbackName + '&data=' + encodeURIComponent(encoded)
+    script.onerror = function() {
+      cleanup()
+      resolve({ data: null, error: new Error('Ошибка загрузки скрипта') })
+    }
+    document.head.appendChild(script)
+  })
+}
 
     // ===== WEB PUSH (через GAS) =====
     const VAPID_PUBLIC_KEY = 'BO5mDuU0D0DbYXwwHi_Q6XeuwobMS3G9eRX4NwlOKoDNGC4EXFx8k1Hn4L47rDuImr8dKSjlhQEo53vvEj5Feog'
