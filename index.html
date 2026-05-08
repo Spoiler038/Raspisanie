@@ -558,6 +558,85 @@
     // ↑ После публикации GAS (Deploy → New Deployment → Web App)
     //   вставьте сюда URL вида https://script.google.com/macros/s/.../exec
 
+
+// ===== ПРЕОБРАЗОВАНИЕ EXCEL TIME ↔ HH:MM =====
+function excelTimeToHHMM(excelTime) {
+  if (!excelTime && excelTime !== 0) return '09:00'
+  
+  // Если уже строка в формате HH:MM - возвращаем как есть
+  if (typeof excelTime === 'string' && excelTime.match(/^\d{2}:\d{2}$/)) {
+    return excelTime
+  }
+  
+  // Если строка в формате ISO с датой - пытаемся извлечь время
+  if (typeof excelTime === 'string' && excelTime.includes('T')) {
+    const date = new Date(excelTime)
+    if (!isNaN(date.getTime())) {
+      return date.toTimeString().slice(0, 5)
+    }
+  }
+  
+  let timeValue = parseFloat(excelTime)
+  if (isNaN(timeValue)) return '09:00'
+  
+  // Excel time: 0 = 00:00, 0.5 = 12:00
+  let totalMinutes = Math.round(timeValue * 24 * 60)
+  totalMinutes = Math.max(0, Math.min(1439, totalMinutes))
+  
+  const hours = Math.floor(totalMinutes / 60)
+  const minutes = totalMinutes % 60
+  
+  return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`
+}
+
+function timeToExcelTime(timeStr) {
+  if (!timeStr) return 0.375 // 09:00 по умолчанию
+  const [hours, minutes] = timeStr.split(':').map(Number)
+  if (isNaN(hours) || isNaN(minutes)) return 0.375
+  return (hours * 60 + minutes) / (24 * 60)
+}
+
+// ===== ПРЕОБРАЗОВАНИЕ EXCEL DATE → YYYY-MM-DD =====
+function excelDateToYYYYMMDD(excelDate) {
+  if (!excelDate) return new Date().toISOString().slice(0, 10)
+  
+  // Если уже строка в формате YYYY-MM-DD - возвращаем как есть
+  if (typeof excelDate === 'string' && excelDate.match(/^\d{4}-\d{2}-\d{2}/)) {
+    return excelDate.substring(0, 10)
+  }
+  
+  // Если строка в формате ISO
+  if (typeof excelDate === 'string' && excelDate.includes('T')) {
+    const date = new Date(excelDate)
+    if (!isNaN(date.getTime())) {
+      return date.toISOString().slice(0, 10)
+    }
+  }
+  
+  let dateValue = parseFloat(excelDate)
+  if (isNaN(dateValue)) return new Date().toISOString().slice(0, 10)
+  
+  // Excel дата: 1 = 1900-01-01
+  const excelEpoch = new Date(1899, 11, 30)
+  const msPerDay = 86400000
+  const date = new Date(excelEpoch.getTime() + dateValue * msPerDay)
+  
+  return date.toISOString().slice(0, 10)
+}
+
+// ===== НОРМАЛИЗАЦИЯ ДАННЫХ ИЗ ОБЛАКА =====
+function normalizeLessonFromCloud(lesson) {
+  return {
+    id: lesson.lesson_id || lesson.id,
+    date: excelDateToYYYYMMDD(lesson.date),
+    time: excelTimeToHHMM(lesson.time),
+    student: lesson.student || '',
+    duration: Number(lesson.duration) || 60,
+    notes: lesson.notes || ''
+  }
+}
+
+    
     async function gasCall(params) {
   return new Promise((resolve) => {
     const callbackName = 'gasCallback_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5)
@@ -961,20 +1040,13 @@
       if (settingsChanged && wasLoggedIn) showToast('✅ Настройки обновлены из облака', true)
     }
 
-    // Загружаем уроки при восстановлении сессии
+    // Загружаем уроки с нормализацией
     try {
       const { data: lessonsData, error: le } = await gasCall({ action: 'get_lessons', token })
       if (!le && lessonsData) {
         const cloudLessons = lessonsData.lessons || []
         if (cloudLessons.length > 0) {
-          lessons = cloudLessons.map(l => ({
-            id: l.lesson_id,
-            date: String(l.date).substring(0, 10),
-            time: String(l.time).substring(0, 5),
-            student: l.student,
-            duration: Number(l.duration),
-            notes: l.notes || ''
-          }))
+          lessons = cloudLessons.map(l => normalizeLessonFromCloud(l))
           saveLessonsToStorage()
           calendar.refetchEvents()
           console.log('✅ Уроки восстановлены из облака: ' + lessons.length)
@@ -985,7 +1057,6 @@
     }
     
   } catch(error) {
-    // ❗ НУЖЕН catch ДЛЯ ВНЕШНЕГО TRY
     console.error('Ошибка в checkAuthOnLoad:', error)
   }
 }
@@ -1021,85 +1092,85 @@
     }
 
     async function handleLogin() {
-      const email = document.getElementById('authEmail').value
-      const password = document.getElementById('authPassword').value
-      const authMessage = document.getElementById('authMessage')
-      if (!email || !password) { showToast('❌ Введите email и пароль', false); return }
-      showToast('⏳ Выполняется вход...', false)
-      const loginBtn = document.querySelector('#authModal .btn-primary')
-      const originalText = loginBtn.textContent
-      loginBtn.textContent = '⏳ Вход...'; loginBtn.disabled = true
-      try {
-        const { data, error } = await gasCall({ action: 'login', email, password })
-        if (error) {
-          const userMessage = error.message === 'Неверный email или пароль'
-            ? '❌ Неверный email или пароль' : '❌ Ошибка: ' + error.message
-          if (authMessage) { authMessage.textContent = userMessage; authMessage.style.color = '#ef4444' }
-          else showToast(userMessage, false)
-          loginBtn.textContent = originalText; loginBtn.disabled = false
-          return
-        }
-        // Сохраняем токен и пользователя
-        localStorage.setItem('teacher_jwt', data.token)
-        currentUser = { id: data.user.id, email: data.user.email, lastSignIn: new Date().toISOString() }
-        localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(currentUser))
-        if (authMessage) authMessage.textContent = ''
-        closeAuthModal()
-        updateCloudUI()
-        showToast('✅ Вход выполнен: ' + data.user.email, true)
-        setTimeout(() => subscribeToPushNotifications(), 1000)
-        // Загружаем настройки
-        try {
-          const { data: settingsData } = await gasCall({ action: 'get_settings', token: data.token })
-          if (settingsData && settingsData.settings) {
-            const cs = settingsData.settings
-            if (cs.theme) { document.body.className = cs.theme; localStorage.setItem('teacher_theme', cs.theme); const themeEl = document.getElementById('themeSelect'); if (themeEl) themeEl.value = cs.theme }
-            if (cs.work_from && cs.work_to && validateWorkHours(cs.work_from, cs.work_to)) {
-              workHours = { from: cs.work_from, to: cs.work_to }; saveSettingsToStorage()
-              calendar.setOption('slotMinTime', workHours.from); calendar.setOption('slotMaxTime', workHours.to); calculateScrollerHeight()
-              const wfEl = document.getElementById('workFrom'); const wtEl = document.getElementById('workTo')
-              if (wfEl) wfEl.value = workHours.from; if (wtEl) wtEl.value = workHours.to
-            }
-            if (cs.notification_default) {
-              localStorage.setItem('teacher_notification', cs.notification_default)
-              const notifEl = document.getElementById('notificationSelect'); if (notifEl) notifEl.value = cs.notification_default
-              if (cs.notification_default !== 'Не оповещать') setTimeout(() => subscribeToPushNotifications(), 1500)
-            }
-            if (cs.auto_delete_old !== undefined) {
-              const autoDelete = cs.auto_delete_old === true || cs.auto_delete_old === 'true'
-              localStorage.setItem('auto_delete_old', autoDelete ? '1' : '0'); updateAutoDeleteBtn()
-              if (autoDelete) setTimeout(runAutoDelete, 500)
-            }
-          }
-        } catch (e) { console.log('Ошибка загрузки настроек из облака:', e) }
-        loginBtn.textContent = originalText; loginBtn.disabled = false
-        // Загружаем уроки
-        setTimeout(async () => {
-          try {
-            const { data: lessonsData, error: le } = await gasCall({ action: 'get_lessons', token: localStorage.getItem('teacher_jwt') })
-            if (le) throw le
-            const cloudLessons = lessonsData.lessons || []
-            if (cloudLessons.length > 0) {
-              if (lessons.length === 0) {
-                lessons = cloudLessons.map(l => ({ id: l.lesson_id, date: l.date, time: l.time, student: l.student, duration: Number(l.duration), notes: l.notes || '' }))
-                saveLessonsToStorage(); calendar.refetchEvents()
-                showToast('✅ Загружено ' + lessons.length + ' уроков из облака', true)
-              } else {
-                showConfirmModal('📥 Загрузка из облака', 'В облаке найдено ' + cloudLessons.length + ' уроков.\n\nУ вас также есть ' + lessons.length + ' локальных уроков.\n\nЗагрузить данные из облака? Локальные данные будут заменены.', async () => {
-                  lessons = cloudLessons.map(l => ({ id: l.lesson_id, date: l.date, time: l.time, student: l.student, duration: Number(l.duration), notes: l.notes || '' }))
-                  saveLessonsToStorage(); calendar.refetchEvents()
-                  showToast('✅ Загружено ' + lessons.length + ' уроков из облака', true)
-                })
-              }
-            }
-          } catch (syncError) { console.error('Ошибка при проверке облака:', syncError) }
-        }, 1000)
-      } catch (unexpectedError) {
-        console.error('Неожиданная ошибка:', unexpectedError)
-        showToast('❌ Произошла ошибка при входе', false)
-        loginBtn.textContent = originalText; loginBtn.disabled = false
-      }
+  const email = document.getElementById('authEmail').value
+  const password = document.getElementById('authPassword').value
+  const authMessage = document.getElementById('authMessage')
+  if (!email || !password) { showToast('❌ Введите email и пароль', false); return }
+  showToast('⏳ Выполняется вход...', false)
+  const loginBtn = document.querySelector('#authModal .btn-primary')
+  const originalText = loginBtn.textContent
+  loginBtn.textContent = '⏳ Вход...'; loginBtn.disabled = true
+  try {
+    const { data, error } = await gasCall({ action: 'login', email, password })
+    if (error) {
+      const userMessage = error.message === 'Неверный email или пароль'
+        ? '❌ Неверный email или пароль' : '❌ Ошибка: ' + error.message
+      if (authMessage) { authMessage.textContent = userMessage; authMessage.style.color = '#ef4444' }
+      else showToast(userMessage, false)
+      loginBtn.textContent = originalText; loginBtn.disabled = false
+      return
     }
+    // Сохраняем токен и пользователя
+    localStorage.setItem('teacher_jwt', data.token)
+    currentUser = { id: data.user.id, email: data.user.email, lastSignIn: new Date().toISOString() }
+    localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(currentUser))
+    if (authMessage) authMessage.textContent = ''
+    closeAuthModal()
+    updateCloudUI()
+    showToast('✅ Вход выполнен: ' + data.user.email, true)
+    setTimeout(() => subscribeToPushNotifications(), 1000)
+    // Загружаем настройки
+    try {
+      const { data: settingsData } = await gasCall({ action: 'get_settings', token: data.token })
+      if (settingsData && settingsData.settings) {
+        const cs = settingsData.settings
+        if (cs.theme) { document.body.className = cs.theme; localStorage.setItem('teacher_theme', cs.theme); const themeEl = document.getElementById('themeSelect'); if (themeEl) themeEl.value = cs.theme }
+        if (cs.work_from && cs.work_to && validateWorkHours(cs.work_from, cs.work_to)) {
+          workHours = { from: cs.work_from, to: cs.work_to }; saveSettingsToStorage()
+          calendar.setOption('slotMinTime', workHours.from); calendar.setOption('slotMaxTime', workHours.to); calculateScrollerHeight()
+          const wfEl = document.getElementById('workFrom'); const wtEl = document.getElementById('workTo')
+          if (wfEl) wfEl.value = workHours.from; if (wtEl) wtEl.value = workHours.to
+        }
+        if (cs.notification_default) {
+          localStorage.setItem('teacher_notification', cs.notification_default)
+          const notifEl = document.getElementById('notificationSelect'); if (notifEl) notifEl.value = cs.notification_default
+          if (cs.notification_default !== 'Не оповещать') setTimeout(() => subscribeToPushNotifications(), 1500)
+        }
+        if (cs.auto_delete_old !== undefined) {
+          const autoDelete = cs.auto_delete_old === true || cs.auto_delete_old === 'true'
+          localStorage.setItem('auto_delete_old', autoDelete ? '1' : '0'); updateAutoDeleteBtn()
+          if (autoDelete) setTimeout(runAutoDelete, 500)
+        }
+      }
+    } catch (e) { console.log('Ошибка загрузки настроек из облака:', e) }
+    loginBtn.textContent = originalText; loginBtn.disabled = false
+    // Загружаем уроки с нормализацией
+    setTimeout(async () => {
+      try {
+        const { data: lessonsData, error: le } = await gasCall({ action: 'get_lessons', token: localStorage.getItem('teacher_jwt') })
+        if (le) throw le
+        const cloudLessons = lessonsData.lessons || []
+        if (cloudLessons.length > 0) {
+          if (lessons.length === 0) {
+            lessons = cloudLessons.map(l => normalizeLessonFromCloud(l))
+            saveLessonsToStorage(); calendar.refetchEvents()
+            showToast('✅ Загружено ' + lessons.length + ' уроков из облака', true)
+          } else {
+            showConfirmModal('📥 Загрузка из облака', 'В облаке найдено ' + cloudLessons.length + ' уроков.\n\nУ вас также есть ' + lessons.length + ' локальных уроков.\n\nЗагрузить данные из облака? Локальные данные будут заменены.', async () => {
+              lessons = cloudLessons.map(l => normalizeLessonFromCloud(l))
+              saveLessonsToStorage(); calendar.refetchEvents()
+              showToast('✅ Загружено ' + lessons.length + ' уроков из облака', true)
+            })
+          }
+        }
+      } catch (syncError) { console.error('Ошибка при проверке облака:', syncError) }
+    }, 1000)
+  } catch (unexpectedError) {
+    console.error('Неожиданная ошибка:', unexpectedError)
+    showToast('❌ Произошла ошибка при входе', false)
+    loginBtn.textContent = originalText; loginBtn.disabled = false
+  }
+}
 
     async function handleRegister() {
       const email = document.getElementById('authEmail').value
@@ -1182,68 +1253,73 @@
     function exportLocal() { exportData() }
     function importLocal() { document.getElementById('importFile').click() }
 
-    async function exportCloud() {
-      const token = localStorage.getItem('teacher_jwt')
-      if (!token || !currentUser) { showToast('Войдите в облако для синхронизации', false); showAuthModal(); return }
-      showToast('Сохранение в облако...', false)
-      try {
-        // Сохраняем уроки
-        for (const lesson of lessons) {
-          const { error } = await gasCall({ action: 'save_lesson', token, lesson: {
-            lesson_id: lesson.id, student: lesson.student, date: lesson.date,
-            time: lesson.time, duration: lesson.duration, notes: lesson.notes || ''
-          }})
-          if (error) throw error
-        }
-        // Сохраняем настройки
-        const { error: se } = await gasCall({ action: 'save_settings', token, settings: {
-          work_from: workHours.from, work_to: workHours.to,
-          theme: localStorage.getItem('teacher_theme') || 'dark',
-          notification_default: localStorage.getItem('teacher_notification') || 'Не оповещать',
-          auto_delete_old: localStorage.getItem('auto_delete_old') === '1'
-        }})
-        if (se) throw se
-        localStorage.setItem(STORAGE_KEYS.LAST_SYNC, new Date().toISOString())
-        showToast('✅ Данные сохранены в облаке. Уроков: ' + lessons.length, true)
-      } catch (error) {
-        console.log('Ошибка при сохранении в облако:', error)
-        showToast('❌ Ошибка при сохранении в облако', false)
+   async function exportCloud() {
+  const token = localStorage.getItem('teacher_jwt')
+  if (!token || !currentUser) { showToast('Войдите в облако для синхронизации', false); showAuthModal(); return }
+  showToast('Сохранение в облако...', false)
+  try {
+    // Сохраняем уроки с преобразованием времени в Excel формат
+    for (const lesson of lessons) {
+      const lessonForCloud = {
+        lesson_id: lesson.id,
+        student: lesson.student,
+        date: lesson.date,
+        time: timeToExcelTime(lesson.time),
+        duration: lesson.duration,
+        notes: lesson.notes || ''
       }
+      const { error } = await gasCall({ action: 'save_lesson', token, lesson: lessonForCloud })
+      if (error) throw error
     }
+    // Сохраняем настройки
+    const { error: se } = await gasCall({ action: 'save_settings', token, settings: {
+      work_from: workHours.from, work_to: workHours.to,
+      theme: localStorage.getItem('teacher_theme') || 'dark',
+      notification_default: localStorage.getItem('teacher_notification') || 'Не оповещать',
+      auto_delete_old: localStorage.getItem('auto_delete_old') === '1'
+    }})
+    if (se) throw se
+    localStorage.setItem(STORAGE_KEYS.LAST_SYNC, new Date().toISOString())
+    showToast('✅ Данные сохранены в облаке. Уроков: ' + lessons.length, true)
+  } catch (error) {
+    console.log('Ошибка при сохранении в облако:', error)
+    showToast('❌ Ошибка при сохранении в облако', false)
+  }
+}
 
     async function importCloud() {
-      const token = localStorage.getItem('teacher_jwt')
-      if (!token || !currentUser) { showToast('Войдите в облако для синхронизации', false); showAuthModal(); return }
-      showToast('Загрузка из облака...', false)
-      try {
-        const { data: lessonsData, error: le } = await gasCall({ action: 'get_lessons', token })
-        if (le) throw le
-        const { data: settingsData, error: se } = await gasCall({ action: 'get_settings', token })
-        if (se) throw se
-        const cloudLessons = lessonsData.lessons || []
-        if (cloudLessons.length > 0) {
-          lessons = cloudLessons.map(l => ({ id: l.lesson_id, date: l.date, time: l.time, student: l.student, duration: Number(l.duration), notes: l.notes || '' }))
-          saveLessonsToStorage(); calendar.refetchEvents()
-          setTimeout(() => { calculateScrollerHeight(); if (calendar.view.type === 'dayGridMonth') normalizeMonthHeights() }, 100)
-        }
-        if (settingsData && settingsData.settings) {
-          const cs = settingsData.settings
-          workHours = { from: cs.work_from || '09:00', to: cs.work_to || '23:59' }
-          saveSettingsToStorage()
-          document.body.className = cs.theme || 'dark'
-          if (themeSelect) themeSelect.value = cs.theme || 'dark'
-          if (notificationSelect) notificationSelect.value = cs.notification_default || 'Не оповещать'
-          localStorage.setItem('teacher_theme', cs.theme || 'dark')
-          localStorage.setItem('teacher_notification', cs.notification_default || 'Не оповещать')
-          calendar.setOption('slotMinTime', workHours.from); calendar.setOption('slotMaxTime', workHours.to)
-        }
-        localStorage.setItem(STORAGE_KEYS.LAST_SYNC, new Date().toISOString())
-        showToast('✅ Данные загружены из облака. Уроков: ' + lessons.length, true)
-      } catch (error) {
-        console.log('Ошибка при загрузке из облака:', error)
-        showToast('❌ Ошибка при загрузке из облака', false)
-      }
+  const token = localStorage.getItem('teacher_jwt')
+  if (!token || !currentUser) { showToast('Войдите в облако для синхронизации', false); showAuthModal(); return }
+  showToast('Загрузка из облака...', false)
+  try {
+    const { data: lessonsData, error: le } = await gasCall({ action: 'get_lessons', token })
+    if (le) throw le
+    const { data: settingsData, error: se } = await gasCall({ action: 'get_settings', token })
+    if (se) throw se
+    const cloudLessons = lessonsData.lessons || []
+    if (cloudLessons.length > 0) {
+      lessons = cloudLessons.map(l => normalizeLessonFromCloud(l))
+      saveLessonsToStorage(); calendar.refetchEvents()
+      setTimeout(() => { calculateScrollerHeight(); if (calendar.view.type === 'dayGridMonth') normalizeMonthHeights() }, 100)
     }
+    if (settingsData && settingsData.settings) {
+      const cs = settingsData.settings
+      workHours = { from: cs.work_from || '09:00', to: cs.work_to || '23:59' }
+      saveSettingsToStorage()
+      document.body.className = cs.theme || 'dark'
+      if (themeSelect) themeSelect.value = cs.theme || 'dark'
+      if (notificationSelect) notificationSelect.value = cs.notification_default || 'Не оповещать'
+      localStorage.setItem('teacher_theme', cs.theme || 'dark')
+      localStorage.setItem('teacher_notification', cs.notification_default || 'Не оповещать')
+      calendar.setOption('slotMinTime', workHours.from); calendar.setOption('slotMaxTime', workHours.to)
+    }
+    localStorage.setItem(STORAGE_KEYS.LAST_SYNC, new Date().toISOString())
+    showToast('✅ Данные загружены из облака. Уроков: ' + lessons.length, true)
+  } catch (error) {
+    console.log('Ошибка при загрузке из облака:', error)
+    showToast('❌ Ошибка при загрузке из облака', false)
+  }
+}
 
     function initStorage() {
       try {
@@ -1641,53 +1717,58 @@
     }
 
     async function saveLesson() {
-      const dateInput = document.getElementById('dateInput')
-      const timeInput = document.getElementById('timeInput')
-      const studentInput = document.getElementById('studentInput')
-      const durationInput = document.getElementById('durationInput')
-      const notesInput = document.getElementById('notesInput')
-      if (!dateInput.value || !timeInput.value || !studentInput.value.trim()) {
-        showToast('Пожалуйста, заполните все обязательные поля'); return
+  const dateInput = document.getElementById('dateInput')
+  const timeInput = document.getElementById('timeInput')
+  const studentInput = document.getElementById('studentInput')
+  const durationInput = document.getElementById('durationInput')
+  const notesInput = document.getElementById('notesInput')
+  if (!dateInput.value || !timeInput.value || !studentInput.value.trim()) {
+    showToast('Пожалуйста, заполните все обязательные поля'); return
+  }
+  const duration = parseInt(durationInput.value)
+  if (isNaN(duration) || duration < 30) { showToast('Длительность должна быть не менее 30 минут'); return }
+  const lesson = {
+    id: editingLessonId || generateId(),
+    date: dateInput.value, time: timeInput.value,
+    student: studentInput.value.trim(), duration: duration,
+    notes: notesInput.value.trim()
+  }
+  const conflict = hasLessonConflict(lesson, !!editingLessonId)
+  if (conflict.conflict) { showToast(conflict.message, false); return }
+  if (editingLessonId) {
+    const index = lessons.findIndex(l => l.id === editingLessonId)
+    if (index !== -1) lessons[index] = lesson
+  } else { lessons.push(lesson) }
+  saveLessonsToStorage()
+  if (currentUser) {
+    const token = localStorage.getItem('teacher_jwt')
+    try {
+      const lessonForCloud = {
+        lesson_id: lesson.id,
+        student: lesson.student,
+        date: lesson.date,
+        time: timeToExcelTime(lesson.time),
+        duration: lesson.duration,
+        notes: lesson.notes || ''
       }
-      const duration = parseInt(durationInput.value)
-      if (isNaN(duration) || duration < 30) { showToast('Длительность должна быть не менее 30 минут'); return }
-      const lesson = {
-        id: editingLessonId || generateId(),
-        date: dateInput.value, time: timeInput.value,
-        student: studentInput.value.trim(), duration: duration,
-        notes: notesInput.value.trim()
+      const { error } = await gasCall({ action: 'save_lesson', token, lesson: lessonForCloud, is_update: !!editingLessonId })
+      if (error) throw error
+      showToast('✅ Данные синхронизированы с облаком', true)
+    } catch (error) {
+      if (error.message && error.message.includes('Failed to fetch')) {
+        showToast('⚠️ Урок сохранен локально. Будет синхронизирован при подключении', false)
+      } else {
+        showToast('❌ Ошибка синхронизации: ' + error.message, false)
       }
-      const conflict = hasLessonConflict(lesson, !!editingLessonId)
-      if (conflict.conflict) { showToast(conflict.message, false); return }
-      if (editingLessonId) {
-        const index = lessons.findIndex(l => l.id === editingLessonId)
-        if (index !== -1) lessons[index] = lesson
-      } else { lessons.push(lesson) }
-      saveLessonsToStorage()
-      if (currentUser) {
-        const token = localStorage.getItem('teacher_jwt')
-        try {
-          const { error } = await gasCall({ action: 'save_lesson', token, lesson: {
-            lesson_id: lesson.id, student: lesson.student, date: lesson.date,
-            time: lesson.time, duration: lesson.duration, notes: lesson.notes || ''
-          }, is_update: !!editingLessonId })
-          if (error) throw error
-          showToast('✅ Данные синхронизированы с облаком', true)
-        } catch (error) {
-          if (error.message && error.message.includes('Failed to fetch')) {
-            showToast('⚠️ Урок сохранен локально. Будет синхронизирован при подключении', false)
-          } else {
-            showToast('❌ Ошибка синхронизации: ' + error.message, false)
-          }
-          pendingChanges.push({ action: editingLessonId ? 'update' : 'insert', lesson, timestamp: new Date().toISOString() })
-          localStorage.setItem(STORAGE_KEYS.PENDING_CHANGES, JSON.stringify(pendingChanges))
-        }
-      }
-      calendar.refetchEvents(); calculateScrollerHeight()
-      document.getElementById('sheet').classList.remove('active')
-      editingLessonId = null
-      showToast('Занятие сохранено', true)
+      pendingChanges.push({ action: editingLessonId ? 'update' : 'insert', lesson, timestamp: new Date().toISOString() })
+      localStorage.setItem(STORAGE_KEYS.PENDING_CHANGES, JSON.stringify(pendingChanges))
     }
+  }
+  calendar.refetchEvents(); calculateScrollerHeight()
+  document.getElementById('sheet').classList.remove('active')
+  editingLessonId = null
+  showToast('Занятие сохранено', true)
+}
 
     async function deleteLesson() {
       if (!editingLessonId) return
@@ -2340,142 +2421,101 @@
     }
 
     function fillOtherLessons(currentLesson) {
-      const list = document.getElementById('otherLessonsList')
-      const now = new Date()
-      const others = lessons.filter(l =>
-        l.student === currentLesson.student &&
-        l.id !== currentLesson.id &&
-        new Date(`${l.date}T${l.time}`) > now
-      ).sort((a, b) => new Date(`${a.date}T${a.time}`) - new Date(`${b.date}T${b.time}`))
+  const list = document.getElementById('otherLessonsList')
+  const now = new Date()
+  const others = lessons.filter(l =>
+    l.student === currentLesson.student &&
+    l.id !== currentLesson.id &&
+    new Date(`${l.date}T${l.time}`) > now
+  ).sort((a, b) => new Date(`${a.date}T${a.time}`) - new Date(`${b.date}T${b.time}`))
 
-      // Устанавливаем текущее время урока как значение по умолчанию
-      document.getElementById('newCommonTime').value = currentLesson.time.slice(0, 5)
+  // Устанавливаем текущее время урока как значение по умолчанию
+  document.getElementById('newCommonTime').value = currentLesson.time.slice(0, 5)
 
-      if (others.length === 0) {
-        list.innerHTML = '<div style="color:#64748b; font-size:14px; padding:16px 0; text-align:center;">Нет других будущих уроков этого ученика</div>'
-        return
-      }
-      list.innerHTML = others.map(l => {
-        const d = new Date(l.date)
-        const dd = String(d.getDate()).padStart(2,'0')
-        const mm = String(d.getMonth()+1).padStart(2,'0')
-        const yyyy = d.getFullYear()
-        return `<div class="others-lesson-row">
-          <span class="others-lesson-info">${dd}.${mm}.${yyyy}&nbsp;&nbsp;${l.time.slice(0,5)} — ${l.duration} мин</span>
-          <input type="checkbox" class="others-cb other-lesson-cb" data-id="${l.id}" data-date="${dd}.${mm}.${yyyy}" data-time="${l.time.slice(0,5)}" checked>
-        </div>`
-      }).join('')
-    }
+  if (others.length === 0) {
+    list.innerHTML = '<div style="color:#64748b; font-size:14px; padding:16px 0; text-align:center;">Нет других будущих уроков этого ученика</div>'
+    return
+  }
+  
+  list.innerHTML = others.map(l => {
+    const d = new Date(l.date)
+    const dd = String(d.getDate()).padStart(2,'0')
+    const mm = String(d.getMonth()+1).padStart(2,'0')
+    const yyyy = d.getFullYear()
+    return `<div class="others-lesson-row">
+      <span class="others-lesson-info">${dd}.${mm}.${yyyy}&nbsp;&nbsp;${l.time.slice(0,5)} — ${l.duration} мин</span>
+      <input type="checkbox" class="others-cb other-lesson-cb" data-id="${l.id}" data-date="${dd}.${mm}.${yyyy}" data-time="${l.time.slice(0,5)}" checked>
+    </div>`
+  }).join('')
+}
 
     let _pendingTimeChanges = []
     let _pendingDeletes = []
 
     function applyNewTime() {
-      const newTime = document.getElementById('newCommonTime').value
-      if (!newTime) { showToast('Укажите новое время', false); return }
-      const checked = document.querySelectorAll('.other-lesson-cb:checked')
-      if (checked.length === 0) { showToast('Отметьте хотя бы один урок', false); return }
+  const newTime = document.getElementById('newCommonTime').value
+  if (!newTime) { showToast('Укажите новое время', false); return }
+  const checked = document.querySelectorAll('.other-lesson-cb:checked')
+  if (checked.length === 0) { showToast('Отметьте хотя бы один урок', false); return }
 
-      _pendingTimeChanges = Array.from(checked).map(cb => ({
-        id: cb.dataset.id, date: cb.dataset.date, oldTime: cb.dataset.time, newTime
-      }))
+  _pendingTimeChanges = Array.from(checked).map(cb => ({
+    id: cb.dataset.id, 
+    date: cb.dataset.date, 
+    oldTime: cb.dataset.time, 
+    newTime: newTime
+  }))
 
-      // Проверяем конфликты с другими уроками
-      const conflicts = []
-      for (const item of _pendingTimeChanges) {
-        const lesson = lessons.find(l => l.id === item.id)
-        if (!lesson) continue
-        // Ищем конфликт: другие уроки в тот же день с пересечением по времени
-        const newStart = new Date(`${lesson.date}T${item.newTime}`)
-        const newEnd = new Date(newStart.getTime() + lesson.duration * 60000)
-        for (const other of lessons) {
-          // Пропускаем сам урок и уроки которые тоже переносим
-          if (other.id === lesson.id) continue
-          if (_pendingTimeChanges.find(p => p.id === other.id)) continue
-          if (other.date !== lesson.date) continue
-          const otherStart = new Date(`${other.date}T${other.time}`)
-          const otherEnd = new Date(otherStart.getTime() + other.duration * 60000)
-          if (newStart < otherEnd && newEnd > otherStart) {
-            conflicts.push({
-              moving: lesson,
-              newTime: item.newTime,
-              conflict: other
-            })
-          }
-        }
+  // Проверяем конфликты с другими уроками
+  const conflicts = []
+  for (const item of _pendingTimeChanges) {
+    const lesson = lessons.find(l => l.id === item.id)
+    if (!lesson) continue
+    
+    const newStart = new Date(`${lesson.date}T${item.newTime}`)
+    const newEnd = new Date(newStart.getTime() + lesson.duration * 60000)
+    
+    for (const other of lessons) {
+      // Пропускаем сам урок и уроки которые тоже переносим
+      if (other.id === lesson.id) continue
+      if (_pendingTimeChanges.find(p => p.id === other.id)) continue
+      if (other.date !== lesson.date) continue
+      
+      const otherStart = new Date(`${other.date}T${other.time}`)
+      const otherEnd = new Date(otherStart.getTime() + other.duration * 60000)
+      
+      if (newStart < otherEnd && newEnd > otherStart) {
+        conflicts.push({
+          moving: lesson,
+          newTime: item.newTime,
+          conflict: other
+        })
       }
-
-      if (conflicts.length > 0) {
-        // Показываем конфликты с предложением исправить
-        const conflictText = conflicts.map(c =>
-          `⚠️ ${c.moving.date} ${c.newTime} (${c.moving.student})\n   пересекается с: ${c.conflict.time} — ${c.conflict.student}`
-        ).join('\n\n')
-        document.getElementById('applyTimeList').textContent =
-          `Обнаружены конфликты:\n\n${conflictText}\n\n──────────\nОстальные уроки без конфликтов:\n` +
-          _pendingTimeChanges
-            .filter(r => !conflicts.find(c => c.moving.id === r.id))
-            .map(r => `${r.date}  ${r.oldTime} → ${r.newTime}`)
-            .join('\n') || '(нет)'
-        // Скрываем основную кнопку Применить — показываем кнопку "Применить без конфликтов"
-        document.getElementById('applyTimeConfirmBtn').textContent = 'Копировать не конфликтные'
-        document.getElementById('applyTimeConfirmBtn').style.background = '#d97706'
-      } else {
-        document.getElementById('applyTimeList').textContent =
-          _pendingTimeChanges.map(r => `${r.date}  ${r.oldTime} → ${r.newTime}`).join('\n')
-        document.getElementById('applyTimeConfirmBtn').textContent = 'Применить'
-        document.getElementById('applyTimeConfirmBtn').style.background = ''
-      }
-      document.getElementById('applyTimeModal').style.display = 'flex'
     }
+  }
 
-    async function confirmApplyTime() {
-      document.getElementById('applyTimeModal').style.display = 'none'
-
-      // Если были конфликты — применяем только уроки без конфликтов
-      const toApply = _pendingTimeChanges.filter(item => {
-        const lesson = lessons.find(l => l.id === item.id)
-        if (!lesson) return false
-        const newStart = new Date(`${lesson.date}T${item.newTime}`)
-        const newEnd = new Date(newStart.getTime() + lesson.duration * 60000)
-        for (const other of lessons) {
-          if (other.id === lesson.id) continue
-          if (_pendingTimeChanges.find(p => p.id === other.id)) continue
-          if (other.date !== lesson.date) continue
-          const otherStart = new Date(`${other.date}T${other.time}`)
-          const otherEnd = new Date(otherStart.getTime() + other.duration * 60000)
-          if (newStart < otherEnd && newEnd > otherStart) return false
-        }
-        return true
-      })
-
-      for (const item of toApply) {
-        const idx = lessons.findIndex(l => l.id === item.id)
-        if (idx !== -1) lessons[idx].time = item.newTime
-        if (currentUser) {
-          try {
-            await gasCall({ action: 'save_lesson', token: localStorage.getItem('teacher_jwt'), lesson: {
-              lesson_id: item.id,
-              student: lessons.find(l => l.id === item.id)?.student || '',
-              date: lessons.find(l => l.id === item.id)?.date || '',
-              time: item.newTime,
-              duration: lessons.find(l => l.id === item.id)?.duration || 60,
-              notes: lessons.find(l => l.id === item.id)?.notes || ''
-            }, is_update: true })
-          } catch(e) { console.error('Ошибка обновления времени:', e) }
-        }
-      }
-
-      const skipped = _pendingTimeChanges.length - toApply.length
-      saveLessonsToStorage()
-      calendar.refetchEvents()
-      document.getElementById('sheet').classList.remove('active')
-      if (skipped > 0) {
-        showToast(`✅ Обновлено: ${toApply.length}, пропущено конфликтов: ${skipped}`, true)
-      } else {
-        showToast(`✅ Обновлено уроков: ${toApply.length}`, true)
-      }
-      _pendingTimeChanges = []
-    }
+  if (conflicts.length > 0) {
+    // Показываем конфликты с предложением исправить
+    const conflictText = conflicts.map(c =>
+      `⚠️ ${c.moving.date} ${c.newTime} (${c.moving.student})\n   пересекается с: ${c.conflict.time} — ${c.conflict.student}`
+    ).join('\n\n')
+    
+    document.getElementById('applyTimeList').textContent =
+      `Обнаружены конфликты:\n\n${conflictText}\n\n──────────\nОстальные уроки без конфликтов:\n` +
+      _pendingTimeChanges
+        .filter(r => !conflicts.find(c => c.moving.id === r.id))
+        .map(r => `${r.date}  ${r.oldTime} → ${r.newTime}`)
+        .join('\n') || '(нет)'
+    
+    document.getElementById('applyTimeConfirmBtn').textContent = 'Применить только без конфликтов'
+    document.getElementById('applyTimeConfirmBtn').style.background = '#d97706'
+  } else {
+    document.getElementById('applyTimeList').textContent =
+      _pendingTimeChanges.map(r => `${r.date}  ${r.oldTime} → ${r.newTime}`).join('\n')
+    document.getElementById('applyTimeConfirmBtn').textContent = 'Применить'
+    document.getElementById('applyTimeConfirmBtn').style.background = '#2563eb'
+  }
+  document.getElementById('applyTimeModal').style.display = 'flex'
+}
 
     function deleteCheckedLessons() {
       const checked = document.querySelectorAll('.other-lesson-cb:checked')
