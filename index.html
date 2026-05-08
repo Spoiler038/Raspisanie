@@ -892,97 +892,103 @@
     }
 
     async function checkAuthOnLoad() {
-      try {
-        const token = localStorage.getItem('teacher_jwt')
-        if (!token) {
-          if (currentSyncMode === SYNC_MODES.CLOUD) setTimeout(() => showAuthModal(), 500)
-          return
-        }
-        // Проверяем токен через попытку загрузить настройки
-        const { data, error } = await gasCall({ action: 'get_settings', token })
-        if (error) {
-          // Токен недействителен — сброс
-          localStorage.removeItem('teacher_jwt')
-          localStorage.removeItem(STORAGE_KEYS.USER)
-          currentUser = null
-          if (currentSyncMode === SYNC_MODES.CLOUD) setTimeout(() => showAuthModal(), 500)
-          return
-        }
-        if (!currentUser) {
-  const saved = localStorage.getItem(STORAGE_KEYS.USER)
-  if (saved) try { currentUser = JSON.parse(saved) } catch(e) {}
-}
-const wasLoggedIn = !!currentUser
-updateCloudUI()
+  try {
+    const token = localStorage.getItem('teacher_jwt')
+    if (!token) {
+      if (currentSyncMode === SYNC_MODES.CLOUD) setTimeout(() => showAuthModal(), 500)
+      return
+    }
+    // Проверяем токен через попытку загрузить настройки
+    const { data, error } = await gasCall({ action: 'get_settings', token })
+    if (error) {
+      // Токен недействителен — сброс
+      localStorage.removeItem('teacher_jwt')
+      localStorage.removeItem(STORAGE_KEYS.USER)
+      currentUser = null
+      if (currentSyncMode === SYNC_MODES.CLOUD) setTimeout(() => showAuthModal(), 500)
+      return
+    }
+    if (!currentUser) {
+      const saved = localStorage.getItem(STORAGE_KEYS.USER)
+      if (saved) try { currentUser = JSON.parse(saved) } catch(e) {}
+    }
+    const wasLoggedIn = !!currentUser
+    updateCloudUI()
 
-const cloudSettings = data.settings
-if (cloudSettings) {
-  let settingsChanged = false
-  if (cloudSettings.theme) {
-    const currentTheme = localStorage.getItem('teacher_theme') || 'dark'
-    if (currentTheme !== cloudSettings.theme) {
-      document.body.className = cloudSettings.theme
-      localStorage.setItem('teacher_theme', cloudSettings.theme)
-      const themeEl = document.getElementById('themeSelect')
-      if (themeEl) themeEl.value = cloudSettings.theme
-      settingsChanged = true
+    const cloudSettings = data.settings
+    if (cloudSettings) {
+      let settingsChanged = false
+      if (cloudSettings.theme) {
+        const currentTheme = localStorage.getItem('teacher_theme') || 'dark'
+        if (currentTheme !== cloudSettings.theme) {
+          document.body.className = cloudSettings.theme
+          localStorage.setItem('teacher_theme', cloudSettings.theme)
+          const themeEl = document.getElementById('themeSelect')
+          if (themeEl) themeEl.value = cloudSettings.theme
+          settingsChanged = true
+        }
+      }
+      if (cloudSettings.work_from && cloudSettings.work_to) {
+        if (validateWorkHours(cloudSettings.work_from, cloudSettings.work_to)) {
+          workHours = { from: cloudSettings.work_from, to: cloudSettings.work_to }
+          saveSettingsToStorage()
+          calendar.setOption('slotMinTime', workHours.from)
+          calendar.setOption('slotMaxTime', workHours.to)
+          calculateScrollerHeight()
+          const wfEl = document.getElementById('workFrom')
+          const wtEl = document.getElementById('workTo')
+          if (wfEl) wfEl.value = workHours.from
+          if (wtEl) wtEl.value = workHours.to
+          settingsChanged = true
+        }
+      }
+      if (cloudSettings.notification_default) {
+        localStorage.setItem('teacher_notification', cloudSettings.notification_default)
+        const notifEl = document.getElementById('notificationSelect')
+        if (notifEl) notifEl.value = cloudSettings.notification_default
+        if (cloudSettings.notification_default !== 'Не оповещать') {
+          setTimeout(() => subscribeToPushNotifications(), 1500)
+        }
+        settingsChanged = true
+      }
+      if (cloudSettings.auto_delete_old !== undefined && cloudSettings.auto_delete_old !== null) {
+        const autoDelete = cloudSettings.auto_delete_old === true || cloudSettings.auto_delete_old === 'true'
+        localStorage.setItem('auto_delete_old', autoDelete ? '1' : '0')
+        updateAutoDeleteBtn()
+        if (autoDelete) setTimeout(runAutoDelete, 500)
+        settingsChanged = true
+      }
+      if (settingsChanged && wasLoggedIn) showToast('✅ Настройки обновлены из облака', true)
     }
-  }
-  if (cloudSettings.work_from && cloudSettings.work_to) {
-    if (validateWorkHours(cloudSettings.work_from, cloudSettings.work_to)) {
-      workHours = { from: cloudSettings.work_from, to: cloudSettings.work_to }
-      saveSettingsToStorage()
-      calendar.setOption('slotMinTime', workHours.from)
-      calendar.setOption('slotMaxTime', workHours.to)
-      calculateScrollerHeight()
-      const wfEl = document.getElementById('workFrom')
-      const wtEl = document.getElementById('workTo')
-      if (wfEl) wfEl.value = workHours.from
-      if (wtEl) wtEl.value = workHours.to
-      settingsChanged = true
-    }
-  }
-  if (cloudSettings.notification_default) {
-    localStorage.setItem('teacher_notification', cloudSettings.notification_default)
-    const notifEl = document.getElementById('notificationSelect')
-    if (notifEl) notifEl.value = cloudSettings.notification_default
-    if (cloudSettings.notification_default !== 'Не оповещать') {
-      setTimeout(() => subscribeToPushNotifications(), 1500)
-    }
-    settingsChanged = true
-  }
-  if (cloudSettings.auto_delete_old !== undefined && cloudSettings.auto_delete_old !== null) {
-    const autoDelete = cloudSettings.auto_delete_old === true || cloudSettings.auto_delete_old === 'true'
-    localStorage.setItem('auto_delete_old', autoDelete ? '1' : '0')
-    updateAutoDeleteBtn()
-    if (autoDelete) setTimeout(runAutoDelete, 500)
-    settingsChanged = true
-  }
-  if (settingsChanged && wasLoggedIn) showToast('✅ Настройки обновлены из облака', true)
-}
 
-// Загружаем уроки при восстановлении сессии
-try {
-  const { data: lessonsData, error: le } = await gasCall({ action: 'get_lessons', token })
-  if (!le && lessonsData) {
-    const cloudLessons = lessonsData.lessons || []
-    if (cloudLessons.length > 0) {
-      lessons = cloudLessons.map(l => ({
-        id: l.lesson_id,
-        date: String(l.date).substring(0, 10),
-        time: String(l.time).substring(0, 5),
-        student: l.student,
-        duration: Number(l.duration),
-        notes: l.notes || ''
-      }))
-      saveLessonsToStorage()
-      calendar.refetchEvents()
-      console.log('✅ Уроки восстановлены из облака: ' + lessons.length)
+    // Загружаем уроки при восстановлении сессии
+    try {
+      const { data: lessonsData, error: le } = await gasCall({ action: 'get_lessons', token })
+      if (!le && lessonsData) {
+        const cloudLessons = lessonsData.lessons || []
+        if (cloudLessons.length > 0) {
+          lessons = cloudLessons.map(l => ({
+            id: l.lesson_id,
+            date: String(l.date).substring(0, 10),
+            time: String(l.time).substring(0, 5),
+            student: l.student,
+            duration: Number(l.duration),
+            notes: l.notes || ''
+          }))
+          saveLessonsToStorage()
+          calendar.refetchEvents()
+          console.log('✅ Уроки восстановлены из облака: ' + lessons.length)
+        }
+      }
+    } catch(e) { 
+      console.log('Ошибка загрузки уроков при восстановлении сессии:', e) 
     }
+    
+  } catch(error) {
+    // ❗ НУЖЕН catch ДЛЯ ВНЕШНЕГО TRY
+    console.error('Ошибка в checkAuthOnLoad:', error)
   }
-} catch(e) { console.log('Ошибка загрузки уроков при восстановлении сессии:', e) }
-    }
-    }
+}
 
     function setSyncMode(mode) {
       currentSyncMode = mode
