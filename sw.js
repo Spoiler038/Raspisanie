@@ -1,4 +1,4 @@
-const CACHE_NAME = 'raspisanie-v4';
+const CACHE_NAME = 'raspisanie-v5';
 
 const NEVER_CACHE = ['supabase.co', 'cdn.tailwindcss.com', 'googleapis.com'];
 
