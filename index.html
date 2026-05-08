@@ -568,11 +568,14 @@ function excelTimeToHHMM(excelTime) {
     return excelTime
   }
   
-  // Если строка в формате ISO с датой - пытаемся извлечь время
+  // Если пришла ISO строка - извлекаем время
   if (typeof excelTime === 'string' && excelTime.includes('T')) {
     const date = new Date(excelTime)
     if (!isNaN(date.getTime())) {
-      return date.toTimeString().slice(0, 5)
+      // Используем UTC для получения правильного времени
+      const hours = date.getUTCHours()
+      const minutes = date.getUTCMinutes()
+      return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`
     }
   }
   
@@ -580,6 +583,7 @@ function excelTimeToHHMM(excelTime) {
   if (isNaN(timeValue)) return '09:00'
   
   // Excel time: 0 = 00:00, 0.5 = 12:00
+  // Просто вычисляем часы и минуты без создания Date объекта
   let totalMinutes = Math.round(timeValue * 24 * 60)
   totalMinutes = Math.max(0, Math.min(1439, totalMinutes))
   
@@ -612,14 +616,15 @@ function excelTimeToTimeString(excelTime) {
   return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`
 }
 
-function timeToExcelTime(timeStr) {
+
   if (!timeStr) return 0.375 // 09:00 по умолчанию
   const [hours, minutes] = timeStr.split(':').map(Number)
   if (isNaN(hours) || isNaN(minutes)) return 0.375
+  // Простое математическое преобразование без часовых поясов
   return (hours * 60 + minutes) / (24 * 60)
 }
 
-// ===== ПРЕОБРАЗОВАНИЕ EXCEL DATE → YYYY-MM-DD =====
+// ===== ПРЕОБРАЗОВАНИЕ EXCEL DATE → YYYY-MM-DD (С UTC) =====
 function excelDateToYYYYMMDD(excelDate) {
   if (!excelDate) return new Date().toISOString().slice(0, 10)
   
@@ -632,7 +637,8 @@ function excelDateToYYYYMMDD(excelDate) {
   if (typeof excelDate === 'string' && excelDate.includes('T')) {
     const date = new Date(excelDate)
     if (!isNaN(date.getTime())) {
-      return date.toISOString().slice(0, 10)
+      // Используем UTC для получения правильной даты
+      return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate())).toISOString().slice(0, 10)
     }
   }
   
@@ -640,10 +646,12 @@ function excelDateToYYYYMMDD(excelDate) {
   if (isNaN(dateValue)) return new Date().toISOString().slice(0, 10)
   
   // Excel дата: 1 = 1900-01-01
-  const excelEpoch = new Date(1899, 11, 30)
+  // Используем UTC для корректного преобразования
+  const excelEpoch = Date.UTC(1899, 11, 30)
   const msPerDay = 86400000
-  const date = new Date(excelEpoch.getTime() + dateValue * msPerDay)
+  const date = new Date(excelEpoch + dateValue * msPerDay)
   
+  // Возвращаем в формате YYYY-MM-DD
   return date.toISOString().slice(0, 10)
 }
 
@@ -1398,6 +1406,7 @@ function normalizeLessonFromCloud(lesson) {
     function lessonsToEvents() {
   return lessons
     .filter(lesson => {
+      // Создаем дату локально, не добавляя временную зону
       const start = new Date(lesson.date + 'T' + lesson.time)
       if (isNaN(start.getTime())) {
         console.warn('⚠️ Пропущен урок с неверной датой/временем:', lesson)
@@ -1406,6 +1415,7 @@ function normalizeLessonFromCloud(lesson) {
       return true
     })
     .map(lesson => {
+      // Создаем локальные даты
       const start = new Date(lesson.date + 'T' + lesson.time)
       const end = new Date(start.getTime() + lesson.duration * 60000)
       const timeStr = lesson.time.substring(0, 5)
