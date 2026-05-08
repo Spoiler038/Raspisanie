@@ -1,9 +1,12 @@
-const CACHE_NAME = 'raspisanie-v5';
-
-const NEVER_CACHE = ['supabase.co', 'cdn.tailwindcss.com', 'googleapis.com'];
-
+const CACHE_NAME = 'raspisanie-v6';
+const NEVER_CACHE = [
+  'script.google.com',
+  'cdn.tailwindcss.com',
+  'googleapis.com'
+];
 const urlsToCache = [
-  '/Raspisanie/js/supabase.js',
+  '/Raspisanie/',
+  '/Raspisanie/index.html',
   '/Raspisanie/js/fullcalendar.js',
   '/Raspisanie/js/fullcalendar-locales.js',
   '/Raspisanie/manifest.json',
@@ -34,11 +37,13 @@ self.addEventListener('activate', event => {
 self.addEventListener('fetch', event => {
   const url = event.request.url;
 
+  // Никогда не кешируем внешние сервисы
   if (NEVER_CACHE.some(domain => url.includes(domain))) {
     event.respondWith(fetch(event.request));
     return;
   }
 
+  // index.html — всегда свежий с сервера, кеш только как запасной
   if (url.endsWith('/Raspisanie/') || url.endsWith('/Raspisanie/index.html')) {
     event.respondWith(
       fetch(event.request).catch(() => caches.match(event.request))
@@ -46,6 +51,7 @@ self.addEventListener('fetch', event => {
     return;
   }
 
+  // Остальное — сначала кеш, потом сеть
   event.respondWith(
     caches.match(event.request).then(response => response || fetch(event.request))
   );
@@ -69,7 +75,9 @@ self.addEventListener('push', event => {
         { action: 'close', title: 'Закрыть' }
       ]
     };
-    event.waitUntil(self.registration.showNotification(data.title || '📅 Расписание', options));
+    event.waitUntil(
+      self.registration.showNotification(data.title || '📅 Расписание', options)
+    );
   } catch (error) { console.error('Push error:', error); }
 });
 
