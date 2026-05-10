@@ -1,4 +1,4 @@
-const CACHE_NAME = 'raspisanie-v7';
+const CACHE_NAME = 'raspisanie-v8';
 const NEVER_CACHE = [
   'script.google.com',
   'cdn.tailwindcss.com',
@@ -13,6 +13,8 @@ const urlsToCache = [
   '/Raspisanie/icons/android/icon-72x72.png',
   '/Raspisanie/icons/android/icon-192x192.png'
 ];
+
+let ntfyTopic = null
 
 self.addEventListener('install', event => {
   self.skipWaiting();
