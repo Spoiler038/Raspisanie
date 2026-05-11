@@ -554,7 +554,7 @@
     }
 
     // ===== GAS API — замена Supabase =====
-    const GAS_URL = 'https://script.google.com/macros/s/AKfycbze-wcsH86536i6NAJ1QgfAP-7F4gtNACaUtYWOVgJnsVJ_WCzYZ_XX1uDQ5ugwOsw/exec'
+    const GAS_URL = 'https://script.google.com/macros/s/AKfycbzBC1eKU1N_1ZhPt0cfKhScbax2Zbk8ynSKARBk0VxL1hrx4rSxEMkmrI0rNDsr9yo6Lw/exec'
     // ↑ После публикации GAS (Deploy → New Deployment → Web App)
     //   вставьте сюда URL вида https://script.google.com/macros/s/.../exec
 
@@ -676,7 +676,7 @@ function normalizeLessonFromCloud(lesson) {
     const timeout = setTimeout(() => {
       cleanup()
       resolve({ data: null, error: new Error('Timeout: GAS не ответил за 15 секунд') })
-    }, 15000)
+    }, 30000)
 
     function cleanup() {
       clearTimeout(timeout)
@@ -1319,8 +1319,7 @@ function normalizeLessonFromCloud(lesson) {
     }})
     if (se) throw se
     localStorage.setItem(STORAGE_KEYS.LAST_SYNC, new Date().toISOString())
-    settingsChanged = false  // ← FIX: сбрасываем флаг чтобы closeSettings не перезаписал настройки
-    showToast('✅ Данные загружены из облака. Уроков: ' + lessons.length, true)
+    showToast('✅ Данные сохранены в облаке. Уроков: ' + lessons.length, true)
   } catch (error) {
     console.log('Ошибка при сохранении в облако:', error)
     showToast('❌ Ошибка при сохранении в облако', false)
@@ -1358,6 +1357,8 @@ function normalizeLessonFromCloud(lesson) {
       calendar.setOption('slotMaxTime', workHours.to)
     }
     localStorage.setItem(STORAGE_KEYS.LAST_SYNC, new Date().toISOString())
+    localStorage.setItem(STORAGE_KEYS.LAST_SYNC, new Date().toISOString())
+    settingsChanged = false  // ← сбрасываем чтобы closeSettings не перезаписал
     showToast('✅ Данные загружены из облака. Уроков: ' + lessons.length, true)
   } catch (error) {
     console.log('Ошибка при загрузке из облака:', error)
