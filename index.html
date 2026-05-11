@@ -554,7 +554,7 @@
     }
 
     // ===== GAS API — замена Supabase =====
-    const GAS_URL = 'https://script.google.com/macros/s/AKfycby2rn4S5tYuZS8Q5_39B6qsMl8cRZd2q-rs5p-R7HyxRS7h-RewoQDTJk1A7XZAxVs6Jg/exec'
+    const GAS_URL = 'https://script.google.com/macros/s/AKfycbwysfskvoimQLZi5qEKQV6WetIbViDQ9bL0Pq-oJpg8-hQXn5zJFy2j86guzyxSdecFNw/exec'
     // ↑ После публикации GAS (Deploy → New Deployment → Web App)
     //   вставьте сюда URL вида https://script.google.com/macros/s/.../exec
 
@@ -1038,9 +1038,11 @@ function normalizeLessonFromCloud(lesson) {
         }
       }
       if (cloudSettings.work_from && cloudSettings.work_to) {
-  // Преобразуем время из Excel формата в HH:MM
   const workFromStr = excelTimeToTimeString(cloudSettings.work_from)
-  const workToStr = excelTimeToTimeString(cloudSettings.work_to)
+  let workToStr = excelTimeToTimeString(cloudSettings.work_to)
+  
+  // 00:00 трактуем как конец дня
+  if (workToStr === '00:00') workToStr = '23:59'
   if (validateWorkHours(workFromStr, workToStr)) {
     workHours = { from: workFromStr, to: workToStr }
     saveSettingsToStorage()
@@ -1160,7 +1162,10 @@ function normalizeLessonFromCloud(lesson) {
         if (cs.theme) { document.body.className = cs.theme; localStorage.setItem('teacher_theme', cs.theme); const themeEl = document.getElementById('themeSelect'); if (themeEl) themeEl.value = cs.theme }
         if (cs.work_from && cs.work_to) {
   const workFromStr = excelTimeToTimeString(cs.work_from)
-  const workToStr = excelTimeToTimeString(cs.work_to)
+  let workToStr = excelTimeToTimeString(cs.work_to)
+  
+  // 00:00 трактуем как конец дня
+  if (workToStr === '00:00') workToStr = '23:59'
   if (validateWorkHours(workFromStr, workToStr)) {
     workHours = { from: workFromStr, to: workToStr }; saveSettingsToStorage()
     calendar.setOption('slotMinTime', workHours.from); calendar.setOption('slotMaxTime', workHours.to); calculateScrollerHeight()
@@ -1347,6 +1352,8 @@ function normalizeLessonFromCloud(lesson) {
         from: excelTimeToTimeString(cs.work_from) || '09:00', 
         to: excelTimeToTimeString(cs.work_to) || '23:59' 
       }
+      // 00:00 трактуем как конец дня
+    if (workHours.to === '00:00') workHours.to = '23:59'
       saveSettingsToStorage()
       document.body.className = cs.theme || 'dark'
       if (themeSelect) themeSelect.value = cs.theme || 'dark'
@@ -1873,11 +1880,16 @@ function normalizeLessonFromCloud(lesson) {
     }
 
     async function closeSettings() {
-      const settingsSheet = document.getElementById('settingsSheet')
-      const workFromEl = document.getElementById('workFrom')
-      const workToEl = document.getElementById('workTo')
-      const fromTime = workFromEl.value
-      const toTime = workToEl.value
+  const settingsSheet = document.getElementById('settingsSheet')
+  const workFromEl = document.getElementById('workFrom')
+  const workToEl = document.getElementById('workTo')
+  let fromTime = workFromEl.value
+  let toTime = workToEl.value
+
+  // 00:00 трактуем как конец дня
+  if (toTime === '00:00') { toTime = '23:59'; workToEl.value = '23:59' }
+
+      
       if (!validateWorkHours(fromTime, toTime)) {
         const fromDate = new Date('2000-01-01T' + fromTime)
         const toDate = new Date('2000-01-01T' + toTime)
@@ -1922,6 +1934,10 @@ function normalizeLessonFromCloud(lesson) {
     }
 
     function validateWorkHours(fromTime, toTime) {
+  // 00:00 трактуем как конец дня
+  if (toTime === '00:00') toTime = '23:59'
+  if (fromTime === '00:00') fromTime = '00:01'
+      
       if (!fromTime || !toTime) { showToast('Введите время начала и окончания работы'); return false }
       const fromDate = new Date(`2000-01-01T${fromTime}`)
       const toDate = new Date(`2000-01-01T${toTime}`)
