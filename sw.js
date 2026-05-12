@@ -1,4 +1,4 @@
-const CACHE_NAME = 'raspisanie-v9';
+const CACHE_NAME = 'raspisanie-v10';
 const NEVER_CACHE = [
   'script.google.com',
   'cdn.tailwindcss.com',
