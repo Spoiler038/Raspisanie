@@ -807,7 +807,7 @@ function normalizeLessonFromCloud(lesson) {
         
         if (timeToLesson <= 0) return
 
-        if (timeToLesson <= notifyMinutes && timeToLesson > notifyMinutes - 5) {
+       if (timeToLesson <= notifyMinutes && timeToLesson > notifyMinutes - 16) {
           sendLocalNotification(lesson, setting)
           notificationHistory.add(lesson.id)
         } 
