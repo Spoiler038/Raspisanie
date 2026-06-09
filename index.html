@@ -228,6 +228,17 @@ body.dark .fc-timegrid-event,
 body.dark .fc-event-main {
     box-shadow: inset 0 0 0 1px #475569; /* Тёмно-серый для тёмной темы */
 }
+    /* Стиль для отображения email профиля */
+.profile-email {
+    font-size: 12px;
+    color: #94a3b8;
+    margin-left: 8px;
+    font-weight: normal;
+}
+
+body.light .profile-email {
+    color: #475569;
+}
   </style>
 </head>
 
@@ -424,10 +435,13 @@ body.dark .fc-event-main {
         <input type="file" id="importFile" style="display:none;" accept=".json">
       </div>
 
-      <div id="profileSection" style="display: none; margin-bottom: 12px;">
-        <div class="text-xs mb-1">Управление профилем</div>
+     <div id="profileSection" style="display: none; margin-bottom: 12px;">
+        <div class="text-xs mb-1" style="display: flex; align-items: center; justify-content: space-between;">
+            <span>Управление профилем</span>
+            <span id="profileEmail" class="profile-email"></span>
+        </div>
         <button id="deleteProfileButton" class="btn-danger" onclick="deleteProfile()" style="padding: 8px; font-size: 13px; background: #7f1d1d;">🗑️ Удалить профиль</button>
-      </div>
+    </div>
 
       <div>
         <div class="text-xs mb-1">Очистка данных</div>
@@ -2072,6 +2086,7 @@ function normalizeLessonFromCloud(lesson) {
     function updateCloudUI() {
       const cloudButton = document.getElementById('cloudActionButton')
       const profileSection = document.getElementById('profileSection')
+      const profileEmailSpan = document.getElementById('profileEmail')
       const clearCloudButton = document.getElementById('clearCloudButton')
       const exportCloudBtn = document.querySelector('button[onclick="exportCloud()"]')
       const importCloudBtn = document.querySelector('button[onclick="importCloud()"]')
@@ -2080,6 +2095,7 @@ function normalizeLessonFromCloud(lesson) {
       if (currentUser) {
         if (cloudButton) { cloudButton.textContent = '🔌 Отключить облако'; cloudButton.style.background = '#dc2626' }
         if (profileSection) profileSection.style.display = 'block'
+        if (profileEmailSpan && currentUser.email) {profileEmailSpan.textContent = currentUser.email}
         if (clearCloudButton) { clearCloudButton.disabled = false; clearCloudButton.style.opacity = '1'; clearCloudButton.style.background = '#b91c1c' }
         if (exportCloudBtn) { exportCloudBtn.disabled = false; exportCloudBtn.style.opacity = '1'; exportCloudBtn.style.background = '#2563eb' }
         if (importCloudBtn) { importCloudBtn.disabled = false; importCloudBtn.style.opacity = '1'; importCloudBtn.style.background = '#2563eb' }
@@ -2088,6 +2104,7 @@ function normalizeLessonFromCloud(lesson) {
       } else {
         if (cloudButton) { cloudButton.textContent = '☁️ Подключить облако'; cloudButton.style.background = '#2563eb' }
         if (profileSection) profileSection.style.display = 'none'
+        if (profileEmailSpan) profileEmailSpan.textContent = ''
         if (clearCloudButton) { clearCloudButton.disabled = true; clearCloudButton.style.opacity = '0.5'; clearCloudButton.style.background = '#7f1d1d' }
         if (exportCloudBtn) { exportCloudBtn.disabled = true; exportCloudBtn.style.opacity = '0.5'; exportCloudBtn.style.background = '#2563eb' }
         if (importCloudBtn) { importCloudBtn.disabled = true; importCloudBtn.style.opacity = '0.5'; importCloudBtn.style.background = '#2563eb' }
@@ -2095,6 +2112,8 @@ function normalizeLessonFromCloud(lesson) {
         if (notifSelect) { notifSelect.disabled = true; notifSelect.style.opacity = '0.5' }
       }
     }
+
+    
 
     function deleteProfile() {
       if (!currentUser) { showToast('❌ Нет активного профиля', false); return }
