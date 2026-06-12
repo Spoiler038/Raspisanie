@@ -727,44 +727,72 @@ function normalizeLessonFromCloud(lesson) {
 
     // ===== WEB PUSH (через GAS) =====
     const VAPID_PUBLIC_KEY = 'BO5mDuU0D0DbYXwwHi_Q6XeuwobMS3G9eRX4NwlOKoDNGC4EXFx8k1Hn4L47rDuImr8dKSjlhQEo53vvEj5Feog'
-
+    const NTFY_VAPID_PUBLIC_KEY = 'BD8zOiMeN7cAOCGpz7oRDMbMqkMOfx2ULCY5kHuFXJGGsRn_lXnqLfZaMbdS7Z3P3e5XFK3sCudPhPMsRiRWL9g'
+    
     function urlBase64ToUint8Array(base64String) {
-      const padding = '='.repeat((4 - base64String.length % 4) % 4)
-      const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/')
-      const rawData = atob(base64)
-      return Uint8Array.from([...rawData].map(char => char.charCodeAt(0)))
+    const padding = '='.repeat((4 - base64String.length % 4) % 4)
+    const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/')
+    const rawData = atob(base64)
+    return Uint8Array.from([...rawData].map(char => char.charCodeAt(0)))
+}
+
+async function subscribeToPushNotifications() {
+  if (!currentUser) return
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+    console.warn('Push не поддерживается в этом браузере')
+    return
+  }
+
+  try {
+    const permission = await Notification.requestPermission()
+    if (permission !== 'granted') {
+      console.warn('Разрешение на уведомления не получено')
+      return
     }
 
-    async function subscribeToPushNotifications() {
-      if (!currentUser) return
-      if (!('serviceWorker' in navigator)) return
-      try {
-        const permission = await Notification.requestPermission()
-        if (permission !== 'granted') return
+    const registration = await navigator.serviceWorker.ready
 
-        // ntfy — уникальный топик на основе ID пользователя
-        const topic = 'raspisanie_' + currentUser.id.replace(/-/g, '').substring(0, 20)
-        const ntfyEndpoint = 'https://ntfy.sh/' + topic
-
-        const token = localStorage.getItem('teacher_jwt')
-        await gasCall({
-          action: 'save_push_sub', token,
-          endpoint: ntfyEndpoint,
-          p256dh: '',
-          auth: ''
-        })
-
-        // Сообщаем SW о топике для polling
-        const registration = await navigator.serviceWorker.ready
-        if (registration.active) {
-          registration.active.postMessage({ action: 'subscribentfy', topic: topic })
-        }
-
-        console.log('✅ ntfy подписка сохранена:', ntfyEndpoint)
-      } catch (error) {
-        console.error('Ошибка подписки на push:', error)
-      }
+    // Отписываемся от старой подписки если есть (могла быть с другим ключом)
+    const existingSub = await registration.pushManager.getSubscription()
+    if (existingSub) {
+      await existingSub.unsubscribe()
     }
+
+    // Подписываемся через ntfy.sh VAPID
+    // ntfy.sh использует свой VAPID ключ и проксирует через FCM/Web Push
+    let subscription
+    try {
+      subscription = await registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(NTFY_VAPID_PUBLIC_KEY)
+      })
+    } catch (subErr) {
+      console.error('pushManager.subscribe ошибка:', subErr)
+      // Fallback: сохраняем ntfy topic URL как endpoint (для отправки через ntfy HTTP API)
+      const topic = 'raspisanie_' + currentUser.id.replace(/-/g, '').substring(0, 20)
+      const ntfyEndpoint = 'https://ntfy.sh/' + topic
+      const token = localStorage.getItem('teacher_jwt')
+      await gasCall({ action: 'save_push_sub', token, endpoint: ntfyEndpoint, p256dh: '', auth: '' })
+      console.log('✅ Сохранён ntfy topic URL (fallback):', ntfyEndpoint)
+      return
+    }
+
+    // Извлекаем ключи из подписки
+    const subJson = subscription.toJSON()
+    const endpoint = subJson.endpoint
+    const p256dh = subJson.keys ? subJson.keys.p256dh : ''
+    const auth = subJson.keys ? subJson.keys.auth : ''
+
+    // Сохраняем в GAS
+    const token = localStorage.getItem('teacher_jwt')
+    await gasCall({ action: 'save_push_sub', token, endpoint, p256dh, auth })
+
+    console.log('✅ Web Push подписка сохранена:', endpoint.substring(0, 60))
+
+  } catch (error) {
+    console.error('Ошибка subscribeToPushNotifications:', error)
+  }
+}
 
     async function unsubscribeFromPushNotifications() {
       if (!('serviceWorker' in navigator)) return
