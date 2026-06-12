@@ -1,5 +1,4 @@
-const CACHE_NAME = 'raspisanie-v11';
-const NTFY_CACHE = 'ntfy-config';
+const CACHE_NAME = 'raspisanie-v12';
 const NEVER_CACHE = [
   'script.google.com',
   'cdn.tailwindcss.com',
@@ -15,30 +14,6 @@ const urlsToCache = [
   '/Raspisanie/icons/android/icon-192x192.png'
 ];
 
-// ===== ПЕРСИСТЕНТНОЕ ХРАНЕНИЕ NTFY TOPIC =====
-// Используем Cache API вместо переменной в памяти —
-// переменная в памяти SW сбрасывается при засыпании.
-
-async function getNtfyTopic() {
-  try {
-    const cache = await caches.open(NTFY_CACHE);
-    const res = await cache.match('/ntfy-topic');
-    if (!res) return null;
-    return await res.text();
-  } catch (e) {
-    return null;
-  }
-}
-
-async function setNtfyTopic(topic) {
-  try {
-    const cache = await caches.open(NTFY_CACHE);
-    await cache.put('/ntfy-topic', new Response(topic));
-  } catch (e) {
-    console.error('Ошибка сохранения ntfy topic:', e);
-  }
-}
-
 // ===== INSTALL =====
 self.addEventListener('install', event => {
   self.skipWaiting();
@@ -48,27 +23,17 @@ self.addEventListener('install', event => {
 });
 
 // ===== ACTIVATE =====
-// При активации SW восстанавливаем ntfy polling —
-// это срабатывает после обновления SW и при первом запуске.
 self.addEventListener('activate', event => {
   event.waitUntil(
     Promise.all([
       self.clients.claim(),
-      // Удаляем старые кеши (кроме ntfy-config)
       caches.keys().then(cacheNames =>
         Promise.all(
           cacheNames
-            .filter(name => name !== CACHE_NAME && name !== NTFY_CACHE)
+            .filter(name => name !== CACHE_NAME)
             .map(name => caches.delete(name))
         )
-      ),
-      // Восстанавливаем polling после перезапуска SW
-      getNtfyTopic().then(topic => {
-        if (topic) {
-          console.log('SW активирован, восстанавливаем ntfy polling для:', topic);
-          startPollNtfy(topic);
-        }
-      })
+      )
     ])
   );
 });
@@ -94,31 +59,43 @@ self.addEventListener('fetch', event => {
   );
 });
 
-// ===== PUSH (стандартный Web Push) =====
+// ===== PUSH (стандартный Web Push — работает когда приложение закрыто) =====
+// GAS отправляет POST на ntfy.sh → ntfy доставляет через браузерный Push API →
+// SW получает этот event даже если страница закрыта.
 self.addEventListener('push', event => {
-  if (!event.data) return;
-  try {
-    const data = event.data.json();
-    const options = {
-      body: data.body || 'Напоминание о занятии',
+  let title = '📅 Расписание';
+  let body = 'Напоминание о занятии';
+  let url = '/Raspisanie/';
+
+  if (event.data) {
+    try {
+      // ntfy.sh отправляет JSON: { title, message, click, ... }
+      const data = event.data.json();
+      title = data.title || title;
+      body = data.message || data.body || body;
+      url = data.click || data.url || url;
+    } catch (e) {
+      // ntfy иногда шлёт plain text
+      body = event.data.text() || body;
+    }
+  }
+
+  event.waitUntil(
+    self.registration.showNotification(title, {
+      body: body,
       icon: '/Raspisanie/icons/android/icon-192x192.png',
       badge: '/Raspisanie/icons/android/icon-72x72.png',
       vibrate: [200, 100, 200, 100, 200],
-      tag: 'lesson-' + (data.lessonId || Date.now()),
-      renotify: false,
+      tag: 'lesson-reminder',
+      renotify: true,
       requireInteraction: false,
-      data: { url: data.url || '/Raspisanie/', lessonId: data.lessonId },
+      data: { url: url },
       actions: [
         { action: 'open', title: '📅 Открыть' },
         { action: 'close', title: 'Закрыть' }
       ]
-    };
-    event.waitUntil(
-      self.registration.showNotification(data.title || '📅 Расписание', options)
-    );
-  } catch (error) {
-    console.error('Push error:', error);
-  }
+    })
+  );
 });
 
 // ===== NOTIFICATION CLICK =====
@@ -141,82 +118,8 @@ self.addEventListener('notificationclose', function() {});
 // ===== СООБЩЕНИЯ ОТ СТРАНИЦЫ =====
 self.addEventListener('message', event => {
   if (!event.data) return;
-
   if (event.data.action === 'skipWaiting') {
     self.skipWaiting();
   }
-
-  if (event.data.action === 'subscribentfy') {
-    const topic = event.data.topic;
-    setNtfyTopic(topic).then(() => {
-      startPollNtfy(topic);
-    });
-  }
+  // subscribentfy больше не нужен — polling удалён
 });
-
-// ===== NTFY POLLING =====
-// startPollNtfy — точка входа, вызывается при активации SW и из message-обработчика.
-// pollNtfy — рекурсивная функция с переподключением.
-
-let _ntfyPolling = false; // защита от двойного запуска
-
-function startPollNtfy(topic) {
-  if (_ntfyPolling) return; // уже запущен
-  _ntfyPolling = true;
-  pollNtfy(topic);
-}
-
-async function pollNtfy(topic) {
-  if (!topic) {
-    topic = await getNtfyTopic();
-    if (!topic) {
-      _ntfyPolling = false;
-      return;
-    }
-  }
-
-  try {
-    const response = await fetch('https://ntfy.sh/' + topic + '/json', {
-      headers: { 'Accept': 'text/event-stream' }
-    });
-
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder();
-
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-
-      const text = decoder.decode(value);
-      const lines = text.trim().split('\n');
-
-      for (const line of lines) {
-        if (!line.trim()) continue;
-        try {
-          const msg = JSON.parse(line);
-          if (msg.event === 'message') {
-            self.registration.showNotification(msg.title || '📅 Расписание', {
-              body: msg.message,
-              icon: '/Raspisanie/icons/android/icon-192x192.png',
-              badge: '/Raspisanie/icons/android/icon-72x72.png',
-              vibrate: [200, 100, 200],
-              data: { url: '/Raspisanie/' }
-            });
-          }
-        } catch (e) {
-          // Игнорируем битые строки
-        }
-      }
-    }
-
-    // Поток закрылся — переподключаемся
-    _ntfyPolling = false;
-    setTimeout(() => startPollNtfy(topic), 5000);
-
-  } catch (e) {
-    console.error('ntfy polling ошибка:', e.message);
-    _ntfyPolling = false;
-    // Переподключаемся через 30 секунд при ошибке сети
-    setTimeout(() => startPollNtfy(topic), 30000);
-  }
-}
