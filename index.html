@@ -751,7 +751,13 @@ function normalizeLessonFromCloud(lesson) {
 async function subscribeToPushNotifications() {
   if (!currentUser) return
   if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
-    console.warn('Push не поддерживается в этом браузере')
+    const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent)
+    const isStandalone = window.navigator.standalone === true
+    if (isIOS && !isStandalone) {
+      showToast('📱 Для уведомлений на iOS — добавьте приложение на экран: Поделиться → На экран «Домой»', false, 6000)
+    } else {
+      console.warn('Push не поддерживается в этом браузере')
+    }
     return
   }
 
@@ -1017,14 +1023,14 @@ async function subscribeToPushNotifications() {
     }
 
     // ===== ОСТАЛЬНЫЕ ФУНКЦИИ =====
-    function showToast(message, isSuccess = false) {
+    function showToast(message, isSuccess = false, duration = 3000) {
       const toast = document.getElementById('toast')
       if (!toast) return
       toast.textContent = message
       toast.className = 'toast'
       if (isSuccess) toast.classList.add('success')
       toast.style.display = 'block'
-      setTimeout(() => { toast.style.display = 'none' }, 3000)
+      setTimeout(() => { toast.style.display = 'none' }, duration)
     }
 
     function showConfirmModal(title, message, onConfirm) {
@@ -1984,18 +1990,24 @@ async function subscribeToPushNotifications() {
         subsData.subs.forEach((sub, i) => {
           const isCurrent = sub.endpoint === currentEndpoint
           const shortId = sub.endpoint.split('/').pop().substring(0, 24) + '...'
-          const date = sub.updated_at ? new Date(sub.updated_at).toLocaleDateString('ru-RU') : '—'
+          let dateStr = '—'
+          if (sub.updated_at) {
+            const d = new Date(sub.updated_at)
+            const datePart = d.toLocaleDateString('ru-RU')
+            const timePart = d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })
+            dateStr = datePart + ' ' + timePart
+          }
           const div = document.createElement('div')
-          div.style.cssText = 'display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-radius:10px;background:var(--bg-hover);gap:8px;'
+          div.style.cssText = 'display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-radius:10px;background:var(--bg-hover);gap:8px;' + (isCurrent ? 'outline:2px solid #22c55e;' : '')
           div.innerHTML = `
             <div style="flex:1;min-width:0;">
-              <div style="font-size:13px;font-weight:500;margin-bottom:2px;">${isCurrent ? '🟢' : '📱'} Устройство ${i + 1}</div>
+              <div style="font-size:13px;font-weight:500;margin-bottom:2px;">${isCurrent ? '🟢 Устройство ' + (i + 1) + ' <span style=\'font-size:11px;color:#22c55e;font-weight:400;\'>(это устройство)</span>' : '📱 Устройство ' + (i + 1)}</div>
               <div style="font-size:11px;color:var(--text-secondary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${sub.endpoint}">${shortId}</div>
-              <div style="font-size:11px;color:var(--text-secondary);">Подключено: ${date}</div>
+              <div style="font-size:11px;color:var(--text-secondary);">Подключено: ${dateStr}</div>
             </div>
             ${!isCurrent
               ? `<button onclick="deleteDevice('${sub.endpoint.replace(/'/g, "\'")}')" style="flex-shrink:0;background:#dc2626;color:white;border:none;border-radius:8px;padding:6px 10px;font-size:13px;cursor:pointer;">🗑️</button>`
-              : '<span style="flex-shrink:0;font-size:12px;color:#22c55e;font-weight:500;">Текущее</span>'}
+              : ''}
           `
           list.appendChild(div)
         })
@@ -2882,6 +2894,19 @@ async function subscribeToPushNotifications() {
         target: '#notificationSelect',
         position: 'bottom',
         before: () => { openSettings() }
+      },
+      {
+        title: '📱 Устройства уведомлений',
+        text: 'Кнопка 📱 открывает список устройств, подключённых к push-уведомлениям. Можно отключить любое устройство кроме текущего. Максимум 3 устройства. Доступно только при входе в облако.',
+        target: '#devicesBtn',
+        position: 'bottom',
+        before: () => {
+          openSettings()
+          // Убеждаемся что показываем настройки, а не панель устройств
+          const db = document.getElementById('devicesBody'); if (db) db.style.display = 'none'
+          const sb = document.getElementById('settingsBody'); if (sb) sb.style.display = ''
+          const st = document.getElementById('settingsTitle'); if (st) st.textContent = 'Настройки'
+        }
       },
       {
         title: '🗑️ Автоудаление',
