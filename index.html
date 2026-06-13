@@ -1964,9 +1964,10 @@ async function subscribeToPushNotifications() {
 
       try {
         const token = localStorage.getItem('teacher_jwt')
-        const data = await gasCall({ action: 'get_push_subs', token })
+        const { data: subsData, error: subsError } = await gasCall({ action: 'get_push_subs', token })
+        if (subsError) throw subsError
 
-        if (!data.subs || data.subs.length === 0) {
+        if (!subsData || !subsData.subs || subsData.subs.length === 0) {
           list.innerHTML = '<div style="color:var(--text-secondary);font-size:14px;text-align:center;padding:20px;">Нет подключённых устройств</div>'
           return
         }
@@ -1980,7 +1981,7 @@ async function subscribeToPushNotifications() {
         } catch(e) {}
 
         list.innerHTML = ''
-        data.subs.forEach((sub, i) => {
+        subsData.subs.forEach((sub, i) => {
           const isCurrent = sub.endpoint === currentEndpoint
           const shortId = sub.endpoint.split('/').pop().substring(0, 24) + '...'
           const date = sub.updated_at ? new Date(sub.updated_at).toLocaleDateString('ru-RU') : '—'
