@@ -376,6 +376,22 @@ body.light .profile-email {
   </div>
 
   <!-- SETTINGS -->
+  <!-- Модальное окно управления устройствами -->
+  <div id="devicesModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1000;align-items:center;justify-content:center;">
+    <div style="background:var(--bg-card);border-radius:16px;padding:20px;width:90%;max-width:420px;max-height:80vh;overflow-y:auto;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+        <h3 style="margin:0;font-size:16px;">📱 Устройства уведомлений</h3>
+        <button onclick="closeDevicesModal()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--text-secondary);">✕</button>
+      </div>
+      <div id="devicesList" style="display:flex;flex-direction:column;gap:10px;">
+        <div style="color:var(--text-secondary);font-size:14px;text-align:center;">Загрузка...</div>
+      </div>
+      <div style="margin-top:16px;font-size:12px;color:var(--text-secondary);text-align:center;">
+        Максимум 3 устройства. Текущее устройство помечено 🟢
+      </div>
+    </div>
+  </div>
+
   <div id="settingsSheet" class="sheet" onclick="if(event.target.id==='settingsSheet')closeSettings()">
     <div class="sheet-content" style="padding: 16px; max-height: 90vh; overflow-y: hidden;">
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
@@ -388,6 +404,8 @@ body.light .profile-email {
             style="background:#64748b;color:white;border:none;border-radius:8px;padding:6px 10px;font-size:15px;cursor:pointer;">❓</button>
           <button id="autoDeleteBtn" onclick="toggleAutoDelete()" title="Автоудаление старых уроков"
             style="background:#64748b;color: white;border:none;border-radius:8px;padding:6px 10px;font-size:15px;cursor:pointer;">🗑️</button>
+          <button id="devicesBtn" onclick="openDevicesModal()" title="Управление устройствами уведомлений"
+            style="background:#7c3aed;color:white;border:none;border-radius:8px;padding:6px 10px;font-size:15px;cursor:pointer;">📱</button>
           <button id="cloudActionButton" onclick="handleCloudAction()"
             style="background: #2563eb; color: white; border: none; border-radius: 8px; padding: 6px 12px; font-size: 13px; cursor: pointer;">☁️ Подключить облако</button>
         </div>
@@ -1917,7 +1935,71 @@ async function subscribeToPushNotifications() {
 
     let settingsChanged = false
 
-    function openSettings() {
+    // ===== УПРАВЛЕНИЕ УСТРОЙСТВАМИ PUSH =====
+
+    async function openDevicesModal() {
+      if (!currentUser) { showToast('Войдите в облако', false); return }
+      const modal = document.getElementById('devicesModal')
+      modal.style.display = 'flex'
+      const list = document.getElementById('devicesList')
+      list.innerHTML = '<div style="color:var(--text-secondary);font-size:14px;text-align:center;">Загрузка...</div>'
+
+      try {
+        const token = localStorage.getItem('teacher_jwt')
+        const data = await gasCall({ action: 'get_push_subs', token })
+        if (!data.subs || data.subs.length === 0) {
+          list.innerHTML = '<div style="color:var(--text-secondary);font-size:14px;text-align:center;">Нет подключённых устройств</div>'
+          return
+        }
+
+        let currentEndpoint = ''
+        try {
+          const reg = await navigator.serviceWorker.ready
+          const sub = await reg.pushManager.getSubscription()
+          if (sub) currentEndpoint = sub.endpoint
+        } catch(e) {}
+
+        list.innerHTML = ''
+        data.subs.forEach((sub, i) => {
+          const isCurrent = sub.endpoint === currentEndpoint
+          const shortId = sub.endpoint.split('/').pop().substring(0, 20) + '...'
+          const date = sub.updated_at ? new Date(sub.updated_at).toLocaleDateString('ru-RU') : '—'
+          const div = document.createElement('div')
+          div.style.cssText = 'display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-radius:10px;background:var(--bg-hover);gap:8px;'
+          div.innerHTML = `
+            <div style="flex:1;min-width:0;">
+              <div style="font-size:13px;font-weight:500;">${isCurrent ? '🟢' : '📱'} Устройство ${i + 1}</div>
+              <div style="font-size:11px;color:var(--text-secondary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${shortId}</div>
+              <div style="font-size:11px;color:var(--text-secondary);">Добавлено: ${date}</div>
+            </div>
+            ${!isCurrent
+              ? `<button onclick="deleteDevice('${sub.endpoint}')" style="background:#dc2626;color:white;border:none;border-radius:8px;padding:6px 10px;font-size:13px;cursor:pointer;white-space:nowrap;">🗑️ Удалить</button>`
+              : '<span style="font-size:12px;color:#22c55e;white-space:nowrap;">Текущее</span>'}
+          `
+          list.appendChild(div)
+        })
+      } catch(e) {
+        list.innerHTML = '<div style="color:#dc2626;font-size:14px;text-align:center;">Ошибка загрузки</div>'
+      }
+    }
+
+    function closeDevicesModal() {
+      document.getElementById('devicesModal').style.display = 'none'
+    }
+
+    async function deleteDevice(endpoint) {
+      if (!confirm('Удалить это устройство из списка уведомлений?')) return
+      try {
+        const token = localStorage.getItem('teacher_jwt')
+        await gasCall({ action: 'delete_push_sub', token, endpoint })
+        showToast('✅ Устройство удалено', true)
+        openDevicesModal()
+      } catch(e) {
+        showToast('❌ Ошибка удаления', false)
+      }
+    }
+
+        function openSettings() {
       const settingsSheet = document.getElementById('settingsSheet')
       const workFrom = document.getElementById('workFrom')
       const workTo = document.getElementById('workTo')
