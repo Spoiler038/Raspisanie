@@ -727,7 +727,6 @@ function normalizeLessonFromCloud(lesson) {
 
     // ===== WEB PUSH (через GAS) =====
     const VAPID_PUBLIC_KEY = 'BO5mDuU0D0DbYXwwHi_Q6XeuwobMS3G9eRX4NwlOKoDNGC4EXFx8k1Hn4L47rDuImr8dKSjlhQEo53vvEj5Feog'
-    const NTFY_VAPID_PUBLIC_KEY = 'BD8zOiMeN7cAOCGpz7oRDMbMqkMOfx2ULCY5kHuFXJGGsRn_lXnqLfZaMbdS7Z3P3e5XFK3sCudPhPMsRiRWL9g'
     
     function urlBase64ToUint8Array(base64String) {
     const padding = '='.repeat((4 - base64String.length % 4) % 4)
@@ -764,7 +763,7 @@ async function subscribeToPushNotifications() {
     try {
       subscription = await registration.pushManager.subscribe({
         userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(NTFY_VAPID_PUBLIC_KEY)
+        applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
       })
     } catch (subErr) {
       console.error('pushManager.subscribe ошибка:', subErr)
