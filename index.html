@@ -518,6 +518,21 @@ body.light .profile-email {
     </div>
   </div>
 
+  <!-- Модальное окно удаления устройства -->
+  <div id="deleteDeviceModal" class="modal-overlay" style="display:none;z-index:4000;">
+    <div class="modal" style="animation:slideUp 0.2s ease;">
+      <div class="modal-title">📵 Удалить устройство?</div>
+      <div class="modal-content">
+        Это устройство больше не будет получать push-уведомления о занятиях.<br><br>
+        <span id="deleteDeviceInfo" style="font-size:12px;word-break:break-all;"></span>
+      </div>
+      <div class="modal-buttons" style="flex-direction:column;gap:8px;">
+        <button id="deleteDeviceConfirmBtn" class="btn-danger" style="width:100%;">🗑️ Удалить</button>
+        <button onclick="closeDeleteDeviceModal()" class="btn-secondary" style="width:100%;">Отмена</button>
+      </div>
+    </div>
+  </div>
+
   <div id="confirmModal" class="modal-overlay" style="display: none; z-index: 3000;">
     <div class="modal" style="max-width: 300px;">
       <div class="modal-title" id="confirmModalTitle">Подтверждение</div>
@@ -2017,15 +2032,38 @@ async function subscribeToPushNotifications() {
       }
     }
 
-    async function deleteDevice(endpoint) {
-      if (!confirm('Удалить это устройство из списка уведомлений?')) return
+    let _pendingDeleteEndpoint = null
+
+    function deleteDevice(endpoint) {
+      _pendingDeleteEndpoint = endpoint
+      const shortId = endpoint.split('/').pop().substring(0, 28) + '...'
+      document.getElementById('deleteDeviceInfo').textContent = shortId
+      document.getElementById('deleteDeviceModal').style.display = 'flex'
+      document.getElementById('deleteDeviceConfirmBtn').onclick = confirmDeleteDevice
+    }
+
+    function closeDeleteDeviceModal() {
+      document.getElementById('deleteDeviceModal').style.display = 'none'
+      _pendingDeleteEndpoint = null
+    }
+
+    async function confirmDeleteDevice() {
+      if (!_pendingDeleteEndpoint) return
+      const btn = document.getElementById('deleteDeviceConfirmBtn')
+      btn.disabled = true
+      btn.textContent = 'Удаление...'
+      btn.style.opacity = '0.7'
       try {
         const token = localStorage.getItem('teacher_jwt')
-        await gasCall({ action: 'delete_push_sub', token, endpoint })
+        await gasCall({ action: 'delete_push_sub', token, endpoint: _pendingDeleteEndpoint })
+        closeDeleteDeviceModal()
         showToast('✅ Устройство удалено', true)
         await loadDevicesList()
       } catch(e) {
         showToast('❌ Ошибка удаления', false)
+        btn.disabled = false
+        btn.textContent = '🗑️ Удалить'
+        btn.style.opacity = '1'
       }
     }
 
