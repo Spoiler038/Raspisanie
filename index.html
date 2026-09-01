@@ -615,7 +615,7 @@ body.light .profile-email {
         Вы уверены, что хотите удалить это занятие?
       </div>
       <div class="modal-buttons" style="display: flex; flex-direction: column; gap: 8px;">
-        <button id="deleteLessonConfirm" class="btn-danger" style="width: 100%;">🗑️ Удалить</button>
+        <button id="deleteLessonConfirm" class="btn-danger" style="width: 100%;">Удалить</button>
         <button id="deleteLessonCancel" class="btn-secondary" style="width: 100%;">Отмена</button>
       </div>
     </div>
@@ -2177,8 +2177,15 @@ try {
   const fromMin = parseInt(fromTime.split(':')[0]) * 60 + parseInt(fromTime.split(':')[1]);
   const toMin = parseInt(toTime.split(':')[0]) * 60 + parseInt(toTime.split(':')[1]);
   
-  if (fromMin % 60 !== 0 || toMin % 60 !== 0) {
-    showToast('⏰ Время работы должно быть кратно 1 часу (например: 09:00, 10:00, 18:00)');
+  const isFromHourly = fromMin % 60 === 0;
+  const isToHourly = toMin % 60 === 0 || toTime === '23:59';
+  
+  if (!isFromHourly || !isToHourly) {
+    if (toTime !== '23:59') {
+      showToast('⏰ Время работы должно быть кратно 1 часу (например: 09:00, 10:00, 18:00)');
+    } else {
+      showToast('⏰ Время начала работы должно быть кратно 1 часу (например: 09:00, 10:00)');
+    }
     return;
   }
   
@@ -2231,11 +2238,20 @@ try {
   }
   
   // ⭐ НОВОЕ: проверка что время кратно 1 часу
+  // Исключение: 23:59 - специальное значение "конец дня"
   const fromMinutes = parseInt(fromTime.split(':')[0]) * 60 + parseInt(fromTime.split(':')[1])
   const toMinutes = parseInt(toTime.split(':')[0]) * 60 + parseInt(toTime.split(':')[1])
   
-  if (fromMinutes % 60 !== 0 || toMinutes % 60 !== 0) {
-    showToast('⏰ Время работы должно быть кратно 1 часу (например: 09:00, 10:00, 18:00)');
+  // Проверяем кратность, но пропускаем 23:59
+  const isFromHourly = fromMinutes % 60 === 0
+  const isToHourly = toMinutes % 60 === 0 || toTime === '23:59'
+  
+  if (!isFromHourly || !isToHourly) {
+    if (toTime !== '23:59') {
+      showToast('⏰ Время работы должно быть кратно 1 часу (например: 09:00, 10:00, 18:00)');
+    } else {
+      showToast('⏰ Время начала работы должно быть кратно 1 часу (например: 09:00, 10:00)');
+    }
     return false;
   }
   
