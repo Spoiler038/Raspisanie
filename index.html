@@ -2985,14 +2985,12 @@ async function subscribeToPushNotifications() {
     }
 
     function skipTour() {
-      _hideTour()
-      const isFirstTime = !localStorage.getItem('tour_done')
-      localStorage.setItem('tour_done', '1')
-      // После первого тура — показываем выбор режима хранения
-      if (isFirstTime) {
-        setTimeout(checkSyncMode, 300)
-      }
-    }
+    _hideTour()
+    // ⭐ КЛЮЧЕВОЙ МОМЕНТ - сохраняем флаг, что тур пройден/пропущен
+    localStorage.setItem('tour_done', '1')
+    // Затем показываем выбор режима хранения (для новых пользователей)
+    setTimeout(checkSyncMode, 300)
+}
 
     function tourNext() {
       if (_tourStep >= TOUR_STEPS.length - 1) {
@@ -3105,16 +3103,18 @@ async function subscribeToPushNotifications() {
       card.style.transform = 'translateX(-50%) translateY(-50%)'
     }
 
-    // Запуск тура при первом входе — тур идёт ДО выбора режима хранения
-    function checkFirstTimeTour() {
-      if (!localStorage.getItem('tour_done')) {
-        // Первый запуск — показываем тур, syncMode запустится после
-        setTimeout(startTour, 500)
-      } else {
-        // Тур уже был — сразу проверяем режим хранения
+  
+   // При загрузке приложения проверяем этот флаг
+function checkFirstTimeTour() {
+    const tourDone = localStorage.getItem('tour_done') === '1'
+    if (!tourDone) {
+        // Если тур НЕ пройден - показываем
+        setTimeout(startTour, 800)
+    } else {
+        // Если тур УЖЕ пройден - сразу проверяем режим синхронизации
         checkSyncMode()
-      }
     }
+}
 
     // Функция для тестирования уведомлений
     window.testNotification = function() {
