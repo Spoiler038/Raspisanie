@@ -62,6 +62,17 @@ body.light .fc-col-header-cell {
     background: #e5e7eb; 
     color: #020617; 
 }
+    /* ⭐ ДОПОЛНИТЕЛЬНО: для режима День, чтобы точно применилось */
+.fc-timeGridDay-view .fc-col-header-cell,
+.fc-timeGridWeek-view .fc-col-header-cell {
+    background: #020617 !important;
+    color: #e5e7eb !important;
+}
+body.light .fc-timeGridDay-view .fc-col-header-cell,
+body.light .fc-timeGridWeek-view .fc-col-header-cell {
+    background: #e5e7eb !important;
+    color: #020617 !important;
+}
     .fc-col-header-cell-cushion { padding: 6px 0; font-weight: 500; }
     .fc-dayGridMonth-view .fc-daygrid-day { min-height: 77px !important; height: auto !important; max-height: 168px !important; position: relative !important; background: #020617 !important; }
     body.light .fc-dayGridMonth-view .fc-daygrid-day { background: #ffffff !important; }
