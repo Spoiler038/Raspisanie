@@ -296,13 +296,13 @@ body.light .profile-email {
   <div class="wrapper">
     <header>
       <div class="header-left">
-        <button onclick="goHome()" title="Сегодня">🏠</button>
+        <button onclick="goHome()" title="Перейти на текущий день">🏠</button>
       </div>
       <div class="header-center">
         📅 Расписание на <span id="headerDate" class="opacity-70"></span>
       </div>
       <div class="header-right">
-        <button onclick="openSettings()">⚙️</button>
+        <button onclick="openSettings()" title="Открыть Настройки" >⚙️</button>
       </div>
     </header>
 
@@ -312,20 +312,20 @@ body.light .profile-email {
   <div class="bottom-bar">
     <div id="mode-month" class="mode active">
       <button onclick="prev()">←</button>
-      <span onclick="setView('month')">Месяц</span>
+      <span onclick="setView('month')" title="Просмотр на месяц" >Месяц</span>
       <button onclick="next()">→</button>
     </div>
     <div id="mode-week" class="mode">
       <button onclick="prev()">←</button>
-      <span onclick="setView('week')">Неделя</span>
+      <span onclick="setView('week')" title="Просмотр по неделям" >Неделя</span>
       <button onclick="next()">→</button>
     </div>
     <div id="mode-day" class="mode">
       <button onclick="prev()">←</button>
-      <span onclick="setView('day')">День</span>
+      <span onclick="setView('day')" title="Просмотр по дням" >День</span>
       <button onclick="next()">→</button>
     </div>
-    <div class="add-btn" onclick="openAdd()">+</div>
+    <div class="add-btn" onclick="openAdd()" title="Добавить новое занятие" >+</div>
   </div>
 
   <!-- ADD/EDIT FORM -->
@@ -415,8 +415,14 @@ body.light .profile-email {
         <div style="display: flex; gap: 6px; align-items: center;">
           <button id="tourHelpButton" onclick="startTour()" title="Обучение"
             style="background:#64748b;color:white;border:none;border-radius:8px;padding:6px 6px;font-size:15px;cursor:pointer;">❓</button>
-          <button id="autoDeleteBtn" onclick="toggleAutoDelete()" title="Автоудаление старых уроков"
-            style="background:#64748b;color: white;border:none;border-radius:8px;padding:6px 6px;font-size:15px;cursor:pointer;">🗑️</button>
+          <button id="autoDeleteBtn" onclick="toggleAutoDelete()" title="Автоудаление прошлых уроков" style="background:#64748b;color: white;border:none;border-radius:8px;padding:6px 6px;font-size:15px;cursor:pointer;">
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M3 6h18"/>
+    <path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
+    <line x1="10" y1="11" x2="10" y2="17"/>
+    <line x1="14" y1="11" x2="14" y2="17"/>
+  </svg>
+</button>
           <button id="devicesBtn" onclick="toggleDevicesView()" title="Управление устройствами уведомлений"
             style="background:#64748b;color:white;border:none;border-radius:8px;padding:6px 6px;font-size:15px;cursor:pointer;" disabled>📱</button>
           <button id="cloudActionButton" onclick="handleCloudAction()"
@@ -449,8 +455,8 @@ body.light .profile-email {
       <div style="margin-bottom: 12px;">
         <div class="text-xs mb-1">Режим работы</div>
         <div class="flex gap-2">
-          <input id="workFrom" type="time" value="09:00" style="padding: 8px; font-size: 14px;">
-          <input id="workTo" type="time" value="18:00" style="padding: 8px; font-size: 14px;">
+          <input id="workFrom" type="time" value="09:00" step="3600" style="padding: 8px; font-size: 14px;">
+          <input id="workTo" type="time" value="18:00" step="3600" style="padding: 8px; font-size: 14px;">
         </div>
       </div>
 
@@ -472,7 +478,7 @@ body.light .profile-email {
             <span>Управление профилем</span>
             <span id="profileEmail" class="profile-email"></span>
         </div>
-        <button id="deleteProfileButton" class="btn-danger" onclick="deleteProfile()" style="padding: 8px; font-size: 13px; background: #7f1d1d;">🗑️ Удалить профиль</button>
+        <button id="deleteProfileButton" class="btn-danger" onclick="deleteProfile()" style="padding: 8px; font-size: 13px; background: #7f1d1d;">   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block; vertical-align:middle;">     <path d="M3 6h18"/>     <path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/>     <line x1="10" y1="11" x2="10" y2="17"/>     <line x1="14" y1="11" x2="14" y2="17"/>   </svg>   <span style="vertical-align:middle;">Удалить профиль</span> </button>
     </div>
 
       <div>
@@ -2153,10 +2159,23 @@ try {
         return
       }
       if (workHours.from !== fromTime || workHours.to !== toTime) {
-        workHours = { from: fromTime, to: toTime }; saveSettingsToStorage()
-        calendar.setOption('slotMinTime', workHours.from); calendar.setOption('slotMaxTime', workHours.to)
-        calendar.render(); calculateScrollerHeight(); settingsChanged = true
-      }
+  // Проверяем кратность 1 часу перед сохранением
+  const fromMin = parseInt(fromTime.split(':')[0]) * 60 + parseInt(fromTime.split(':')[1]);
+  const toMin = parseInt(toTime.split(':')[0]) * 60 + parseInt(toTime.split(':')[1]);
+  
+  if (fromMin % 60 !== 0 || toMin % 60 !== 0) {
+    showToast('⏰ Время работы должно быть кратно 1 часу (например: 09:00, 10:00, 18:00)');
+    return;
+  }
+  
+  workHours = { from: fromTime, to: toTime }; 
+  saveSettingsToStorage();
+  calendar.setOption('slotMinTime', workHours.from); 
+  calendar.setOption('slotMaxTime', workHours.to);
+  calendar.render(); 
+  calculateScrollerHeight(); 
+  settingsChanged = true;
+}
       settingsSheet.classList.remove('active')
       if (settingsChanged && currentUser) {
         const token = localStorage.getItem('teacher_jwt')
@@ -2191,37 +2210,29 @@ try {
   // 00:00 трактуем как конец дня
   if (toTime === '00:00') toTime = '23:59'
   if (fromTime === '00:00') fromTime = '00:01'
-      
-      if (!fromTime || !toTime) { showToast('Введите время начала и окончания работы'); return false }
-      const fromDate = new Date(`2000-01-01T${fromTime}`)
-      const toDate = new Date(`2000-01-01T${toTime}`)
-      if (fromDate >= toDate) { showToast('Время окончания работы должно быть позже времени начала'); return false }
-      return true
-    }
-
-    const workFromEl = document.getElementById('workFrom')
-    const workToEl = document.getElementById('workTo')
-    
-    const notificationSelect = document.getElementById('notificationSelect')
-    if (notificationSelect) {
-      const savedNotification = localStorage.getItem('teacher_notification') || 'Не оповещать'
-      notificationSelect.value = savedNotification
-
-      notificationSelect.onchange = function() {
-        const value = this.value
-        localStorage.setItem('teacher_notification', value)
-        notificationHistory.clear()
-        checkAndScheduleNotifications()
-        if (value === 'Не оповещать') {
-          unsubscribeFromPushNotifications()
-          showToast('🔕 Оповещения отключены', true)
-        } else {
-          setTimeout(() => subscribeToPushNotifications(), 1000)
-          showToast(`✅ Оповещения: ${value}`, true)
-        }
-        settingsChanged = true
-      }
-    }
+  
+  if (!fromTime || !toTime) { 
+    showToast('Введите время начала и окончания работы'); 
+    return false 
+  }
+  
+  // ⭐ НОВОЕ: проверка что время кратно 1 часу
+  const fromMinutes = parseInt(fromTime.split(':')[0]) * 60 + parseInt(fromTime.split(':')[1])
+  const toMinutes = parseInt(toTime.split(':')[0]) * 60 + parseInt(toTime.split(':')[1])
+  
+  if (fromMinutes % 60 !== 0 || toMinutes % 60 !== 0) {
+    showToast('⏰ Время работы должно быть кратно 1 часу (например: 09:00, 10:00, 18:00)');
+    return false;
+  }
+  
+  const fromDate = new Date(`2000-01-01T${fromTime}`)
+  const toDate = new Date(`2000-01-01T${toTime}`)
+  if (fromDate >= toDate) { 
+    showToast('⚠️ Время окончания работы должно быть позже времени начала'); 
+    return false 
+  }
+  return true
+}
 
     function exportData() {
       const data = {
