@@ -3348,17 +3348,12 @@ try {
   
    // При загрузке приложения проверяем этот флаг
 function checkFirstTimeTour() {
-    // ⭐ Защита от двойного показа тура (SW перезагружает страницу)
-    if (sessionStorage.getItem('tour_check_done') === '1') {
-        console.log('⏭️ Тур уже проверялся в этой сессии, пропуск')
-        return
-    }
-    sessionStorage.setItem('tour_check_done', '1')
-    
     const tourDone = localStorage.getItem('tour_done') === '1'
     if (!tourDone) {
+        // Если тур НЕ пройден - показываем
         setTimeout(startTour, 800)
     } else {
+        // Если тур УЖЕ пройден - сразу проверяем режим синхронизации
         checkSyncMode()
     }
 }
