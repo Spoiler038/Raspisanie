@@ -2162,7 +2162,7 @@ function updateCopyCount() {
   
   const start = new Date()
   start.setDate(start.getDate() + 1)
-  start.setHours(0,0,0,0)
+  start.setHours(0, 0, 0, 0)
   const end = new Date(until + 'T23:59:59')
   
   let count = 0
@@ -2193,17 +2193,24 @@ async function applyCopyPeriod() {
   showSaveOverlay(true)
   
   try {
+    // ⭐ ВАЖНО: работаем только с локальными датами, без UTC
     const start = new Date()
     start.setDate(start.getDate() + 1)
-    start.setHours(0,0,0,0)
-    const end = new Date(until + 'T23:59:59')
+    start.setHours(0, 0, 0, 0)
+    
+    // ⭐ Парсим "until" как локальную дату (без Z)
+    const [untilY, untilM, untilD] = until.split('-').map(Number)
+    const end = new Date(untilY, untilM - 1, untilD, 23, 59, 59)
     
     const candidates = []
     const cur = new Date(start)
     while (cur <= end) {
       if (activeDays.includes(cur.getDay())) {
-        const dateStr = cur.toISOString().slice(0, 10)
-        candidates.push(dateStr)
+        // ⭐ Форматируем дату вручную, без toISOString()
+        const y = cur.getFullYear()
+        const m = String(cur.getMonth() + 1).padStart(2, '0')
+        const d = String(cur.getDate()).padStart(2, '0')
+        candidates.push(`${y}-${m}-${d}`)
       }
       cur.setDate(cur.getDate() + 1)
     }
@@ -2218,11 +2225,11 @@ async function applyCopyPeriod() {
     const skipped = []
     
     for (const dateStr of candidates) {
-      // Проверка на конфликт
       const newStart = new Date(`${dateStr}T${time}`)
       const newEnd = new Date(newStart.getTime() + duration * 60000)
       
       let conflict = false
+      
       // Конфликт с рабочим днём
       const workStart = new Date(`${dateStr}T${workHours.from}`)
       const workEnd = new Date(`${dateStr}T${workHours.to}`)
@@ -2286,10 +2293,10 @@ async function applyCopyPeriod() {
     // Уведомление
     if (skipped.length > 0) {
       const skippedStr = skipped.map(d => {
-        const [y,m,dd] = d.split('-')
+        const [y, m, dd] = d.split('-')
         return `${dd}.${m}`
       }).join(', ')
-      showToast(`✅ Создано: ${created.length}, ⚠️ Пропущено (конфликт): ${skipped.length} [${skippedStr}]`, true, 6000)
+      showToast(`✅ Создано: ${created.length}, ⚠️ Пропущено: ${skipped.length} [${skippedStr}]`, true, 6000)
     } else {
       showToast(`✅ Создано занятий: ${created.length}`, true)
     }
@@ -2297,7 +2304,7 @@ async function applyCopyPeriod() {
     showSaveOverlay(false)
   }
 }
-
+    
 function copyClose() {
   document.getElementById('sheet').classList.remove('active')
   window._copySource = null
