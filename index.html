@@ -212,6 +212,37 @@ body.light .fc-timeGridWeek-view .fc-col-header-cell {
     input[type="date"], input[type="time"] { min-width: 0 !important; box-sizing: border-box !important; }
     #notesInput { resize: none; overflow: hidden; min-height: 44px; }
     @keyframes spin { to { transform: rotate(360deg); } }
+    /* ===== СПИННЕР СОХРАНЕНИЯ ===== */
+.save-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.65);
+    backdrop-filter: blur(2px);
+    -webkit-backdrop-filter: blur(2px);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 9998;
+    flex-direction: column;
+    gap: 16px;
+}
+.save-overlay.active {
+    display: flex;
+}
+.save-overlay .save-spinner {
+    width: 56px;
+    height: 56px;
+    border: 5px solid rgba(37, 99, 235, 0.25);
+    border-top-color: #2563eb;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+.save-overlay .save-label {
+    color: #e5e7eb;
+    font-size: 15px;
+    font-weight: 500;
+    letter-spacing: 0.3px;
+}
 
     /* ===== АНИМАЦИЯ КНОПОК ===== */
 @keyframes button-pop {
@@ -354,6 +385,11 @@ body.light .fc-timeGridDay-view .fc-scrollgrid-sync-inner {
   <div id="tourOverlay" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:transparent; z-index:9001;"></div>
 
   <div id="toast" class="toast"></div>
+  <!-- Оверлей сохранения -->
+<div id="saveOverlay" class="save-overlay">
+  <div class="save-spinner"></div>
+  <div class="save-label">Сохранение...</div>
+</div>
 
   <div class="wrapper">
     <header>
@@ -1185,6 +1221,20 @@ async function subscribeToPushNotifications() {
       modal.style.display = 'flex'
     }
 
+    // ===== СПИННЕР СОХРАНЕНИЯ =====
+function showSaveOverlay(show) {
+  const overlay = document.getElementById('saveOverlay')
+  if (!overlay) return
+  if (show) {
+    overlay.classList.add('active')
+    document.body.style.pointerEvents = 'none'
+    overlay.style.pointerEvents = 'auto'
+  } else {
+    overlay.classList.remove('active')
+    document.body.style.pointerEvents = ''
+  }
+}
+
     // ===== УПРАВЛЕНИЕ РЕЖИМАМИ ХРАНЕНИЯ =====
     function checkSyncMode() {
       const mode = localStorage.getItem(STORAGE_KEYS.SYNC_MODE)
@@ -1313,11 +1363,36 @@ async function subscribeToPushNotifications() {
     }
 
     function showAuthModal() {
-      document.getElementById('authModal').style.display = 'flex'
-      document.getElementById('authEmail').value = ''
-      document.getElementById('authPassword').value = ''
-      document.getElementById('authMessage').textContent = ''
+  document.getElementById('authModal').style.display = 'flex'
+  document.getElementById('authEmail').value = ''
+  document.getElementById('authPassword').value = ''
+  document.getElementById('authMessage').textContent = ''
+  
+  // ⭐ Фокус на email + Enter для отправки
+  setTimeout(() => {
+    const emailInput = document.getElementById('authEmail')
+    const passwordInput = document.getElementById('authPassword')
+    if (emailInput) {
+      emailInput.focus()
+      
+      // Enter на email → переход на пароль
+      emailInput.onkeydown = function(e) {
+        if (e.key === 'Enter') {
+          e.preventDefault()
+          passwordInput.focus()
+        }
+      }
+      
+      // Enter на пароле → вход
+      passwordInput.onkeydown = function(e) {
+        if (e.key === 'Enter') {
+          e.preventDefault()
+          handleLogin()
+        }
+      }
     }
+  }, 100)
+}
 
     function closeAuthModal() {
       document.getElementById('authModal').style.display = 'none'
@@ -1846,30 +1921,35 @@ async function subscribeToPushNotifications() {
 }
 
     function openEditForm(lesson) {
-      editingLessonId = lesson.id
-      document.getElementById('formTitle').textContent = 'Редактировать занятие'
-      document.getElementById('deleteSection').style.display = 'block'
-      document.getElementById('copyLessonBtn').style.display = 'block'
-      const dateInput = document.getElementById('dateInput')
-      const timeInput = document.getElementById('timeInput')
-      const studentInput = document.getElementById('studentInput')
-      const durationInput = document.getElementById('durationInput')
-      const notesInput = document.getElementById('notesInput')
-      const sheet = document.getElementById('sheet')
-      if (dateInput && timeInput && sheet) {
-        dateInput.value = lesson.date
-        timeInput.value = lesson.time
-        studentInput.value = lesson.student
-        durationInput.value = lesson.duration
-        notesInput.value = lesson.notes || ''
-        setTimeout(autoResizeNotes, 0)
-        // Показываем вкладки и заполняем "Другие"
-        document.getElementById('editTabsBar').style.display = 'flex'
-        switchEditTab(1)
-        fillOtherLessons(lesson)
-        sheet.classList.add('active')
-      }
-    }
+  editingLessonId = lesson.id
+  document.getElementById('formTitle').textContent = 'Редактировать занятие'
+  document.getElementById('deleteSection').style.display = 'block'
+  document.getElementById('copyLessonBtn').style.display = 'block'
+  const dateInput = document.getElementById('dateInput')
+  const timeInput = document.getElementById('timeInput')
+  const studentInput = document.getElementById('studentInput')
+  const durationInput = document.getElementById('durationInput')
+  const notesInput = document.getElementById('notesInput')
+  const sheet = document.getElementById('sheet')
+  if (dateInput && timeInput && sheet) {
+    dateInput.value = lesson.date
+    timeInput.value = lesson.time
+    studentInput.value = lesson.student
+    durationInput.value = lesson.duration
+    notesInput.value = lesson.notes || ''
+    setTimeout(autoResizeNotes, 0)
+    document.getElementById('editTabsBar').style.display = 'flex'
+    switchEditTab(1)
+    fillOtherLessons(lesson)
+    sheet.classList.add('active')
+    
+    // ⭐ Фокус на имя ученика для редактирования
+    setTimeout(() => {
+      studentInput.focus()
+      studentInput.select()
+    }, 350)
+  }
+}
 
     function openAdd() {
       editingLessonId = null
@@ -1985,52 +2065,66 @@ async function subscribeToPushNotifications() {
   const studentInput = document.getElementById('studentInput')
   const durationInput = document.getElementById('durationInput')
   const notesInput = document.getElementById('notesInput')
+  
   if (!dateInput.value || !timeInput.value || !studentInput.value.trim()) {
     showToast('Пожалуйста, заполните все обязательные поля'); return
   }
   const duration = parseInt(durationInput.value)
   if (isNaN(duration) || duration < 30) { showToast('Длительность должна быть не менее 30 минут'); return }
+  
   const lesson = {
     id: editingLessonId || generateId(),
     date: dateInput.value, time: timeInput.value,
     student: studentInput.value.trim(), duration: duration,
     notes: notesInput.value.trim()
   }
+  
   const conflict = hasLessonConflict(lesson, !!editingLessonId)
   if (conflict.conflict) { showToast(conflict.message, false); return }
-  if (editingLessonId) {
-    const index = lessons.findIndex(l => l.id === editingLessonId)
-    if (index !== -1) lessons[index] = lesson
-  } else { lessons.push(lesson) }
-  saveLessonsToStorage()
-  if (currentUser) {
-    const token = localStorage.getItem('teacher_jwt')
-    try {
-      const lessonForCloud = {
-        lesson_id: lesson.id,
-        student: lesson.student,
-        date: lesson.date,
-        time: timeToExcelTime(lesson.time),
-        duration: lesson.duration,
-        notes: lesson.notes || ''
+  
+  // ⭐ Показываем спиннер и блокируем экран
+  showSaveOverlay(true)
+  
+  try {
+    if (editingLessonId) {
+      const index = lessons.findIndex(l => l.id === editingLessonId)
+      if (index !== -1) lessons[index] = lesson
+    } else { lessons.push(lesson) }
+    saveLessonsToStorage()
+    
+    if (currentUser) {
+      const token = localStorage.getItem('teacher_jwt')
+      try {
+        const lessonForCloud = {
+          lesson_id: lesson.id,
+          student: lesson.student,
+          date: lesson.date,
+          time: timeToExcelTime(lesson.time),
+          duration: lesson.duration,
+          notes: lesson.notes || ''
+        }
+        const { error } = await gasCall({ action: 'save_lesson', token, lesson: lessonForCloud, is_update: !!editingLessonId })
+        if (error) throw error
+        showToast('✅ Данные синхронизированы с облаком', true)
+      } catch (error) {
+        if (error.message && error.message.includes('Failed to fetch')) {
+          showToast('⚠️ Урок сохранен локально. Будет синхронизирован при подключении', false)
+        } else {
+          showToast('❌ Ошибка синхронизации: ' + error.message, false)
+        }
+        pendingChanges.push({ action: editingLessonId ? 'update' : 'insert', lesson, timestamp: new Date().toISOString() })
+        localStorage.setItem(STORAGE_KEYS.PENDING_CHANGES, JSON.stringify(pendingChanges))
       }
-      const { error } = await gasCall({ action: 'save_lesson', token, lesson: lessonForCloud, is_update: !!editingLessonId })
-      if (error) throw error
-      showToast('✅ Данные синхронизированы с облаком', true)
-    } catch (error) {
-      if (error.message && error.message.includes('Failed to fetch')) {
-        showToast('⚠️ Урок сохранен локально. Будет синхронизирован при подключении', false)
-      } else {
-        showToast('❌ Ошибка синхронизации: ' + error.message, false)
-      }
-      pendingChanges.push({ action: editingLessonId ? 'update' : 'insert', lesson, timestamp: new Date().toISOString() })
-      localStorage.setItem(STORAGE_KEYS.PENDING_CHANGES, JSON.stringify(pendingChanges))
     }
+    
+    calendar.refetchEvents(); calculateScrollerHeight()
+    document.getElementById('sheet').classList.remove('active')
+    editingLessonId = null
+    showToast('Занятие сохранено', true)
+  } finally {
+    // ⭐ Всегда скрываем спиннер
+    showSaveOverlay(false)
   }
-  calendar.refetchEvents(); calculateScrollerHeight()
-  document.getElementById('sheet').classList.remove('active')
-  editingLessonId = null
-  showToast('Занятие сохранено', true)
 }
 
     async function deleteLesson() {
