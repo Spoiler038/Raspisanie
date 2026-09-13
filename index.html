@@ -113,9 +113,20 @@ body.light .fc-timeGridWeek-view .fc-col-header-cell {
     /* FIX iPhone: нижняя панель выше + safe area */
     .wrapper { max-width: 420px; margin: 0 auto; height: 100vh; display: flex; flex-direction: column; padding-bottom: 64px; box-sizing: border-box; overflow: hidden; }
     header { padding: 12px; display: flex; align-items: center; flex-shrink: 0; }
-    .header-center { flex: 1; text-align: center; font-weight: 600; }
-    .header-right { width: 32px; text-align: right }
-    .header-left { width: 32px; text-align: left }
+.header-center { flex: 1; text-align: center; font-weight: 600; display: flex; align-items: center; justify-content: center; }
+.header-right { width: 32px; text-align: right }
+.header-left { width: 32px; text-align: left }
+header button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  padding: 4px;
+  background: transparent;
+  border: none;
+  font-size: 20px;
+  cursor: pointer;
+}
     /* FIX: увеличена высота панели, кнопки подняты через padding-bottom */
     .bottom-bar { position: fixed; bottom: 0; left: 0; right: 0; background: #020617; border-top: 1px solid #1e293b; padding: 8px 8px 16px 8px; display: flex; justify-content: space-around; align-items: center; z-index: 100; height: 64px; box-sizing: border-box; width: 100%; padding-bottom: max(16px, env(safe-area-inset-bottom)); }
     body.light .bottom-bar { background: #e5e7eb }
@@ -397,8 +408,10 @@ body.light .fc-timeGridDay-view .fc-scrollgrid-sync-inner {
         <button onclick="goHome()" title="Перейти на текущий день">🏠</button>
       </div>
       <div class="header-center">
-        📅 Расписание на <span id="headerDate" class="opacity-70"></span>
-      </div>
+  <span style="display:inline-flex; align-items:center; gap:4px; line-height:1;">
+    📅 Расписание на <span id="headerDate" class="opacity-70"></span>
+  </span>
+</div>
       <div class="header-right">
         <button onclick="openSettings()" title="Открыть Настройки" >⚙️</button>
       </div>
@@ -427,14 +440,19 @@ body.light .fc-timeGridDay-view .fc-scrollgrid-sync-inner {
   </div>
 
   <!-- ADD/EDIT FORM -->
-  <div id="sheet" class="sheet" onclick="if(event.target.id==='sheet')sheet.classList.remove('active')">
+  <div id="sheet" class="sheet" onclick="if(event.target.id==='sheet')closeSheet()">
     <div class="sheet-content space-y-3">
 
       <!-- Вкладки — показываются только при редактировании -->
       <div id="editTabsBar" class="edit-tabs" style="display:none;">
-        <button class="edit-tab-btn active" id="editTab1Btn" onclick="switchEditTab(1)">Выбранное занятие</button>
-        <button class="edit-tab-btn" id="editTab2Btn" onclick="switchEditTab(2)">Другие</button>
-      </div>
+  <button class="edit-tab-btn active" id="editTab1Btn" onclick="switchEditTab(1)">Выбранное занятие</button>
+  <button class="edit-tab-btn" id="editTab2Btn" onclick="switchEditTab(2)">Другие</button>
+</div>
+
+<div id="createTabsBar" class="edit-tabs" style="display:none;">
+  <button class="edit-tab-btn active" id="createTab1Btn" onclick="switchCreateTab(1)">Новое занятие</button>
+  <button class="edit-tab-btn" id="createTab2Btn" onclick="switchCreateTab(2)">Новые занятия</button>
+</div>
 
       <!-- ПАНЕЛЬ 1: поля занятия (всегда видна при новом, скрывается только при переключении) -->
       <div id="editPanel1">
@@ -474,7 +492,55 @@ body.light .fc-timeGridDay-view .fc-scrollgrid-sync-inner {
           <button class="btn-primary" style="flex:1; padding:10px; font-size:13px;" onclick="applyNewTime()">Применить</button>
         </div>
       </div>
+      <!-- ПАНЕЛЬ 3: Новые занятия (массовое создание) -->
+<div id="copyPanel" style="display:none;">
+  <div style="margin-bottom:12px;">
+    <div class="text-xs mb-1">Дата до которой проставить занятия</div>
+    <input type="date" id="copyUntilDate">
+  </div>
 
+  <div style="margin-bottom:12px;">
+    <div class="text-xs mb-1" style="display:flex; align-items:center; justify-content:space-between;">
+      <span>Дни недели</span>
+      <label style="display:flex; align-items:center; gap:6px; font-size:13px; color:#94a3b8; cursor:pointer;">
+        Все
+        <input type="checkbox" id="copySelectAll" style="width:18px; height:18px; accent-color:#2563eb; cursor:pointer;">
+      </label>
+    </div>
+    <div style="display:flex; flex-wrap:wrap; gap:8px; margin-top:8px;">
+      <label style="display:flex; align-items:center; gap:4px; cursor:pointer; font-size:14px;">
+        <input type="checkbox" class="copy-weekday-cb" value="1" style="width:18px; height:18px; accent-color:#2563eb;"> Пн
+      </label>
+      <label style="display:flex; align-items:center; gap:4px; cursor:pointer; font-size:14px;">
+        <input type="checkbox" class="copy-weekday-cb" value="2" style="width:18px; height:18px; accent-color:#2563eb;"> Вт
+      </label>
+      <label style="display:flex; align-items:center; gap:4px; cursor:pointer; font-size:14px;">
+        <input type="checkbox" class="copy-weekday-cb" value="3" style="width:18px; height:18px; accent-color:#2563eb;"> Ср
+      </label>
+      <label style="display:flex; align-items:center; gap:4px; cursor:pointer; font-size:14px;">
+        <input type="checkbox" class="copy-weekday-cb" value="4" style="width:18px; height:18px; accent-color:#2563eb;"> Чт
+      </label>
+      <label style="display:flex; align-items:center; gap:4px; cursor:pointer; font-size:14px;">
+        <input type="checkbox" class="copy-weekday-cb" value="5" style="width:18px; height:18px; accent-color:#2563eb;"> Пт
+      </label>
+      <label style="display:flex; align-items:center; gap:4px; cursor:pointer; font-size:14px;">
+        <input type="checkbox" class="copy-weekday-cb" value="6" style="width:18px; height:18px; accent-color:#2563eb;"> Сб
+      </label>
+      <label style="display:flex; align-items:center; gap:4px; cursor:pointer; font-size:14px;">
+        <input type="checkbox" class="copy-weekday-cb" value="0" style="width:18px; height:18px; accent-color:#2563eb;"> Вс
+      </label>
+    </div>
+  </div>
+
+  <div style="margin-bottom:12px; font-size:13px; color:#94a3b8;">
+    Будет создано: <span id="copyCount" style="font-weight:600; color:#2563eb;">0</span> занятий
+  </div>
+
+  <div class="others-actions">
+    <button class="btn-secondary" style="flex:1; padding:10px; font-size:13px;" onclick="copyClose()">Отмена</button>
+    <button class="btn-primary" style="flex:1; padding:10px; font-size:13px;" onclick="applyCopyPeriod()">Применить</button>
+  </div>
+</div>
     </div>
   </div>
 
@@ -1893,38 +1959,45 @@ function showSaveOverlay(show) {
     }
 
         function openFormWithDate(date) {
-      editingLessonId = null
-      document.getElementById('formTitle').textContent = 'Новое занятие'
-      document.getElementById('deleteSection').style.display = 'none'
-      document.getElementById('editTabsBar').style.display = 'none'
-      document.getElementById('editPanel1').style.display = 'block'
-      document.getElementById('editPanel2').style.display = 'none'
-      const dateInput = document.getElementById('dateInput')
-      const timeInput = document.getElementById('timeInput')
-      const studentInput = document.getElementById('studentInput')
-      const durationInput = document.getElementById('durationInput')
-      const notesInput = document.getElementById('notesInput')
-      const sheet = document.getElementById('sheet')
-      if (dateInput && timeInput && sheet) {
-        dateInput.value = date.toISOString().slice(0, 10)
-        timeInput.value = date.toTimeString().slice(0, 5)
-        studentInput.value = ''
-        durationInput.value = '60'
-        notesInput.value = ''
-        setTimeout(autoResizeNotes, 0)
-        sheet.classList.add('active')
-     setTimeout(() => {
-            studentInput.focus();
-            studentInput.select(); // выделяет текст для быстрого ввода
-        }, 350);
-    }
+  editingLessonId = null
+  document.getElementById('formTitle').textContent = 'Новое занятие'
+  document.getElementById('deleteSection').style.display = 'none'
+  document.getElementById('copyLessonBtn').style.display = 'none'
+  document.getElementById('editTabsBar').style.display = 'none'
+  document.getElementById('createTabsBar').style.display = 'flex'
+  document.getElementById('editPanel1').style.display = 'block'
+  document.getElementById('editPanel2').style.display = 'none'
+  document.getElementById('copyPanel').style.display = 'none'
+  switchCreateTab(1)
+  
+  const dateInput = document.getElementById('dateInput')
+  const timeInput = document.getElementById('timeInput')
+  const studentInput = document.getElementById('studentInput')
+  const durationInput = document.getElementById('durationInput')
+  const notesInput = document.getElementById('notesInput')
+  const sheet = document.getElementById('sheet')
+  if (dateInput && timeInput && sheet) {
+    dateInput.value = date.toISOString().slice(0, 10)
+    timeInput.value = date.toTimeString().slice(0, 5)
+    studentInput.value = ''
+    durationInput.value = '60'
+    notesInput.value = ''
+    setTimeout(autoResizeNotes, 0)
+    sheet.classList.add('active')
+    setTimeout(() => {
+      studentInput.focus()
+      studentInput.select()
+    }, 350)
+  }
 }
-
     function openEditForm(lesson) {
   editingLessonId = lesson.id
   document.getElementById('formTitle').textContent = 'Редактировать занятие'
   document.getElementById('deleteSection').style.display = 'block'
   document.getElementById('copyLessonBtn').style.display = 'block'
+  document.getElementById('editTabsBar').style.display = 'flex'
+  document.getElementById('createTabsBar').style.display = 'none'
+  document.getElementById('copyPanel').style.display = 'none'
   const dateInput = document.getElementById('dateInput')
   const timeInput = document.getElementById('timeInput')
   const studentInput = document.getElementById('studentInput')
@@ -1938,12 +2011,42 @@ function showSaveOverlay(show) {
     durationInput.value = lesson.duration
     notesInput.value = lesson.notes || ''
     setTimeout(autoResizeNotes, 0)
-    document.getElementById('editTabsBar').style.display = 'flex'
     switchEditTab(1)
     fillOtherLessons(lesson)
     sheet.classList.add('active')
+    // ⭐ Без фокуса
+  }
+}
+
+    function openAdd() {
+  editingLessonId = null
+  document.getElementById('formTitle').textContent = 'Новое занятие'
+  document.getElementById('deleteSection').style.display = 'none'
+  document.getElementById('copyLessonBtn').style.display = 'none'
+  document.getElementById('editTabsBar').style.display = 'none'
+  document.getElementById('createTabsBar').style.display = 'flex'
+  document.getElementById('editPanel1').style.display = 'block'
+  document.getElementById('editPanel2').style.display = 'none'
+  document.getElementById('copyPanel').style.display = 'none'
+  switchCreateTab(1)
+  
+  const now = new Date()
+  const dateInput = document.getElementById('dateInput')
+  const timeInput = document.getElementById('timeInput')
+  const studentInput = document.getElementById('studentInput')
+  const durationInput = document.getElementById('durationInput')
+  const notesInput = document.getElementById('notesInput')
+  const sheet = document.getElementById('sheet')
+  if (dateInput && timeInput && sheet) {
+    dateInput.value = now.toISOString().slice(0, 10)
+    timeInput.value = getCurrentTime()
+    studentInput.value = ''
+    durationInput.value = '60'
+    notesInput.value = ''
+    setTimeout(autoResizeNotes, 0)
+    sheet.classList.add('active')
     
-    // ⭐ Фокус на имя ученика для редактирования
+    // ⭐ Фокус на имя ученика
     setTimeout(() => {
       studentInput.focus()
       studentInput.select()
@@ -1951,72 +2054,269 @@ function showSaveOverlay(show) {
   }
 }
 
-    function openAdd() {
-      editingLessonId = null
-      document.getElementById('formTitle').textContent = 'Новое занятие'
-      document.getElementById('deleteSection').style.display = 'none'
-      document.getElementById('copyLessonBtn').style.display = 'none'
-      document.getElementById('editTabsBar').style.display = 'none'
-      document.getElementById('editPanel1').style.display = 'block'
-      document.getElementById('editPanel2').style.display = 'none'
-      const now = new Date()
-      const dateInput = document.getElementById('dateInput')
-      const timeInput = document.getElementById('timeInput')
-      const studentInput = document.getElementById('studentInput')
-      const durationInput = document.getElementById('durationInput')
-      const notesInput = document.getElementById('notesInput')
-      const sheet = document.getElementById('sheet')
-      if (dateInput && timeInput && sheet) {
-        dateInput.value = now.toISOString().slice(0, 10)
-        timeInput.value = getCurrentTime()
-        studentInput.value = ''
-        durationInput.value = '60'
-        notesInput.value = ''
-        setTimeout(autoResizeNotes, 0)
-        sheet.classList.add('active')
-      }
-    }
-
     function cancelForm() { const sheet = document.getElementById('sheet'); if (sheet) sheet.classList.remove('active') }
 
     function copyLesson() {
-      const studentInput = document.getElementById('studentInput')
-      const timeInput = document.getElementById('timeInput')
-      const durationInput = document.getElementById('durationInput')
-      const notesInput = document.getElementById('notesInput')
-      const dateInput = document.getElementById('dateInput')
+  const studentInput = document.getElementById('studentInput')
+  const timeInput = document.getElementById('timeInput')
+  const durationInput = document.getElementById('durationInput')
+  const notesInput = document.getElementById('notesInput')
+  const dateInput = document.getElementById('dateInput')
+  
+  // Сохраняем исходные данные
+  window._copySource = {
+    student: studentInput ? studentInput.value : '',
+    time: timeInput ? timeInput.value : '',
+    duration: durationInput ? durationInput.value : '60',
+    notes: notesInput ? notesInput.value : '',
+    date: dateInput ? dateInput.value : ''
+  }
+  
+  // Переключаемся на "создание"
+  editingLessonId = null
+  document.getElementById('formTitle').textContent = 'Создание занятия'
+  document.getElementById('deleteSection').style.display = 'none'
+  document.getElementById('copyLessonBtn').style.display = 'none'
+  document.getElementById('editTabsBar').style.display = 'none'
+  document.getElementById('createTabsBar').style.display = 'flex'
+  document.getElementById('editPanel2').style.display = 'none'
+  document.getElementById('copyPanel').style.display = 'none'
+  document.getElementById('editPanel1').style.display = 'block'
+  
+  // Заполняем форму скопированными данными
+  if (studentInput) studentInput.value = window._copySource.student
+  if (timeInput) timeInput.value = window._copySource.time
+  if (durationInput) durationInput.value = window._copySource.duration
+  if (notesInput) { notesInput.value = window._copySource.notes; setTimeout(autoResizeNotes, 0) }
+  
+  // Подсвечиваем дату
+  if (dateInput) {
+    dateInput.style.outline = '2px solid #2563eb'
+    dateInput.style.outlineOffset = '2px'
+    setTimeout(() => { dateInput.style.outline = ''; dateInput.style.outlineOffset = '' }, 3000)
+  }
+  
+  switchCreateTab(1)
+  showToast('📋 Урок скопирован — выберите дату', true)
+}
 
-      // Сохраняем данные текущего урока
-      const copiedStudent = studentInput ? studentInput.value : ''
-      const copiedTime = timeInput ? timeInput.value : ''
-      const copiedDuration = durationInput ? durationInput.value : '60'
-      const copiedNotes = notesInput ? notesInput.value : ''
+// ===== ВКЛАДКИ СОЗДАНИЯ =====
+function switchCreateTab(n) {
+  document.getElementById('createTab1Btn').classList.toggle('active', n === 1)
+  document.getElementById('createTab2Btn').classList.toggle('active', n === 2)
+  document.getElementById('editPanel1').style.display = n === 1 ? 'block' : 'none'
+  document.getElementById('copyPanel').style.display = n === 2 ? 'block' : 'none'
+  
+  if (n === 2) {
+    initCopyPeriodPanel()
+  }
+}
 
-      // Открываем форму создания нового урока
-      editingLessonId = null
-      document.getElementById('formTitle').textContent = 'Новое занятие'
-      document.getElementById('deleteSection').style.display = 'none'
-      document.getElementById('copyLessonBtn').style.display = 'none'
-      document.getElementById('editTabsBar').style.display = 'none'
-      document.getElementById('editPanel1').style.display = 'block'
-      document.getElementById('editPanel2').style.display = 'none'
-
-      // Заполняем поля — дата остаётся прежней, выделяем её
-      if (studentInput) studentInput.value = copiedStudent
-      if (timeInput) timeInput.value = copiedTime
-      if (durationInput) durationInput.value = copiedDuration
-      if (notesInput) { notesInput.value = copiedNotes; setTimeout(autoResizeNotes, 0) }
-
-      // Выделяем поле даты чтобы пользователь сразу видел что нужно выбрать
-      if (dateInput) {
-        dateInput.style.outline = '2px solid #2563eb'
-        dateInput.style.outlineOffset = '2px'
-        setTimeout(() => { dateInput.style.outline = ''; dateInput.style.outlineOffset = '' }, 3000)
-      }
-
-      showToast('📋 Урок скопирован — выберите дату', true)
+function initCopyPeriodPanel() {
+  const untilDate = document.getElementById('copyUntilDate')
+  if (!untilDate.value) {
+    const d = new Date()
+    d.setDate(d.getDate() + 30)
+    untilDate.value = d.toISOString().slice(0, 10)
+  }
+  
+  // Отмечаем день недели исходного урока (если он есть)
+  const srcDate = window._copySource?.date || document.getElementById('dateInput').value
+  if (srcDate) {
+    const dow = new Date(srcDate + 'T12:00:00').getDay()
+    document.querySelectorAll('.copy-weekday-cb').forEach(cb => {
+      cb.checked = (parseInt(cb.value) === dow)
+    })
+  }
+  
+  untilDate.onchange = updateCopyCount
+  document.querySelectorAll('.copy-weekday-cb').forEach(cb => {
+    cb.onchange = function() {
+      // Синхронизируем "Все"
+      const all = document.querySelectorAll('.copy-weekday-cb')
+      const checked = document.querySelectorAll('.copy-weekday-cb:checked')
+      const selectAll = document.getElementById('copySelectAll')
+      if (selectAll) selectAll.checked = (all.length === checked.length)
+      updateCopyCount()
     }
+  })
+  
+  const selectAll = document.getElementById('copySelectAll')
+  if (selectAll) {
+    selectAll.onchange = function() {
+      document.querySelectorAll('.copy-weekday-cb').forEach(cb => cb.checked = this.checked)
+      updateCopyCount()
+    }
+  }
+  
+  updateCopyCount()
+}
 
+function updateCopyCount() {
+  const until = document.getElementById('copyUntilDate').value
+  const countEl = document.getElementById('copyCount')
+  if (!until) { countEl.textContent = '0'; return }
+  
+  const activeDays = Array.from(document.querySelectorAll('.copy-weekday-cb:checked')).map(cb => parseInt(cb.value))
+  if (activeDays.length === 0) { countEl.textContent = '0'; return }
+  
+  const start = new Date()
+  start.setDate(start.getDate() + 1)
+  start.setHours(0,0,0,0)
+  const end = new Date(until + 'T23:59:59')
+  
+  let count = 0
+  const cur = new Date(start)
+  while (cur <= end) {
+    if (activeDays.includes(cur.getDay())) count++
+    cur.setDate(cur.getDate() + 1)
+  }
+  countEl.textContent = count
+}
+
+async function applyCopyPeriod() {
+  const until = document.getElementById('copyUntilDate').value
+  if (!until) { showToast('Укажите дату окончания', false); return }
+  
+  const activeDays = Array.from(document.querySelectorAll('.copy-weekday-cb:checked')).map(cb => parseInt(cb.value))
+  if (activeDays.length === 0) { showToast('Выберите хотя бы один день недели', false); return }
+  
+  // Берём данные из формы
+  const student = document.getElementById('studentInput').value.trim()
+  const time = document.getElementById('timeInput').value
+  const duration = parseInt(document.getElementById('durationInput').value) || 60
+  const notes = document.getElementById('notesInput').value.trim()
+  
+  if (!student) { showToast('Введите имя ученика', false); return }
+  if (!time) { showToast('Укажите время', false); return }
+  
+  showSaveOverlay(true)
+  
+  try {
+    const start = new Date()
+    start.setDate(start.getDate() + 1)
+    start.setHours(0,0,0,0)
+    const end = new Date(until + 'T23:59:59')
+    
+    const candidates = []
+    const cur = new Date(start)
+    while (cur <= end) {
+      if (activeDays.includes(cur.getDay())) {
+        const dateStr = cur.toISOString().slice(0, 10)
+        candidates.push(dateStr)
+      }
+      cur.setDate(cur.getDate() + 1)
+    }
+    
+    if (candidates.length === 0) {
+      showToast('❌ Нет дат для создания', false)
+      return
+    }
+    
+    // Проверяем конфликты
+    const created = []
+    const skipped = []
+    
+    for (const dateStr of candidates) {
+      // Проверка на конфликт
+      const newStart = new Date(`${dateStr}T${time}`)
+      const newEnd = new Date(newStart.getTime() + duration * 60000)
+      
+      let conflict = false
+      // Конфликт с рабочим днём
+      const workStart = new Date(`${dateStr}T${workHours.from}`)
+      const workEnd = new Date(`${dateStr}T${workHours.to}`)
+      if (newStart < workStart || newEnd > workEnd) conflict = true
+      
+      // Конфликт с существующими
+      if (!conflict) {
+        for (const l of lessons) {
+          if (l.date !== dateStr) continue
+          const lStart = new Date(`${l.date}T${l.time}`)
+          const lEnd = new Date(lStart.getTime() + l.duration * 60000)
+          if (newStart < lEnd && newEnd > lStart) { conflict = true; break }
+        }
+      }
+      
+      if (conflict) {
+        skipped.push(dateStr)
+      } else {
+        created.push({
+          id: generateId(),
+          date: dateStr,
+          time: time,
+          student: student,
+          duration: duration,
+          notes: notes
+        })
+      }
+    }
+    
+    if (created.length === 0) {
+      showToast(`⚠️ Все ${skipped.length} дат конфликтуют — ничего не создано`, false)
+      return
+    }
+    
+    // Добавляем локально
+    lessons.push(...created)
+    saveLessonsToStorage()
+    
+    // Синхронизация
+    if (currentUser) {
+      const token = localStorage.getItem('teacher_jwt')
+      for (const lesson of created) {
+        try {
+          await gasCall({ action: 'save_lesson', token, lesson: {
+            lesson_id: lesson.id,
+            student: lesson.student,
+            date: lesson.date,
+            time: timeToExcelTime(lesson.time),
+            duration: lesson.duration,
+            notes: lesson.notes || ''
+          }})
+        } catch(e) { console.error('Ошибка синхронизации:', e) }
+      }
+    }
+    
+    calendar.refetchEvents()
+    calculateScrollerHeight()
+    document.getElementById('sheet').classList.remove('active')
+    window._copySource = null
+    
+    // Уведомление
+    if (skipped.length > 0) {
+      const skippedStr = skipped.map(d => {
+        const [y,m,dd] = d.split('-')
+        return `${dd}.${m}`
+      }).join(', ')
+      showToast(`✅ Создано: ${created.length}, ⚠️ Пропущено (конфликт): ${skipped.length} [${skippedStr}]`, true, 6000)
+    } else {
+      showToast(`✅ Создано занятий: ${created.length}`, true)
+    }
+  } finally {
+    showSaveOverlay(false)
+  }
+}
+
+function copyClose() {
+  document.getElementById('sheet').classList.remove('active')
+  window._copySource = null
+  document.getElementById('createTabsBar').style.display = 'none'
+  document.getElementById('copyPanel').style.display = 'none'
+  document.getElementById('editPanel1').style.display = 'block'
+}
+
+function closeSheet() {
+  document.getElementById('sheet').classList.remove('active')
+  window._copySource = null
+  // Возвращаем дефолтные вкладки
+  document.getElementById('createTabsBar').style.display = 'none'
+  document.getElementById('copyPanel').style.display = 'none'
+  document.getElementById('editTabsBar').style.display = 'none'
+  document.getElementById('editPanel1').style.display = 'block'
+  document.getElementById('editPanel2').style.display = 'none'
+}
+    
     function autoResizeNotes() {
       const el = document.getElementById('notesInput')
       if (!el) return
@@ -2961,11 +3261,15 @@ try {
 
     // ===== ВКЛАДКИ И ГРУППОВЫЕ ДЕЙСТВИЯ =====
     function switchEditTab(n) {
-      document.getElementById('editTab1Btn').classList.toggle('active', n === 1)
-      document.getElementById('editTab2Btn').classList.toggle('active', n === 2)
-      document.getElementById('editPanel1').style.display = n === 1 ? 'block' : 'none'
-      document.getElementById('editPanel2').style.display = n === 2 ? 'block' : 'none'
-    }
+  document.getElementById('editTab1Btn').classList.toggle('active', n === 1)
+  document.getElementById('editTab2Btn').classList.toggle('active', n === 2)
+  document.getElementById('editPanel1').style.display = n === 1 ? 'block' : 'none'
+  document.getElementById('editPanel2').style.display = n === 2 ? 'block' : 'none'
+  // Скрываем панель создания
+  document.getElementById('copyPanel').style.display = 'none'
+  document.getElementById('createTabsBar').style.display = 'none'
+  document.getElementById('editTabsBar').style.display = 'flex'
+}
 
     function fillOtherLessons(currentLesson) {
   const list = document.getElementById('otherLessonsList')
