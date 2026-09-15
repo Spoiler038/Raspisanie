@@ -2160,10 +2160,22 @@ function updateCopyCount() {
   const activeDays = Array.from(document.querySelectorAll('.copy-weekday-cb:checked')).map(cb => parseInt(cb.value))
   if (activeDays.length === 0) { countEl.textContent = '0'; return }
   
-  const start = new Date()
+  // ⭐ Берём исходную дату занятия
+  const sourceDateStr = (window._copySource && window._copySource.date) 
+    ? window._copySource.date 
+    : document.getElementById('dateInput').value
+  
+  if (!sourceDateStr) { countEl.textContent = '0'; return }
+  
+  const [srcY, srcM, srcD] = sourceDateStr.split('-').map(Number)
+  const start = new Date(srcY, srcM - 1, srcD)
   start.setDate(start.getDate() + 1)
   start.setHours(0, 0, 0, 0)
-  const end = new Date(until + 'T23:59:59')
+  
+  const [untilY, untilM, untilD] = until.split('-').map(Number)
+  const end = new Date(untilY, untilM - 1, untilD, 23, 59, 59)
+  
+  if (start > end) { countEl.textContent = '0'; return }
   
   let count = 0
   const cur = new Date(start)
@@ -2173,6 +2185,7 @@ function updateCopyCount() {
   }
   countEl.textContent = count
 }
+
 
 async function applyCopyPeriod() {
   const until = document.getElementById('copyUntilDate').value
@@ -2190,23 +2203,37 @@ async function applyCopyPeriod() {
   if (!student) { showToast('Введите имя ученика', false); return }
   if (!time) { showToast('Укажите время', false); return }
   
+  // ⭐ Берём дату исходного занятия как старт
+  // Если это копирование существующего — используем _copySource.date
+  // Если новое создание — используем dateInput
+  const sourceDateStr = (window._copySource && window._copySource.date) 
+    ? window._copySource.date 
+    : document.getElementById('dateInput').value
+  
+  if (!sourceDateStr) { showToast('Не указана исходная дата', false); return }
+  
   showSaveOverlay(true)
   
   try {
-    // ⭐ ВАЖНО: работаем только с локальными датами, без UTC
-    const start = new Date()
+    // ⭐ Старт — со следующего дня после исходного занятия
+    const [srcY, srcM, srcD] = sourceDateStr.split('-').map(Number)
+    const start = new Date(srcY, srcM - 1, srcD)
     start.setDate(start.getDate() + 1)
     start.setHours(0, 0, 0, 0)
     
-    // ⭐ Парсим "until" как локальную дату (без Z)
+    // ⭐ Конец — указанная дата "до"
     const [untilY, untilM, untilD] = until.split('-').map(Number)
     const end = new Date(untilY, untilM - 1, untilD, 23, 59, 59)
+    
+    if (start > end) {
+      showToast('❌ Дата «до» раньше исходного занятия', false)
+      return
+    }
     
     const candidates = []
     const cur = new Date(start)
     while (cur <= end) {
       if (activeDays.includes(cur.getDay())) {
-        // ⭐ Форматируем дату вручную, без toISOString()
         const y = cur.getFullYear()
         const m = String(cur.getMonth() + 1).padStart(2, '0')
         const d = String(cur.getDate()).padStart(2, '0')
@@ -2303,7 +2330,8 @@ async function applyCopyPeriod() {
   } finally {
     showSaveOverlay(false)
   }
-}
+                         }
+
     
 function copyClose() {
   document.getElementById('sheet').classList.remove('active')
