@@ -1002,7 +1002,13 @@ function normalizeLessonFromCloud(lesson) {
     return Uint8Array.from([...rawData].map(char => char.charCodeAt(0)))
 }
 
+    let _isSubscribing = false
 async function subscribeToPushNotifications() {
+  // ⭐ Защита от параллельного вызова
+  if (_isSubscribing) {
+    console.log('⏳ Подписка уже выполняется, пропуск')
+    return
+  }
   if (!currentUser) return
   if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
     const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent)
@@ -1014,6 +1020,8 @@ async function subscribeToPushNotifications() {
     }
     return
   }
+
+  _isSubscribing = true
 
   try {
     const permission = await Notification.requestPermission()
@@ -1697,7 +1705,7 @@ async function syncPendingChanges() {
     closeAuthModal()
     updateCloudUI()
     showToast('✅ Вход выполнен: ' + data.user.email, true)
-    setTimeout(() => subscribeToPushNotifications(), 1000)
+    //setTimeout(() => subscribeToPushNotifications(), 1000)
     // Загружаем настройки
     try {
       const { data: settingsData } = await gasCall({ action: 'get_settings', token: data.token })
@@ -3332,11 +3340,19 @@ function doDeleteProfile() {
   })
 
     // ===== ВЕРСИЯ ПРИЛОЖЕНИЯ =====
-    // Версия берётся из Supabase app_config — менять код не нужно
 
     async function checkAppVersion() {
-      const vLabel = document.getElementById('appVersionLabel')
-      try {
+  const vLabel = document.getElementById('appVersionLabel')
+  
+  // ⭐ Офлайн: не проверяем версию
+  if (!navigator.onLine) {
+    console.log('📴 Офлайн: пропускаем проверку версии')
+    const knownVersion = localStorage.getItem('app_known_version')
+    if (vLabel && knownVersion) vLabel.textContent = 'v' + knownVersion
+    return
+  }
+  
+  try {
         const { data, error } = await gasCall({ action: 'get_app_config', key: 'version' })
         if (error || !data) return
         const serverVersion = data.value
