@@ -43,7 +43,7 @@ self.addEventListener('fetch', event => {
   const url = event.request.url;
 
   if (NEVER_CACHE.some(domain => url.includes(domain))) {
-    event.respondWith(fetch(event.request));
+    //event.respondWith(fetch(event.request));
     return;
   }
 
