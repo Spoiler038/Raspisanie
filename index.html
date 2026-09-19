@@ -603,7 +603,7 @@ body.light .fc-timeGridDay-view .fc-scrollgrid-sync-inner {
     <path d="M17.5 19H9a7 7 0 110-14h3.5a7.5 7.5 0 015 13z"/>
     <path d="M12 10v4m-2-2h4"/>
   </svg>
-  <span style="vertical-align:middle;">Подключить облако</span>
+  <span style="vertical-align:middle;">Подключить<br>облако</span>
 </button>
         </div>
       </div>
@@ -785,6 +785,32 @@ body.light .fc-timeGridDay-view .fc-scrollgrid-sync-inner {
     </div>
   </div>
 
+  <!-- Подтверждение синхронизации отложенных изменений -->
+<div id="syncPendingModal" class="modal-overlay" style="display: none; z-index: 3000;">
+  <div class="modal" style="max-width: 320px;">
+    <div class="modal-title">🔄 Синхронизация</div>
+    <div class="modal-content" id="syncPendingMessage" style="white-space: pre-line; min-height: 60px;"></div>
+    <div class="modal-buttons" style="display: flex; flex-direction: column; gap: 8px;">
+      <button id="syncPendingSend" class="btn-primary" style="width: 100%;">📤 Отправить в облако</button>
+      <button id="syncPendingRevert" class="btn-danger" style="width: 100%;">🔄 Отменить и загрузить из облака</button>
+      <button id="syncPendingLater" class="btn-secondary" style="width: 100%;">Позже</button>
+    </div>
+  </div>
+</div>
+
+<!-- Подтверждение выхода из облака с несохранёнными изменениями -->
+<div id="logoutWithPendingModal" class="modal-overlay" style="display: none; z-index: 3500;">
+  <div class="modal" style="max-width: 320px;">
+    <div class="modal-title">⚠️ Несохранённые изменения</div>
+    <div class="modal-content" id="logoutWithPendingMessage" style="white-space: pre-line; min-height: 60px;"></div>
+    <div class="modal-buttons" style="display: flex; flex-direction: column; gap: 8px;">
+      <button id="logoutSyncFirst" class="btn-primary" style="width: 100%;">📤 Отправить и выйти</button>
+      <button id="logoutWithoutSync" class="btn-danger" style="width: 100%;">Выйти без отправки</button>
+      <button id="logoutCancel" class="btn-secondary" style="width: 100%;">Отмена</button>
+    </div>
+  </div>
+</div>
+  
   <script>
     let currentView = 'month'
     let lastClickInfo = null
@@ -1301,6 +1327,153 @@ function showSaveOverlay(show) {
   }
 }
 
+    // ===== СИНХРОНИЗАЦИЯ ОТЛОЖЕННЫХ ИЗМЕНЕНИЙ =====
+let _syncModalShown = false
+
+// Склонение числительных
+function declOfNum(n, titles) {
+  const cases = [2, 0, 1, 1, 1, 2]
+  return titles[(n % 100 > 4 && n % 100 < 20) ? 2 : cases[(n % 10 < 5) ? n % 10 : 5]]
+}
+
+// Проверка при появлении интернета
+window.addEventListener('online', function() {
+  console.log('🌐 Интернет появился')
+  _syncModalShown = false
+  setTimeout(checkAndAskSync, 1500)
+})
+
+window.addEventListener('offline', function() {
+  console.log('📴 Интернет пропал')
+  _syncModalShown = false
+})
+
+// Проверка при загрузке (если интернет уже есть и есть pendingChanges)
+setTimeout(checkAndAskSync, 3000)
+
+function checkAndAskSync() {
+  if (_syncModalShown) return
+  if (!navigator.onLine) return
+  if (!currentUser) return
+  if (!pendingChanges || pendingChanges.length === 0) return
+  
+  _syncModalShown = true
+  console.log(`🔄 Найдено ${pendingChanges.length} отложенных изменений`)
+  showSyncPendingModal()
+}
+
+function showSyncPendingModal() {
+  const modal = document.getElementById('syncPendingModal')
+  const messageEl = document.getElementById('syncPendingMessage')
+  const sendBtn = document.getElementById('syncPendingSend')
+  const revertBtn = document.getElementById('syncPendingRevert')
+  const laterBtn = document.getElementById('syncPendingLater')
+  
+  if (!modal || !pendingChanges || pendingChanges.length === 0) return
+  
+  const count = pendingChanges.length
+  const word = declOfNum(count, ['изменение', 'изменения', 'изменений'])
+  messageEl.textContent = `Найдено ${count} ${word}, сделанных без интернета.\n\nЧто сделать?`
+  
+  // Скрываем «Отменить» если нет интернета
+  revertBtn.style.display = navigator.onLine ? 'block' : 'none'
+  
+  // Убираем старые обработчики
+  const newSendBtn = sendBtn.cloneNode(true)
+  const newRevertBtn = revertBtn.cloneNode(true)
+  const newLaterBtn = laterBtn.cloneNode(true)
+  sendBtn.parentNode.replaceChild(newSendBtn, sendBtn)
+  revertBtn.parentNode.replaceChild(newRevertBtn, revertBtn)
+  laterBtn.parentNode.replaceChild(newLaterBtn, laterBtn)
+  
+  newSendBtn.addEventListener('click', function() {
+    modal.style.display = 'none'
+    _syncModalShown = false
+    syncPendingChanges()
+  })
+  
+  newRevertBtn.addEventListener('click', function() {
+    modal.style.display = 'none'
+    _syncModalShown = false
+    showConfirmModal(
+      '⚠️ Отменить офлайн-изменения?',
+      `Все ${count} ${word}, сделанных без интернета, будут потеряны.\n\nДанные будут загружены из облака заново.`,
+      async () => {
+        pendingChanges = []
+        localStorage.removeItem(STORAGE_KEYS.PENDING_CHANGES)
+        await importCloud()
+      }
+    )
+  })
+  
+  newLaterBtn.addEventListener('click', function() {
+    modal.style.display = 'none'
+    showToast('⏰ Синхронизация отложена', false)
+  })
+  
+  modal.onclick = function(e) { if (e.target === modal) modal.style.display = 'none' }
+  modal.style.display = 'flex'
+}
+
+async function syncPendingChanges() {
+  if (!navigator.onLine) { showToast('❌ Нет интернета', false); return }
+  if (!currentUser) { showToast('❌ Войдите в облако', false); return }
+  if (!pendingChanges || pendingChanges.length === 0) { showToast('✅ Нечего синхронизировать', true); return }
+  
+  const token = localStorage.getItem('teacher_jwt')
+  if (!token) return
+  
+  showSaveOverlay(true)
+  
+  const remaining = []
+  let sentCount = 0
+  let errorCount = 0
+  
+  try {
+    for (const change of pendingChanges) {
+      try {
+        if (change.action === 'insert' || change.action === 'update') {
+          const lesson = change.lesson
+          const { error } = await gasCall({
+            action: 'save_lesson', token,
+            lesson: {
+              lesson_id: lesson.id, student: lesson.student,
+              date: lesson.date, time: timeToExcelTime(lesson.time),
+              duration: lesson.duration, notes: lesson.notes || ''
+            },
+            is_update: change.action === 'update'
+          })
+          if (error) throw error
+          sentCount++
+        } else if (change.action === 'delete') {
+          const { error } = await gasCall({
+            action: 'delete_lesson', token, lesson_id: change.lesson_id
+          })
+          if (error) throw error
+          sentCount++
+        }
+      } catch (e) {
+        console.error('Ошибка отправки:', e)
+        remaining.push(change)
+        errorCount++
+      }
+    }
+  } finally {
+    showSaveOverlay(false)
+  }
+  
+  pendingChanges = remaining
+  localStorage.setItem(STORAGE_KEYS.PENDING_CHANGES, JSON.stringify(pendingChanges))
+  
+  if (sentCount > 0 && errorCount === 0) {
+    showToast(`✅ Синхронизировано: ${sentCount}`, true)
+  } else if (sentCount > 0 && errorCount > 0) {
+    showToast(`⚠️ Отправлено: ${sentCount}, осталось: ${errorCount}`, false)
+  } else if (errorCount > 0) {
+    showToast('❌ Ошибка синхронизации', false)
+  }
+}
+
     // ===== УПРАВЛЕНИЕ РЕЖИМАМИ ХРАНЕНИЯ =====
     function checkSyncMode() {
       const mode = localStorage.getItem(STORAGE_KEYS.SYNC_MODE)
@@ -1321,16 +1494,44 @@ function showSaveOverlay(show) {
       if (currentSyncMode === SYNC_MODES.CLOUD) setTimeout(() => showAuthModal(), 500)
       return
     }
-    // Проверяем токен через попытку загрузить настройки
+    
+    // ⭐ Офлайн: не проверяем токен, восстанавливаем пользователя
+    if (!navigator.onLine) {
+      console.log('📴 Офлайн: пропускаем проверку токена')
+      if (!currentUser) {
+        const saved = localStorage.getItem(STORAGE_KEYS.USER)
+        if (saved) try { currentUser = JSON.parse(saved) } catch(e) {}
+      }
+      updateCloudUI()
+      return
+    }
+    
+    // Проверяем токен
     const { data, error } = await gasCall({ action: 'get_settings', token })
     if (error) {
-      // Токен недействителен — сброс
+      const errMsg = error.message || ''
+      const isNetworkError = errMsg.includes('Timeout') 
+        || errMsg.includes('Ошибка загрузки скрипта')
+        || errMsg.includes('Failed to fetch')
+      
+      if (isNetworkError) {
+        console.log('📴 Ошибка сети: не сбрасываем сессию')
+        if (!currentUser) {
+          const saved = localStorage.getItem(STORAGE_KEYS.USER)
+          if (saved) try { currentUser = JSON.parse(saved) } catch(e) {}
+        }
+        updateCloudUI()
+        return
+      }
+      
+      // Настоящая ошибка авторизации — сброс
       localStorage.removeItem('teacher_jwt')
       localStorage.removeItem(STORAGE_KEYS.USER)
       currentUser = null
       if (currentSyncMode === SYNC_MODES.CLOUD) setTimeout(() => showAuthModal(), 500)
       return
     }
+    
     if (!currentUser) {
       const saved = localStorage.getItem(STORAGE_KEYS.USER)
       if (saved) try { currentUser = JSON.parse(saved) } catch(e) {}
@@ -1339,8 +1540,8 @@ function showSaveOverlay(show) {
     updateCloudUI()
 
     if (currentUser) {
-    const notifSetting = localStorage.getItem('teacher_notification') || 'Не оповещать';
-    if (notifSetting !== 'Не оповещать') {
+      const notifSetting = localStorage.getItem('teacher_notification') || 'Не оповещать';
+      if (notifSetting !== 'Не оповещать') {
         setTimeout(() => subscribeToPushNotifications(), 2000);
       }
     }
@@ -1359,24 +1560,22 @@ function showSaveOverlay(show) {
         }
       }
       if (cloudSettings.work_from && cloudSettings.work_to) {
-  const workFromStr = excelTimeToTimeString(cloudSettings.work_from)
-  let workToStr = excelTimeToTimeString(cloudSettings.work_to)
-  
-  // 00:00 трактуем как конец дня
-  if (workToStr === '00:00') workToStr = '23:59'
-  if (validateWorkHours(workFromStr, workToStr)) {
-    workHours = { from: workFromStr, to: workToStr }
-    saveSettingsToStorage()
-    calendar.setOption('slotMinTime', workHours.from)
-    calendar.setOption('slotMaxTime', workHours.to)
-    calculateScrollerHeight()
-    const wfEl = document.getElementById('workFrom')
-    const wtEl = document.getElementById('workTo')
-    if (wfEl) wfEl.value = workHours.from
-    if (wtEl) wtEl.value = workHours.to
-    settingsChanged = true
-  }
-}
+        const workFromStr = excelTimeToTimeString(cloudSettings.work_from)
+        let workToStr = excelTimeToTimeString(cloudSettings.work_to)
+        if (workToStr === '00:00') workToStr = '23:59'
+        if (validateWorkHours(workFromStr, workToStr)) {
+          workHours = { from: workFromStr, to: workToStr }
+          saveSettingsToStorage()
+          calendar.setOption('slotMinTime', workHours.from)
+          calendar.setOption('slotMaxTime', workHours.to)
+          calculateScrollerHeight()
+          const wfEl = document.getElementById('workFrom')
+          const wtEl = document.getElementById('workTo')
+          if (wfEl) wfEl.value = workHours.from
+          if (wtEl) wtEl.value = workHours.to
+          settingsChanged = true
+        }
+      }
       if (cloudSettings.notification_default) {
         localStorage.setItem('teacher_notification', cloudSettings.notification_default)
         const notifEl = document.getElementById('notificationSelect')
@@ -1396,7 +1595,7 @@ function showSaveOverlay(show) {
       if (settingsChanged && wasLoggedIn) showToast('✅ Настройки обновлены из облака', true)
     }
 
-    // Загружаем уроки с нормализацией
+    // Загружаем уроки
     try {
       const { data: lessonsData, error: le } = await gasCall({ action: 'get_lessons', token })
       if (!le && lessonsData) {
@@ -1416,7 +1615,6 @@ function showSaveOverlay(show) {
     console.error('Ошибка в checkAuthOnLoad:', error)
   }
 }
-
     function setSyncMode(mode) {
       currentSyncMode = mode
       localStorage.setItem(STORAGE_KEYS.SYNC_MODE, mode)
@@ -1710,9 +1908,11 @@ function showSaveOverlay(show) {
       calendar.setOption('slotMaxTime', workHours.to)
     }
     localStorage.setItem(STORAGE_KEYS.LAST_SYNC, new Date().toISOString())
-    localStorage.setItem(STORAGE_KEYS.LAST_SYNC, new Date().toISOString())
-    settingsChanged = false  // ← сбрасываем чтобы closeSettings не перезаписал
-    showToast('✅ Данные загружены из облака. Уроков: ' + lessons.length, true)
+// ⭐ Очищаем pendingChanges — они перезаписаны данными из облака
+pendingChanges = []
+localStorage.removeItem(STORAGE_KEYS.PENDING_CHANGES)
+settingsChanged = false
+showToast('✅ Данные загружены из облака. Уроков: ' + lessons.length, true)
   } catch (error) {
     console.log('Ошибка при загрузке из облака:', error)
     showToast('❌ Ошибка при загрузке из облака', false)
@@ -2838,19 +3038,86 @@ try {
     }
 
     async function logoutCloud() {
-      await unsubscribeFromPushNotifications()
-      const token = localStorage.getItem('teacher_jwt')
-      // Просто очищаем локальные данные сессии
-      currentUser = null
-      localStorage.removeItem('teacher_jwt')
-      localStorage.removeItem(STORAGE_KEYS.USER)
-      localStorage.removeItem(STORAGE_KEYS.LAST_SYNC)
-      currentSyncMode = SYNC_MODES.LOCAL
-      localStorage.setItem(STORAGE_KEYS.SYNC_MODE, SYNC_MODES.LOCAL)
-      updateCloudUI()
-      document.getElementById('settingsSheet').classList.remove('active')
-      showToast('✅ Облако отключено, режим локальный', true)
+  const hasPending = pendingChanges && pendingChanges.length > 0
+  if (hasPending) {
+    showLogoutWithPendingModal()
+    return
+  }
+  await doLogout()
+}
+
+function showLogoutWithPendingModal() {
+  const modal = document.getElementById('logoutWithPendingModal')
+  const messageEl = document.getElementById('logoutWithPendingMessage')
+  const syncBtn = document.getElementById('logoutSyncFirst')
+  const noSyncBtn = document.getElementById('logoutWithoutSync')
+  const cancelBtn = document.getElementById('logoutCancel')
+  
+  if (!modal) return
+  
+  const count = pendingChanges.length
+  const word = declOfNum(count, ['изменение', 'изменения', 'изменений'])
+  const hasInternet = navigator.onLine
+  
+  let message = `У вас ${count} ${word}, сделанных без интернета.\n\n`
+  if (hasInternet) {
+    message += 'Что сделать перед выходом?'
+    syncBtn.style.display = 'block'
+  } else {
+    message += 'Нет интернета. При выходе они будут потеряны.\n\nВсё равно выйти?'
+    syncBtn.style.display = 'none'
+  }
+  messageEl.textContent = message
+  
+  const newSyncBtn = syncBtn.cloneNode(true)
+  const newNoSyncBtn = noSyncBtn.cloneNode(true)
+  const newCancelBtn = cancelBtn.cloneNode(true)
+  syncBtn.parentNode.replaceChild(newSyncBtn, syncBtn)
+  noSyncBtn.parentNode.replaceChild(newNoSyncBtn, noSyncBtn)
+  cancelBtn.parentNode.replaceChild(newCancelBtn, cancelBtn)
+  
+  newSyncBtn.addEventListener('click', async function() {
+    modal.style.display = 'none'
+    await syncPendingChanges()
+    if (pendingChanges && pendingChanges.length > 0) {
+      showToast(`⚠️ Осталось ${pendingChanges.length} несинхронизированных`, false)
+      return
     }
+    await doLogout()
+  })
+  
+  newNoSyncBtn.addEventListener('click', async function() {
+    modal.style.display = 'none'
+    showConfirmModal(
+      '⚠️ Последнее предупреждение',
+      `Изменения (${pendingChanges.length}) не будут отправлены и будут потеряны.\n\nПродолжить?`,
+      async () => {
+        pendingChanges = []
+        localStorage.removeItem(STORAGE_KEYS.PENDING_CHANGES)
+        await doLogout()
+      }
+    )
+  })
+  
+  newCancelBtn.addEventListener('click', function() { modal.style.display = 'none' })
+  modal.onclick = function(e) { if (e.target === modal) modal.style.display = 'none' }
+  modal.style.display = 'flex'
+}
+
+async function doLogout() {
+  await unsubscribeFromPushNotifications()
+  currentUser = null
+  localStorage.removeItem('teacher_jwt')
+  localStorage.removeItem(STORAGE_KEYS.USER)
+  localStorage.removeItem(STORAGE_KEYS.LAST_SYNC)
+  pendingChanges = []
+  localStorage.removeItem(STORAGE_KEYS.PENDING_CHANGES)
+  currentSyncMode = SYNC_MODES.LOCAL
+  localStorage.setItem(STORAGE_KEYS.SYNC_MODE, SYNC_MODES.LOCAL)
+  updateCloudUI()
+  document.getElementById('settingsSheet').classList.remove('active')
+  showToast('✅ Облако отключено, режим локальный', true)
+}
 
     function updateCloudUI() {
       const cloudButton = document.getElementById('cloudActionButton')
@@ -2873,7 +3140,7 @@ try {
         const devBtn = document.getElementById('devicesBtn')
         if (devBtn) { devBtn.disabled = false; devBtn.style.opacity = '1'; devBtn.style.background = '#7c3aed' }
       } else {
-        if (cloudButton) { cloudButton.textContent = '☁️ Подключить облако'; cloudButton.style.background = '#2563eb' }
+        if (cloudButton) { cloudButton.innerHTML = '☁️ Подключить облако'; cloudButton.style.background = '#2563eb' }
         if (profileSection) profileSection.style.display = 'none'
         if (profileEmailSpan) profileEmailSpan.textContent = ''
         if (clearCloudButton) { clearCloudButton.disabled = true; clearCloudButton.style.opacity = '0.5'; clearCloudButton.style.background = '#7f1d1d' }
@@ -2899,8 +3166,25 @@ try {
     
 
     function deleteProfile() {
-      if (!currentUser) { showToast('❌ Нет активного профиля', false); return }
-      showConfirmModal('⚠️ ПОЛНОСТЬЮ УДАЛИТЬ ПРОФИЛЬ',
+  if (!currentUser) { showToast('❌ Нет активного профиля', false); return }
+  
+  // ⭐ Проверка pendingChanges
+  if (pendingChanges && pendingChanges.length > 0) {
+    const count = pendingChanges.length
+    const word = declOfNum(count, ['изменение', 'изменения', 'изменений'])
+    showConfirmModal(
+      '⚠️ Есть несохранённые изменения',
+      `У вас ${count} ${word}, не отправленных в облако.\n\nОни будут потеряны при удалении профиля.\n\nПродолжить?`,
+      () => doDeleteProfile()
+    )
+    return
+  }
+  
+  doDeleteProfile()
+}
+
+function doDeleteProfile() {
+  showConfirmModal('⚠️ ПОЛНОСТЬЮ УДАЛИТЬ ПРОФИЛЬ',
         'Вы действительно хотите ПОЛНОСТЬЮ УДАЛИТЬ свой профиль?\n\n• Удалит ваш email из системы\n• Удалит все данные в облаке\n• Отключит облачный режим\n\nЭто действие НЕЛЬЗЯ отменить!',
         async () => {
           showConfirmModal('⚠️ ПОСЛЕДНЕЕ ПРЕДУПРЕЖДЕНИЕ', 'Вы уверены, что хотите удалить профиль навсегда?', async () => {
@@ -2927,6 +3211,7 @@ try {
           })
         }
       )
+    }
     }
 
     function clearLocalData() {
