@@ -3433,7 +3433,7 @@ if (notificationSelect) {
     
     if (value === 'Не оповещать') {
       unsubscribeFromPushNotifications()
-      showToast('🔕 Оповещения отключены', true)
+      showToast('❌ Оповещения отключены', true)
     } else {
       setTimeout(() => subscribeToPushNotifications(), 1000)
       showToast(`✅ Оповещения: ${value}`, true)
