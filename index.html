@@ -603,7 +603,7 @@ body.light .fc-timeGridDay-view .fc-scrollgrid-sync-inner {
     <path d="M17.5 19H9a7 7 0 110-14h3.5a7.5 7.5 0 015 13z"/>
     <path d="M12 10v4m-2-2h4"/>
   </svg>
-  <span style="vertical-align:middle;">Подключить<br>облако</span>
+  <span style="vertical-align:middle;">Подключить облако</span>
 </button>
         </div>
       </div>
@@ -717,19 +717,27 @@ body.light .fc-timeGridDay-view .fc-scrollgrid-sync-inner {
   </div>
 
   <div id="resetPasswordModal" class="modal-overlay" style="display: none;">
-    <div class="modal">
-      <div class="modal-title">Восстановление пароля</div>
-      <div class="modal-content">
-        <p class="mb-4">Введите email, и мы отправим ссылку для сброса пароля</p>
-        <input type="email" id="resetEmail" placeholder="Email" class="w-full mb-2 p-2 rounded">
-        <div id="resetMessage" class="text-sm mb-2"></div>
+  <div class="modal">
+    <div class="modal-title">Восстановление пароля</div>
+    <div class="modal-content">
+      <p class="mb-4" id="resetStep1Text">Введите email, и мы отправим код для сброса пароля</p>
+      <input type="email" id="resetEmail" placeholder="Email" class="w-full mb-2 p-2 rounded">
+      
+      <!-- Шаг 2 — скрыт по умолчанию -->
+      <div id="resetStep2" style="display:none;">
+        <p class="mb-4" style="font-size:13px; color:#94a3b8;">Код отправлен на email. Введите код из письма и новый пароль.</p>
+        <input type="text" id="resetCode" placeholder="Код из письма" class="w-full mb-2 p-2 rounded">
+        <input type="password" id="resetNewPassword" placeholder="Новый пароль (мин. 6)" class="w-full mb-2 p-2 rounded">
       </div>
-      <div class="modal-buttons" style="display: flex; flex-direction: column; gap: 8px;">
-        <button class="btn-primary" onclick="sendResetPassword()" style="width: 100%;">Отправить</button>
-        <button class="btn-secondary" onclick="closeResetModal()" style="width: 100%;">Отмена</button>
-      </div>
+      
+      <div id="resetMessage" class="text-sm mb-2"></div>
+    </div>
+    <div class="modal-buttons" style="display: flex; flex-direction: column; gap: 8px;">
+      <button id="resetPrimaryBtn" class="btn-primary" onclick="sendResetPassword()" style="width: 100%;">Отправить код</button>
+      <button id="resetSecondaryBtn" class="btn-secondary" onclick="closeResetModal()" style="width: 100%;">Отмена</button>
     </div>
   </div>
+</div>
 
   <!-- Модальное окно удаления устройства -->
   <div id="deleteDeviceModal" class="modal-overlay" style="display:none;z-index:4000;">
@@ -1823,37 +1831,118 @@ async function syncPendingChanges() {
       }
     }
 
-    function forgotPassword() {
-      closeAuthModal()
-      document.getElementById('resetPasswordModal').style.display = 'flex'
-      document.getElementById('resetEmail').value = ''
-      document.getElementById('resetMessage').textContent = ''
-    }
 
-    function closeResetModal() { document.getElementById('resetPasswordModal').style.display = 'none' }
 
-   async function sendResetPassword() {
-  const email = document.getElementById('resetEmail').value.trim()
+   // Состояние шага сброса пароля
+let _resetStep = 1
+let _resetEmail = ''
+
+function resetPasswordModalReset() {
+  _resetStep = 1
+  _resetEmail = ''
+  const step2 = document.getElementById('resetStep2')
+  const step1Text = document.getElementById('resetStep1Text')
+  const primaryBtn = document.getElementById('resetPrimaryBtn')
+  const emailInput = document.getElementById('resetEmail')
+  const codeInput = document.getElementById('resetCode')
+  const passInput = document.getElementById('resetNewPassword')
   const msgEl = document.getElementById('resetMessage')
   
-  if (!email) {
-    if (msgEl) { msgEl.textContent = 'Введите email'; msgEl.style.color = '#ef4444' }
+  if (step2) step2.style.display = 'none'
+  if (step1Text) step1Text.style.display = 'block'
+  if (primaryBtn) primaryBtn.textContent = 'Отправить код'
+  if (emailInput) emailInput.disabled = false
+  if (codeInput) codeInput.value = ''
+  if (passInput) passInput.value = ''
+  if (msgEl) msgEl.textContent = ''
+}
+
+function closeResetModal() {
+  document.getElementById('resetPasswordModal').style.display = 'none'
+  resetPasswordModalReset()
+}
+
+async function sendResetPassword() {
+  const msgEl = document.getElementById('resetMessage')
+  
+  // Шаг 1 — отправка кода
+  if (_resetStep === 1) {
+    const email = document.getElementById('resetEmail').value.trim()
+    if (!email) {
+      if (msgEl) { msgEl.textContent = 'Введите email'; msgEl.style.color = '#ef4444' }
+      return
+    }
+    
+    if (msgEl) { msgEl.textContent = '⏳ Отправка...'; msgEl.style.color = '#94a3b8' }
+    
+    try {
+      const { error } = await gasCall({ action: 'forgot_password', email })
+      if (error) throw error
+      
+      _resetEmail = email
+      _resetStep = 2
+      
+      // Показываем шаг 2
+      document.getElementById('resetStep2').style.display = 'block'
+      document.getElementById('resetStep1Text').style.display = 'none'
+      document.getElementById('resetEmail').disabled = true
+      document.getElementById('resetPrimaryBtn').textContent = 'Сменить пароль'
+      document.getElementById('resetCode').focus()
+      
+      if (msgEl) {
+        msgEl.textContent = '✅ Если такой email есть — код отправлен. Проверьте почту.'
+        msgEl.style.color = '#10b981'
+      }
+    } catch (e) {
+      if (msgEl) { msgEl.textContent = '❌ Ошибка: ' + e.message; msgEl.style.color = '#ef4444' }
+    }
     return
   }
   
-  if (msgEl) { msgEl.textContent = '⏳ Отправка...'; msgEl.style.color = '#94a3b8' }
+  // Шаг 2 — смена пароля
+  const code = document.getElementById('resetCode').value.trim()
+  const newPassword = document.getElementById('resetNewPassword').value
+  
+  if (!code) {
+    if (msgEl) { msgEl.textContent = 'Введите код из письма'; msgEl.style.color = '#ef4444' }
+    return
+  }
+  if (!newPassword || newPassword.length < 6) {
+    if (msgEl) { msgEl.textContent = 'Пароль минимум 6 символов'; msgEl.style.color = '#ef4444' }
+    return
+  }
+  
+  if (msgEl) { msgEl.textContent = '⏳ Смена пароля...'; msgEl.style.color = '#94a3b8' }
   
   try {
-    const { data, error } = await gasCall({ action: 'forgot_password', email })
+    const { error } = await gasCall({
+      action: 'reset_password',
+      email: _resetEmail,
+      code: code.toUpperCase(),
+      new_password: newPassword
+    })
     if (error) throw error
     
     if (msgEl) {
-      msgEl.textContent = '✅ Если такой email есть — код отправлен. Проверьте почту.'
+      msgEl.textContent = '✅ Пароль изменён! Войдите с новым паролем.'
       msgEl.style.color = '#10b981'
     }
+    showToast('✅ Пароль изменён', true)
+    
+    setTimeout(() => {
+      closeResetModal()
+      showAuthModal()  // показываем окно входа
+    }, 1500)
+    
   } catch (e) {
-    if (msgEl) { msgEl.textContent = '❌ Ошибка: ' + e.message; msgEl.style.color = '#ef4444' }
+    if (msgEl) { msgEl.textContent = '❌ ' + e.message; msgEl.style.color = '#ef4444' }
   }
+}
+
+function forgotPassword() {
+  closeAuthModal()
+  document.getElementById('resetPasswordModal').style.display = 'flex'
+  resetPasswordModalReset()
 }
 
     function checkCloudAuth() {
@@ -3173,7 +3262,7 @@ async function doLogout() {
         const devBtn = document.getElementById('devicesBtn')
         if (devBtn) { devBtn.disabled = false; devBtn.style.opacity = '1'; devBtn.style.background = '#7c3aed' }
       } else {
-        if (cloudButton) { cloudButton.innerHTML = '☁️ Подключить облако'; cloudButton.style.background = '#2563eb' }
+        if (cloudButton) { cloudButton.textContent = '☁️ Подключить облако'; cloudButton.style.background = '#2563eb' }
         if (profileSection) profileSection.style.display = 'none'
         if (profileEmailSpan) profileEmailSpan.textContent = ''
         if (clearCloudButton) { clearCloudButton.disabled = true; clearCloudButton.style.opacity = '0.5'; clearCloudButton.style.background = '#7f1d1d' }
