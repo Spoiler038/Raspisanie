@@ -1832,17 +1832,29 @@ async function syncPendingChanges() {
 
     function closeResetModal() { document.getElementById('resetPasswordModal').style.display = 'none' }
 
-    async function sendResetPassword() {
-      // Сброс пароля требует email-сервис.
-      // Реализация: обратитесь к администратору или измените пароль через прямой доступ к таблице.
-      const msgEl = document.getElementById('resetMessage')
-      if (msgEl) {
-        msgEl.textContent = 'Для сброса пароля обратитесь к администратору системы.'
-        msgEl.style.color = '#f59e0b'
-      }
-      showToast('Сброс пароля через email не поддерживается в этой версии', false)
-      setTimeout(() => closeResetModal(), 4000)
+   async function sendResetPassword() {
+  const email = document.getElementById('resetEmail').value.trim()
+  const msgEl = document.getElementById('resetMessage')
+  
+  if (!email) {
+    if (msgEl) { msgEl.textContent = 'Введите email'; msgEl.style.color = '#ef4444' }
+    return
+  }
+  
+  if (msgEl) { msgEl.textContent = '⏳ Отправка...'; msgEl.style.color = '#94a3b8' }
+  
+  try {
+    const { data, error } = await gasCall({ action: 'forgot_password', email })
+    if (error) throw error
+    
+    if (msgEl) {
+      msgEl.textContent = '✅ Если такой email есть — код отправлен. Проверьте почту.'
+      msgEl.style.color = '#10b981'
     }
+  } catch (e) {
+    if (msgEl) { msgEl.textContent = '❌ Ошибка: ' + e.message; msgEl.style.color = '#ef4444' }
+  }
+}
 
     function checkCloudAuth() {
       const savedUser = localStorage.getItem(STORAGE_KEYS.USER)
@@ -3322,6 +3334,27 @@ function doDeleteProfile() {
       if (notificationSelect) notificationSelect.value = savedNotification
       } catch (e) { console.log('Ошибка загрузки настроек оповещений') }
 
+     // ⭐ Обработчик изменения уведомлений
+if (notificationSelect) {
+  notificationSelect.onchange = function() {
+    const value = this.value
+    localStorage.setItem('teacher_notification', value)
+    notificationHistory.clear()
+    checkAndScheduleNotifications()
+    
+    if (value === 'Не оповещать') {
+      unsubscribeFromPushNotifications()
+      showToast('🔕 Оповещения отключены', true)
+    } else {
+      setTimeout(() => subscribeToPushNotifications(), 1000)
+      showToast(`✅ Оповещения: ${value}`, true)
+    }
+    
+    settingsChanged = true
+    console.log('📝 notificationSelect изменён:', value, '| settingsChanged=true')
+  }
+}
+     
     try { updateAutoDeleteBtn() } catch(e) {}
 
     if (calendar) {
