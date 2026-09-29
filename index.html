@@ -716,11 +716,13 @@ body.light .fc-timeGridDay-view .fc-scrollgrid-sync-inner {
     </div>
   </div>
 
-  <div id="resetPasswordModal" class="modal-overlay" style="display: none;">
+ <div id="resetPasswordModal" class="modal-overlay" style="display: none;">
   <div class="modal">
     <div class="modal-title">Восстановление пароля</div>
     <div class="modal-content">
       <p class="mb-4" id="resetStep1Text">Введите email, и мы отправим код для сброса пароля</p>
+      
+      <!-- Поле email — скрывается на шаге 2 -->
       <input type="email" id="resetEmail" placeholder="Email" class="w-full mb-2 p-2 rounded">
       
       <!-- Шаг 2 — скрыт по умолчанию -->
@@ -1872,7 +1874,10 @@ function resetPasswordModalReset() {
   if (step2) step2.style.display = 'none'
   if (step1Text) step1Text.style.display = 'block'
   if (primaryBtn) primaryBtn.textContent = 'Отправить код'
-  if (emailInput) emailInput.disabled = false
+  if (emailInput) {
+  emailInput.disabled = false
+  emailInput.style.display = ''
+}
   if (codeInput) codeInput.value = ''
   if (passInput) passInput.value = ''
   if (msgEl) msgEl.textContent = ''
@@ -1906,7 +1911,7 @@ async function sendResetPassword() {
       // Показываем шаг 2
       document.getElementById('resetStep2').style.display = 'block'
       document.getElementById('resetStep1Text').style.display = 'none'
-      document.getElementById('resetEmail').disabled = true
+      document.getElementById('resetEmail').style.display = 'none'
       document.getElementById('resetPrimaryBtn').textContent = 'Сменить пароль'
       document.getElementById('resetCode').focus()
       
