@@ -1969,6 +1969,41 @@ function forgotPassword() {
   closeAuthModal()
   document.getElementById('resetPasswordModal').style.display = 'flex'
   resetPasswordModalReset()
+
+  // ⭐ Обработка Enter на полях
+  setTimeout(() => {
+    const emailInput = document.getElementById('resetEmail')
+    const codeInput = document.getElementById('resetCode')
+    const passwordInput = document.getElementById('resetNewPassword')
+
+    if (emailInput) {
+      emailInput.focus()
+      emailInput.onkeydown = function(e) {
+        if (e.key === 'Enter') {
+          e.preventDefault()
+          sendResetPassword()  // шаг 1 — отправка кода
+        }
+      }
+    }
+
+    if (codeInput) {
+      codeInput.onkeydown = function(e) {
+        if (e.key === 'Enter') {
+          e.preventDefault()
+          passwordInput.focus()  // переход к паролю
+        }
+      }
+    }
+
+    if (passwordInput) {
+      passwordInput.onkeydown = function(e) {
+        if (e.key === 'Enter') {
+          e.preventDefault()
+          sendResetPassword()  // шаг 2 — смена пароля
+        }
+      }
+    }
+  }, 100)
 }
 
     function checkCloudAuth() {
