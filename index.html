@@ -372,6 +372,29 @@ body.light .fc-timeGridDay-view .fc-col-header {
 body.light .fc-timeGridDay-view .fc-scrollgrid-sync-inner {
     background: #e5e7eb !important;
 }
+
+/* ⭐ Выравнивание внутреннего текста в полях формы нового занятия */
+#dateInput,
+#timeInput,
+#studentInput,
+#notesInput {
+  padding-left: 12px !important;   /* одинаковый отступ слева */
+  padding-right: 12px !important;
+  box-sizing: border-box !important;
+}
+
+/* Для нативных date/time оставляем браузерный padding, но сдвигаем текст */
+#dateInput,
+#timeInput {
+  padding-left: 8px !important;
+}
+
+/* textarea «Заметки» — выравниваем по верху */
+#notesInput {
+  padding-top: 10px !important;
+  padding-bottom: 10px !important;
+  line-height: 1.4 !important;
+}    
   </style>
 </head>
 
