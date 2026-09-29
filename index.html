@@ -830,14 +830,25 @@ body.light .fc-timeGridDay-view .fc-scrollgrid-sync-inner {
 
 
     // ===== КОНФИГУРАЦИЯ ХРАНЕНИЯ =====
-    const STORAGE_KEYS = {
-      LESSONS: 'teacher_lessons',
-      SETTINGS: 'teacher_settings',
-      USER: 'teacher_user',
-      SYNC_MODE: 'teacher_sync_mode',
-      LAST_SYNC: 'teacher_last_sync',
-      PENDING_CHANGES: 'teacher_pending_changes'
-    }
+const STORAGE_KEYS = {
+  LESSONS: 'teacher_lessons',
+  SETTINGS: 'teacher_settings',
+  USER: 'teacher_user',
+  SYNC_MODE: 'teacher_sync_mode',
+  LAST_SYNC: 'teacher_last_sync',
+  PENDING_CHANGES: 'teacher_pending_changes',
+  DEVICE_ID: 'teacher_device_id'
+}
+
+// ⭐ Генерируем стабильный ID устройства (один раз на браузер)
+let deviceId = localStorage.getItem(STORAGE_KEYS.DEVICE_ID)
+if (!deviceId) {
+  deviceId = 'dev_' + Date.now().toString(36) + '_' + Math.random().toString(36).substr(2, 12)
+  localStorage.setItem(STORAGE_KEYS.DEVICE_ID, deviceId)
+  console.log('📱 Создан новый device_id:', deviceId)
+} else {
+  console.log('📱 Используется существующий device_id:', deviceId)
+}
 
     const SYNC_MODES = { LOCAL: 'local', CLOUD: 'cloud' }
     let currentSyncMode = localStorage.getItem(STORAGE_KEYS.SYNC_MODE) || SYNC_MODES.LOCAL
@@ -1010,7 +1021,7 @@ function normalizeLessonFromCloud(lesson) {
     return Uint8Array.from([...rawData].map(char => char.charCodeAt(0)))
 }
 
-    let _isSubscribing = false
+   let _isSubscribing = false
 async function subscribeToPushNotifications() {
   // ⭐ Защита от параллельного вызова
   if (_isSubscribing) {
@@ -1039,25 +1050,16 @@ async function subscribeToPushNotifications() {
     }
 
     const registration = await navigator.serviceWorker.ready
+    const token = localStorage.getItem('teacher_jwt')
 
-    // ⭐ Отписываемся от старой и удаляем её с сервера
+    // ⭐ ШАГ 1: Отписываемся от старой подписки в браузере (если есть)
     const existingSub = await registration.pushManager.getSubscription()
     if (existingSub) {
-      const oldEndpoint = existingSub.endpoint
       await existingSub.unsubscribe()
-      // Удаляем старую подписку с сервера, чтобы не было "дублей"
-      try {
-        const token = localStorage.getItem('teacher_jwt')
-        if (token) {
-          await gasCall({ action: 'delete_push_sub', token, endpoint: oldEndpoint })
-          console.log('🗑️ Старая подписка удалена с сервера')
-        }
-      } catch (e) {
-        console.log('Не удалось удалить старую подписку с сервера:', e)
-      }
+      console.log('🗑️ Старая подписка отписана в браузере')
     }
 
-    // Подписываемся
+    // ⭐ ШАГ 2: Создаём новую подписку
     let subscription
     try {
       subscription = await registration.pushManager.subscribe({
@@ -1069,50 +1071,69 @@ async function subscribeToPushNotifications() {
       // Fallback: ntfy.sh
       const topic = 'raspisanie_' + currentUser.id.replace(/-/g, '').substring(0, 20)
       const ntfyEndpoint = 'https://ntfy.sh/' + topic
-      const token = localStorage.getItem('teacher_jwt')
-      await gasCall({ action: 'save_push_sub', token, endpoint: ntfyEndpoint, p256dh: '', auth: '' })
-      console.log('✅ Сохранён ntfy topic URL (fallback):', ntfyEndpoint)
+      if (token) {
+        await gasCall({
+          action: 'save_push_sub',
+          token,
+          endpoint: ntfyEndpoint,
+          p256dh: '',
+          auth: '',
+          device_id: deviceId   // ⭐ Передаём device_id
+        })
+        console.log('✅ Сохранён ntfy topic URL (fallback):', ntfyEndpoint)
+      }
       return
     }
 
-    // Извлекаем ключи
+    // ⭐ ШАГ 3: Извлекаем ключи
     const subJson = subscription.toJSON()
     const endpoint = subJson.endpoint
     const p256dh = subJson.keys ? subJson.keys.p256dh : ''
     const auth = subJson.keys ? subJson.keys.auth : ''
 
-    // Сохраняем в GAS
-    const token = localStorage.getItem('teacher_jwt')
-    await gasCall({ action: 'save_push_sub', token, endpoint, p256dh, auth })
-
-    console.log('✅ Web Push подписка сохранена:', endpoint.substring(0, 60))
+    // ⭐ ШАГ 4: Сохраняем в GAS с device_id
+    if (token) {
+      await gasCall({
+        action: 'save_push_sub',
+        token,
+        endpoint,
+        p256dh,
+        auth,
+        device_id: deviceId   // ⭐ Ключевое изменение
+      })
+      console.log('✅ Web Push подписка сохранена:', endpoint.substring(0, 60))
+    }
 
   } catch (error) {
     console.error('Ошибка subscribeToPushNotifications:', error)
   } finally {
-    // ⭐ Всегда сбрасываем флаг
     _isSubscribing = false
   }
 }
 
-    async function unsubscribeFromPushNotifications() {
-      if (!('serviceWorker' in navigator)) return
-      try {
-        const registration = await navigator.serviceWorker.ready
-        const subscription = await registration.pushManager.getSubscription()
-        if (subscription) {
-          const endpoint = subscription.endpoint
-          await subscription.unsubscribe()
-          if (currentUser) {
-            const token = localStorage.getItem('teacher_jwt')
-            await gasCall({ action: 'delete_push_sub', token, endpoint })
-          }
-          console.log('✅ Отписка выполнена')
-        }
-      } catch (error) {
-        console.error('Ошибка отписки:', error)
+   async function unsubscribeFromPushNotifications() {
+  if (!('serviceWorker' in navigator)) return
+  try {
+    const registration = await navigator.serviceWorker.ready
+    const subscription = await registration.pushManager.getSubscription()
+    if (subscription) {
+      const endpoint = subscription.endpoint
+      await subscription.unsubscribe()
+      if (currentUser) {
+        const token = localStorage.getItem('teacher_jwt')
+        await gasCall({
+          action: 'delete_push_sub',
+          token,
+          endpoint,
+          device_id: deviceId   // ⭐ Передаём device_id
+        })
       }
+      console.log('✅ Отписка выполнена')
     }
+  } catch (error) {
+    console.error('Ошибка отписки:', error)
+  }
+}
 
     // ===== НОВАЯ СИСТЕМА УВЕДОМЛЕНИЙ (ОФЛАЙН) =====
     let notificationTimer = null
@@ -2861,98 +2882,91 @@ function closeSheet() {
     }
 
     async function loadDevicesList() {
-      if (!currentUser) return
-      const list = document.getElementById('devicesList')
-      list.innerHTML = '<div style="color:var(--text-secondary);font-size:14px;text-align:center;padding:20px;">Загрузка...</div>'
+  if (!currentUser) return
+  const list = document.getElementById('devicesList')
+  list.innerHTML = '<div style="color:var(--text-secondary);font-size:14px;text-align:center;padding:20px;">Загрузка...</div>'
 
-      try {
-        const token = localStorage.getItem('teacher_jwt')
-        const { data: subsData, error: subsError } = await gasCall({ action: 'get_push_subs', token })
-        if (subsError) throw subsError
+  try {
+    const token = localStorage.getItem('teacher_jwt')
+    const { data: subsData, error: subsError } = await gasCall({ action: 'get_push_subs', token })
+    if (subsError) throw subsError
 
-        if (!subsData || !subsData.subs || subsData.subs.length === 0) {
-          list.innerHTML = '<div style="color:var(--text-secondary);font-size:14px;text-align:center;padding:20px;">Нет подключённых устройств</div>'
-          return
-        }
-
-        // Получаем endpoint текущего устройства
-let currentEndpoint = '';
-try {
-    const reg = await navigator.serviceWorker.ready;
-    const sub = await reg.pushManager.getSubscription();
-    if (sub) {
-        // Нормализуем endpoint для сравнения
-        currentEndpoint = sub.endpoint.trim();
+    if (!subsData || !subsData.subs || subsData.subs.length === 0) {
+      list.innerHTML = '<div style="color:var(--text-secondary);font-size:14px;text-align:center;padding:20px;">Нет подключённых устройств</div>'
+      return
     }
-} catch(e) {
-    console.warn('Не удалось получить текущую подписку:', e);
+
+    list.innerHTML = ''
+    subsData.subs.forEach((sub, i) => {
+      // ⭐ Сравниваем по device_id, а не по endpoint
+      const isCurrent = sub.device_id === deviceId
+      const shortId = sub.endpoint.split('/').pop().substring(0, 24) + '...'
+      let dateStr = '—'
+      if (sub.updated_at) {
+        const d = new Date(sub.updated_at)
+        const datePart = d.toLocaleDateString('ru-RU')
+        const timePart = d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })
+        dateStr = datePart + ' ' + timePart
+      }
+      const div = document.createElement('div')
+      div.style.cssText = 'display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-radius:10px;background:var(--bg-hover);gap:8px;' + (isCurrent ? 'outline:2px solid #22c55e;' : '')
+      div.innerHTML = `
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:13px;font-weight:500;margin-bottom:2px;">${isCurrent ? '🟢 Устройство ' + (i + 1) + ' <span style=\'font-size:11px;color:#22c55e;font-weight:400;\'>(это устройство)</span>' : '📱 Устройство ' + (i + 1)}</div>
+          <div style="font-size:11px;color:var(--text-secondary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${sub.endpoint}">${shortId}</div>
+          <div style="font-size:11px;color:var(--text-secondary);">Подключено: ${dateStr}</div>
+        </div>
+        ${!isCurrent
+          ? `<button onclick="deleteDevice('${sub.device_id || sub.endpoint}')" style="flex-shrink:0;background:#dc2626;color:white;border:none;border-radius:8px;padding:6px 10px;font-size:13px;cursor:pointer;">🗑️</button>`
+          : ''}
+      `
+      list.appendChild(div)
+    })
+  } catch(e) {
+    console.error('loadDevicesList:', e)
+    list.innerHTML = '<div style="color:#dc2626;font-size:14px;text-align:center;padding:20px;">Ошибка загрузки</div>'
+  }
 }
 
-        list.innerHTML = ''
-        subsData.subs.forEach((sub, i) => {
-          const isCurrent = sub.endpoint.trim() === currentEndpoint;
-          const shortId = sub.endpoint.split('/').pop().substring(0, 24) + '...'
-          let dateStr = '—'
-          if (sub.updated_at) {
-            const d = new Date(sub.updated_at)
-            const datePart = d.toLocaleDateString('ru-RU')
-            const timePart = d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })
-            dateStr = datePart + ' ' + timePart
-          }
-          const div = document.createElement('div')
-          div.style.cssText = 'display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-radius:10px;background:var(--bg-hover);gap:8px;' + (isCurrent ? 'outline:2px solid #22c55e;' : '')
-          div.innerHTML = `
-            <div style="flex:1;min-width:0;">
-              <div style="font-size:13px;font-weight:500;margin-bottom:2px;">${isCurrent ? '🟢 Устройство ' + (i + 1) + ' <span style=\'font-size:11px;color:#22c55e;font-weight:400;\'>(это устройство)</span>' : '📱 Устройство ' + (i + 1)}</div>
-              <div style="font-size:11px;color:var(--text-secondary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${sub.endpoint}">${shortId}</div>
-              <div style="font-size:11px;color:var(--text-secondary);">Подключено: ${dateStr}</div>
-            </div>
-            ${!isCurrent
-              ? `<button onclick="deleteDevice('${sub.endpoint.replace(/'/g, "\'")}')" style="flex-shrink:0;background:#dc2626;color:white;border:none;border-radius:8px;padding:6px 10px;font-size:13px;cursor:pointer;">🗑️</button>`
-              : ''}
-          `
-          list.appendChild(div)
-        })
-      } catch(e) {
-        console.error('loadDevicesList:', e)
-        list.innerHTML = '<div style="color:#dc2626;font-size:14px;text-align:center;padding:20px;">Ошибка загрузки</div>'
-      }
-    }
+   let _pendingDeleteDeviceId = null
 
-    let _pendingDeleteEndpoint = null
+function deleteDevice(deviceIdOrEndpoint) {
+  _pendingDeleteDeviceId = deviceIdOrEndpoint
+  const shortId = deviceIdOrEndpoint.substring(0, 28) + (deviceIdOrEndpoint.length > 28 ? '...' : '')
+  document.getElementById('deleteDeviceInfo').textContent = shortId
+  document.getElementById('deleteDeviceModal').style.display = 'flex'
+  document.getElementById('deleteDeviceConfirmBtn').onclick = confirmDeleteDevice
+}
 
-    function deleteDevice(endpoint) {
-      _pendingDeleteEndpoint = endpoint
-      const shortId = endpoint.split('/').pop().substring(0, 28) + '...'
-      document.getElementById('deleteDeviceInfo').textContent = shortId
-      document.getElementById('deleteDeviceModal').style.display = 'flex'
-      document.getElementById('deleteDeviceConfirmBtn').onclick = confirmDeleteDevice
-    }
+function closeDeleteDeviceModal() {
+  document.getElementById('deleteDeviceModal').style.display = 'none'
+  _pendingDeleteDeviceId = null
+}
 
-    function closeDeleteDeviceModal() {
-      document.getElementById('deleteDeviceModal').style.display = 'none'
-      _pendingDeleteEndpoint = null
-    }
-
-    async function confirmDeleteDevice() {
-      if (!_pendingDeleteEndpoint) return
-      const btn = document.getElementById('deleteDeviceConfirmBtn')
-      btn.disabled = true
-      btn.textContent = 'Удаление...'
-      btn.style.opacity = '0.7'
-      try {
-        const token = localStorage.getItem('teacher_jwt')
-        await gasCall({ action: 'delete_push_sub', token, endpoint: _pendingDeleteEndpoint })
-        closeDeleteDeviceModal()
-        showToast('✅ Устройство удалено', true)
-        await loadDevicesList()
-      } catch(e) {
-        showToast('❌ Ошибка удаления', false)
-        btn.disabled = false
-        btn.textContent = '🗑️ Удалить'
-        btn.style.opacity = '1'
-      }
-    }
+async function confirmDeleteDevice() {
+  if (!_pendingDeleteDeviceId) return
+  const btn = document.getElementById('deleteDeviceConfirmBtn')
+  btn.disabled = true
+  btn.textContent = 'Удаление...'
+  btn.style.opacity = '0.7'
+  try {
+    const token = localStorage.getItem('teacher_jwt')
+    // ⭐ Передаём device_id (или endpoint как fallback)
+    await gasCall({
+      action: 'delete_push_sub',
+      token,
+      device_id: _pendingDeleteDeviceId
+    })
+    closeDeleteDeviceModal()
+    showToast('✅ Устройство удалено', true)
+    await loadDevicesList()
+  } catch(e) {
+    showToast('❌ Ошибка удаления', false)
+    btn.disabled = false
+    btn.textContent = '🗑️ Удалить'
+    btn.style.opacity = '1'
+  }
+}
 
         function openSettings() {
       const settingsSheet = document.getElementById('settingsSheet')
