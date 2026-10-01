@@ -3802,13 +3802,20 @@ if (notificationSelect) {
       console.log('🗑️ Автоудаление ' + toDelete.length + ' уроков до ' + cutoffDate)
       lessons = lessons.filter(l => l.date >= cutoffDate)
       saveLessonsToStorage(); calendar.refetchEvents(); calculateScrollerHeight()
-      if (currentUser) {
-        const token = localStorage.getItem('teacher_jwt')
-        toDelete.forEach(async lesson => {
-          try {
-            await gasCall({ action: 'delete_lesson', token, lesson_id: lesson.id })
-          } catch(e) { console.error('Ошибка автоудаления:', e) }
-        })
+      for (const lesson of toDelete) {
+  try {
+    const { error } = await gasCall({ action: 'delete_lesson', token, lesson_id: lesson.id })
+    if (error) throw error
+  } catch(e) {
+    console.error('Ошибка автоудаления:', e)
+    pendingChanges.push({
+      action: 'delete',
+      lesson_id: lesson.id,
+      timestamp: new Date().toISOString()
+    })
+    localStorage.setItem(STORAGE_KEYS.PENDING_CHANGES, JSON.stringify(pendingChanges))
+  }
+}
       }
       showToast('🗑️ Удалено ' + toDelete.length + ' старых уроков', true)
     }
@@ -3949,18 +3956,27 @@ if (notificationSelect) {
       const idx = lessons.findIndex(l => l.id === item.id)
       if (idx !== -1) lessons[idx].time = item.newTime
       if (currentUser) {
-        try {
-          const lessonAfter = lessons.find(l => l.id === item.id)
-          await gasCall({ action: 'save_lesson', token: localStorage.getItem('teacher_jwt'), lesson: {
-            lesson_id: item.id,
-            student: lessonAfter?.student || '',
-            date: lessonAfter?.date || '',
-            time: timeToExcelTime(item.newTime),
-            duration: lessonAfter?.duration || 60,
-            notes: lessonAfter?.notes || ''
-          }, is_update: true })
-        } catch(e) { console.error('Ошибка обновления времени:', e) }
-      }
+  try {
+    const lessonAfter = lessons.find(l => l.id === item.id)
+    const { error } = await gasCall({ action: 'save_lesson', token: localStorage.getItem('teacher_jwt'), lesson: {
+      lesson_id: item.id,
+      student: lessonAfter?.student || '',
+      date: lessonAfter?.date || '',
+      time: timeToExcelTime(item.newTime),
+      duration: lessonAfter?.duration || 60,
+      notes: lessonAfter?.notes || ''
+    }, is_update: true })
+    if (error) throw error
+  } catch(e) {
+    console.error('Ошибка обновления времени:', e)
+    pendingChanges.push({
+      action: 'update',
+      lesson: lessonAfter,
+      timestamp: new Date().toISOString()
+    })
+    localStorage.setItem(STORAGE_KEYS.PENDING_CHANGES, JSON.stringify(pendingChanges))
+  }
+}
     }
 
     const skipped = _pendingTimeChanges.length - toApply.length
@@ -3995,12 +4011,21 @@ if (notificationSelect) {
       const ids = _pendingDeletes.map(r => r.id)
       lessons = lessons.filter(l => !ids.includes(l.id))
       if (currentUser) {
-        for (const item of _pendingDeletes) {
-          try {
-            await gasCall({ action: 'delete_lesson', token: localStorage.getItem('teacher_jwt'), lesson_id: item.id })
-          } catch(e) { console.error('Ошибка удаления:', e) }
-        }
-      }
+  for (const item of _pendingDeletes) {
+    try {
+      const { error } = await gasCall({ action: 'delete_lesson', token: localStorage.getItem('teacher_jwt'), lesson_id: item.id })
+      if (error) throw error
+    } catch(e) {
+      console.error('Ошибка удаления:', e)
+      pendingChanges.push({
+        action: 'delete',
+        lesson_id: item.id,
+        timestamp: new Date().toISOString()
+      })
+      localStorage.setItem(STORAGE_KEYS.PENDING_CHANGES, JSON.stringify(pendingChanges))
+    }
+  }
+}
       saveLessonsToStorage()
       calendar.refetchEvents()
       calculateScrollerHeight()
