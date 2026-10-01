@@ -3594,18 +3594,30 @@ if (notificationSelect) {
     let newWorker = null
     let isReloading = false
 
-    function applyUpdate() {
-      if (isReloading) return
-      isReloading = true
-      const banner = document.getElementById('updateBanner')
-      if (banner) banner.style.display = 'none'
-      localStorage.removeItem('app_known_version')
-      if (newWorker) {
-        newWorker.postMessage({ action: 'skipWaiting' })
-      } else {
-        window.location.reload()
-      }
+    async function applyUpdate() {
+  if (isReloading) return
+  isReloading = true
+  const banner = document.getElementById('updateBanner')
+  if (banner) banner.style.display = 'none'
+  localStorage.removeItem('app_known_version')
+
+  // ⭐ Обновляем push-подписку перед перезагрузкой
+  // (после обновления SW endpoint может стать недействительным)
+  if (currentUser && localStorage.getItem('teacher_notification') !== 'Не оповещать') {
+    console.log('🔄 Обновляем push-подписку перед обновлением версии...')
+    try {
+      await subscribeToPushNotifications()
+    } catch (e) {
+      console.error('Ошибка обновления подписки:', e)
     }
+  }
+
+  if (newWorker) {
+    newWorker.postMessage({ action: 'skipWaiting' })
+  } else {
+    window.location.reload()
+  }
+}
 
     function showUpdateBanner() {
       const banner = document.getElementById('updateBanner')
@@ -3791,34 +3803,37 @@ if (notificationSelect) {
       btn.title = enabled ? 'Автоудаление: включено' : 'Автоудаление: отключено'
     }
 
-    function runAutoDelete() {
-      const enabled = localStorage.getItem('auto_delete_old') === '1'
-      if (!enabled) return
-      const now = new Date()
-      const startOfCurrentMonth = new Date(now.getFullYear(), now.getMonth(), 1)
-      const cutoffDate = startOfCurrentMonth.toISOString().slice(0, 10)
-      const toDelete = lessons.filter(l => l.date < cutoffDate)
-      if (toDelete.length === 0) return
-      console.log('🗑️ Автоудаление ' + toDelete.length + ' уроков до ' + cutoffDate)
-      lessons = lessons.filter(l => l.date >= cutoffDate)
-      saveLessonsToStorage(); calendar.refetchEvents(); calculateScrollerHeight()
-      for (const lesson of toDelete) {
-  try {
-    const { error } = await gasCall({ action: 'delete_lesson', token, lesson_id: lesson.id })
-    if (error) throw error
-  } catch(e) {
-    console.error('Ошибка автоудаления:', e)
-    pendingChanges.push({
-      action: 'delete',
-      lesson_id: lesson.id,
-      timestamp: new Date().toISOString()
-    })
-    localStorage.setItem(STORAGE_KEYS.PENDING_CHANGES, JSON.stringify(pendingChanges))
-  }
-}
+    async function runAutoDelete() {
+  const enabled = localStorage.getItem('auto_delete_old') === '1'
+  if (!enabled) return
+  const now = new Date()
+  const startOfCurrentMonth = new Date(now.getFullYear(), now.getMonth(), 1)
+  const cutoffDate = startOfCurrentMonth.toISOString().slice(0, 10)
+  const toDelete = lessons.filter(l => l.date < cutoffDate)
+  if (toDelete.length === 0) return
+  console.log('🗑️ Автоудаление ' + toDelete.length + ' уроков до ' + cutoffDate)
+  lessons = lessons.filter(l => l.date >= cutoffDate)
+  saveLessonsToStorage(); calendar.refetchEvents(); calculateScrollerHeight()
+
+  if (currentUser) {
+    const token = localStorage.getItem('teacher_jwt')
+    for (const lesson of toDelete) {
+      try {
+        const { error } = await gasCall({ action: 'delete_lesson', token, lesson_id: lesson.id })
+        if (error) throw error
+      } catch(e) {
+        console.error('Ошибка автоудаления:', e)
+        pendingChanges.push({
+          action: 'delete',
+          lesson_id: lesson.id,
+          timestamp: new Date().toISOString()
+        })
+        localStorage.setItem(STORAGE_KEYS.PENDING_CHANGES, JSON.stringify(pendingChanges))
       }
-      showToast('🗑️ Удалено ' + toDelete.length + ' старых уроков', true)
     }
+  }
+  showToast('🗑️ Удалено ' + toDelete.length + ' старых уроков', true)
+}
 
     // ===== ВКЛАДКИ И ГРУППОВЫЕ ДЕЙСТВИЯ =====
     function switchEditTab(n) {
@@ -3953,31 +3968,31 @@ if (notificationSelect) {
     })
 
     for (const item of toApply) {
-      const idx = lessons.findIndex(l => l.id === item.id)
-      if (idx !== -1) lessons[idx].time = item.newTime
-      if (currentUser) {
-  try {
-    const lessonAfter = lessons.find(l => l.id === item.id)
-    const { error } = await gasCall({ action: 'save_lesson', token: localStorage.getItem('teacher_jwt'), lesson: {
-      lesson_id: item.id,
-      student: lessonAfter?.student || '',
-      date: lessonAfter?.date || '',
-      time: timeToExcelTime(item.newTime),
-      duration: lessonAfter?.duration || 60,
-      notes: lessonAfter?.notes || ''
-    }, is_update: true })
-    if (error) throw error
-  } catch(e) {
-    console.error('Ошибка обновления времени:', e)
-    pendingChanges.push({
-      action: 'update',
-      lesson: lessonAfter,
-      timestamp: new Date().toISOString()
-    })
-    localStorage.setItem(STORAGE_KEYS.PENDING_CHANGES, JSON.stringify(pendingChanges))
+  const idx = lessons.findIndex(l => l.id === item.id)
+  if (idx !== -1) lessons[idx].time = item.newTime
+  if (currentUser) {
+    const lessonAfter = lessons.find(l => l.id === item.id)   // ⭐ Вынесли наружу
+    try {
+      const { error } = await gasCall({ action: 'save_lesson', token: localStorage.getItem('teacher_jwt'), lesson: {
+        lesson_id: item.id,
+        student: lessonAfter?.student || '',
+        date: lessonAfter?.date || '',
+        time: timeToExcelTime(item.newTime),
+        duration: lessonAfter?.duration || 60,
+        notes: lessonAfter?.notes || ''
+      }, is_update: true })
+      if (error) throw error
+    } catch(e) {
+      console.error('Ошибка обновления времени:', e)
+      pendingChanges.push({
+        action: 'update',
+        lesson: lessonAfter,
+        timestamp: new Date().toISOString()
+      })
+      localStorage.setItem(STORAGE_KEYS.PENDING_CHANGES, JSON.stringify(pendingChanges))
+    }
   }
 }
-    }
 
     const skipped = _pendingTimeChanges.length - toApply.length
     saveLessonsToStorage()
