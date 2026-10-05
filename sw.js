@@ -1,4 +1,4 @@
-const CACHE_NAME = 'raspisanie-v12';
+const CACHE_NAME = 'raspisanie-v13';
 const NEVER_CACHE = [
   'script.google.com',
   'cdn.tailwindcss.com',
@@ -7,6 +7,7 @@ const NEVER_CACHE = [
 const urlsToCache = [
   '/Raspisanie/',
   '/Raspisanie/index.html',
+  '/Raspisanie/js/tailwind.js',
   '/Raspisanie/js/fullcalendar.js',
   '/Raspisanie/js/fullcalendar-locales.js',
   '/Raspisanie/manifest.json',
@@ -42,26 +43,53 @@ self.addEventListener('activate', event => {
 self.addEventListener('fetch', event => {
   const url = event.request.url;
 
+  // GAS и внешние CDN — всегда в сеть, без кеша
   if (NEVER_CACHE.some(domain => url.includes(domain))) {
-    //event.respondWith(fetch(event.request));
     return;
   }
 
-  if (url.endsWith('/Raspisanie/') || url.endsWith('/Raspisanie/index.html')) {
+  // ⭐ Навигация (открытие страницы) — Network-first с надёжным fallback
+  if (event.request.mode === 'navigate') {
     event.respondWith(
-      fetch(event.request).catch(() => caches.match(event.request))
+      fetch(event.request)
+        .then(response => {
+          const clone = response.clone();
+          caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
+          return response;
+        })
+        .catch(() => {
+          return caches.match(event.request)
+            .then(cached => cached || caches.match('/Raspisanie/index.html'))
+            .then(fallback => fallback || new Response(
+              '<!DOCTYPE html><html><head><meta charset="utf-8"><title>Офлайн</title></head><body style="font-family:sans-serif;padding:40px;text-align:center;"><h1>📴 Нет соединения</h1><p>Приложение не загружено. Подключитесь к интернету и обновите страницу.</p></body></html>',
+              { headers: { 'Content-Type': 'text/html; charset=utf-8' } }
+            ));
+        })
     );
     return;
   }
 
+  // ⭐ Остальные запросы — Cache-first с фоновым обновлением
   event.respondWith(
-    caches.match(event.request).then(response => response || fetch(event.request))
+    caches.match(event.request).then(cached => {
+      if (cached) {
+        // Обновляем в фоне
+        fetch(event.request).then(response => {
+          if (response && response.status === 200) {
+            caches.open(CACHE_NAME).then(cache => cache.put(event.request, response));
+          }
+        }).catch(() => {});
+        return cached;
+      }
+      // Нет в кеше — пробуем сеть
+      return fetch(event.request).catch(() => {
+        return new Response('', { status: 503, statusText: 'Offline' });
+      });
+    })
   );
 });
 
-// ===== PUSH (стандартный Web Push — работает когда приложение закрыто) =====
-// GAS отправляет POST на ntfy.sh → ntfy доставляет через браузерный Push API →
-// SW получает этот event даже если страница закрыта.
+// ===== PUSH =====
 self.addEventListener('push', event => {
   let title = '📅 Расписание';
   let body = 'Напоминание о занятии';
@@ -69,13 +97,11 @@ self.addEventListener('push', event => {
 
   if (event.data) {
     try {
-      // ntfy.sh отправляет JSON: { title, message, click, ... }
       const data = event.data.json();
       title = data.title || title;
       body = data.message || data.body || body;
       url = data.click || data.url || url;
     } catch (e) {
-      // ntfy иногда шлёт plain text
       body = event.data.text() || body;
     }
   }
@@ -121,5 +147,4 @@ self.addEventListener('message', event => {
   if (event.data.action === 'skipWaiting') {
     self.skipWaiting();
   }
-  // subscribentfy больше не нужен — polling удалён
 });
