@@ -667,15 +667,20 @@ body.light .fc-timeGridDay-view .fc-scrollgrid-sync-inner {
         </div>
       </div>
 
-      <div style="margin-bottom: 12px;">
-        <div class="text-xs mb-1">Экспорт/Импорт</div>
-        <div style="display: flex; gap: 8px; margin-bottom: 4px;">
-          <button class="flex-1 btn-secondary" onclick="exportLocal()" style="padding: 8px; font-size: 13px;">📁 Локально</button>
-          <button class="flex-1 btn-primary" onclick="exportCloud()" style="padding: 8px; font-size: 13px; opacity: 0.5; background: #2563eb;" disabled>☁️ В облако</button>
-        </div>
-        <div style="display: flex; gap: 8px;">
-          <button class="flex-1 btn-secondary" onclick="importLocal()" style="padding: 8px; font-size: 13px;">📁 Из файла</button>
-          <button class="flex-1 btn-primary" onclick="importCloud()" style="padding: 8px; font-size: 13px; opacity: 0.5; background: #2563eb;" disabled>☁️ Из облака</button>
+           <div style="margin-bottom: 12px;">
+        <div style="display: flex; gap: 8px; margin-bottom: 12px;">
+          <!-- ЛЕВАЯ КОЛОНКА: Импорт -->
+          <div style="flex: 1; display: flex; flex-direction: column; gap: 8px;">
+            <div class="text-xs" style="color: #94a3b8; text-align: left;">Импорт</div>
+            <button class="btn-secondary" onclick="importLocal()" style="padding: 8px; font-size: 13px;">📁 Из файла</button>
+            <button class="btn-primary" onclick="importCloud()" style="padding: 8px; font-size: 13px; opacity: 0.5; background: #2563eb;" disabled>☁️ Из облака</button>
+          </div>
+          <!-- ПРАВАЯ КОЛОНКА: Экспорт -->
+          <div style="flex: 1; display: flex; flex-direction: column; gap: 8px;">
+            <div class="text-xs" style="color: #94a3b8; text-align: left;">Экспорт</div>
+            <button class="btn-secondary" onclick="exportLocal()" style="padding: 8px; font-size: 13px;">📁 Локально</button>
+            <button class="btn-primary" onclick="exportCloud()" style="padding: 8px; font-size: 13px; opacity: 0.5; background: #2563eb;" disabled>☁️ В облако</button>
+          </div>
         </div>
         <input type="file" id="importFile" style="display:none;" accept=".json">
       </div>
@@ -2938,7 +2943,7 @@ function closeSheet() {
       if (_devicesViewOpen) {
         settingsBody.style.display = 'none'
         devicesBody.style.display = 'block'
-        title.textContent = '📱 Устройства'
+        title.textContent = 'Устройства'
         devBtn.style.background = '#7c3aed'
         devBtn.style.outline = '2px solid #a78bfa'
         await loadDevicesList()
