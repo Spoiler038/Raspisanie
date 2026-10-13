@@ -3484,6 +3484,7 @@ function doDeleteProfile() {
 
     // ИНИЦИАЛИЗАЦИЯ ПРИ ЗАГРУЗКЕ
    document.addEventListener('DOMContentLoaded', function() {
+     initStorage()
     try {
         const savedTheme = localStorage.getItem('teacher_theme') || 'dark'
         document.body.className = savedTheme
