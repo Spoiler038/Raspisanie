@@ -1248,11 +1248,18 @@ async function subscribeToPushNotifications() {
     }
 
     function sendLocalNotification(lesson, setting) {
-      const timeToLesson = getTimeToLesson(lesson)
-      const title = '📅 Напоминание о занятии'
-      const body = `Через ${timeToLesson} занятие с ${lesson.student}`
-      
-      console.log(`🔔 Уведомление: ${body}`)
+  // ⭐ Если есть сеть — push придёт сам через GAS, локальный звук не нужен
+  if (navigator.onLine) {
+    console.log('🌐 Есть сеть — локальное уведомление пропускаем (push придёт через GAS)')
+    return
+  }
+
+  // ⭐ Нет сети — играем звук, вибрацию, показываем уведомление
+  const timeToLesson = getTimeToLesson(lesson)
+  const title = '📅 Напоминание о занятии'
+  const body = `Через ${timeToLesson} занятие с ${lesson.student}`
+  
+  console.log(`🔔 Локальное уведомление (офлайн): ${body}`)
 
       // Звук — мелодия напоминания ~4.5 сек
       try {
