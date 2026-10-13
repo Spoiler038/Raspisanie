@@ -2632,11 +2632,23 @@ async function applyCopyPeriod() {
   showSaveOverlay(true)
   
   try {
-    // ⭐ Старт — со следующего дня после исходного занятия
     const [srcY, srcM, srcD] = sourceDateStr.split('-').map(Number)
-    const start = new Date(srcY, srcM - 1, srcD)
-    start.setDate(start.getDate() + 1)
-    start.setHours(0, 0, 0, 0)
+
+// ⭐ Проверяем, есть ли уже урок на исходную дату
+const sourceDateStrFormatted = `${srcY}-${String(srcM).padStart(2, '0')}-${String(srcD).padStart(2, '0')}`
+const sourceExists = lessons.some(l =>
+  l.date === sourceDateStrFormatted &&
+  l.student === student &&
+  l.time === time
+)
+
+// ⭐ Старт: если урока на исходную дату нет — включаем её в создание.
+// Если есть — начинаем со следующего дня.
+const start = new Date(srcY, srcM - 1, srcD)
+if (sourceExists) {
+  start.setDate(start.getDate() + 1)
+}
+start.setHours(0, 0, 0, 0)
     
     // ⭐ Конец — указанная дата "до"
     const [untilY, untilM, untilD] = until.split('-').map(Number)
