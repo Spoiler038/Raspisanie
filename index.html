@@ -2217,7 +2217,7 @@ showToast('✅ Данные загружены из облака. Уроков: 
         rows.forEach(row => {
           const cells = Array.from(row.querySelectorAll('.fc-daygrid-day'))
           let maxHeight = 70
-          cells.forEach(cell => { const contentHeight = cell.scrollHeight; if (contentHeight > maxHeight) maxHeight = Math.min(contentHeight, 120) })
+          cells.forEach(cell => { const contentHeight = cell.scrollHeight; if (contentHeight > maxHeight) maxHeight = Math.min(contentHeight, 90) })
           cells.forEach(cell => {
             if (parseInt(cell.style.height) !== maxHeight) {
               needsUpdate = true
