@@ -74,10 +74,10 @@ body.light .fc-timeGridWeek-view .fc-col-header-cell {
     color: #020617 !important;
 }
     .fc-col-header-cell-cushion { padding: 6px 0; font-weight: 500; }
-    .fc-dayGridMonth-view .fc-daygrid-day { min-height: 60px !important; height: auto !important; max-height: 168px !important; position: relative !important; background: #020617 !important; }
+    .fc-dayGridMonth-view .fc-daygrid-day { min-height: 77px !important; height: auto !important; max-height: 168px !important; position: relative !important; background: #020617 !important; }
     body.light .fc-dayGridMonth-view .fc-daygrid-day { background: #ffffff !important; }
     /* FIX: frame и bg берут цвет от родителя, не переопределяем отдельно */
-    .fc-dayGridMonth-view .fc-daygrid-day-frame { min-height: 58px !important; height: auto !important; max-height: 166px !important; overflow: hidden !important; background: transparent !important; position: relative !important; }
+    .fc-dayGridMonth-view .fc-daygrid-day-frame { min-height: 75px !important; height: auto !important; max-height: 166px !important; overflow: hidden !important; background: transparent !important; position: relative !important; }
     .fc-dayGridMonth-view .fc-daygrid-day-bg { position: absolute !important; top: 0 !important; left: 0 !important; right: 0 !important; bottom: 0 !important; width: 100% !important; height: 100% !important; background: transparent !important; }
     .fc-daygrid-day-bottom { display: none !important; }
     .fc-dayGridMonth-view .fc-daygrid-day-events { margin-top: 0 !important; margin-bottom: 0 !important; min-height: 0 !important; padding: 1px 0 !important; }
@@ -2223,8 +2223,8 @@ showToast('✅ Данные загружены из облака. Уроков: 
         let needsUpdate = false
         rows.forEach(row => {
           const cells = Array.from(row.querySelectorAll('.fc-daygrid-day'))
-          let maxHeight = 70
-          cells.forEach(cell => { const contentHeight = cell.scrollHeight; if (contentHeight > maxHeight) maxHeight = Math.min(contentHeight, 90) })
+          let maxHeight = 77
+          cells.forEach(cell => { const contentHeight = cell.scrollHeight; if (contentHeight > maxHeight) maxHeight = Math.min(contentHeight, 168) })
           cells.forEach(cell => {
             if (parseInt(cell.style.height) !== maxHeight) {
               needsUpdate = true
