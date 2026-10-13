@@ -2277,7 +2277,8 @@ showToast('✅ Данные загружены из облака. Уроков: 
           _layoutCache.dayHeaderHeight === dayHeaderHeight) {
         availableHeight = _layoutCache.availableHeight;
       } else {
-        availableHeight = viewportHeight - headerHeight - bottomBarHeight - 5;
+        //availableHeight = viewportHeight - headerHeight - bottomBarHeight - 5;
+        availableHeight = viewportHeight - headerHeight - bottomBarHeight;
         needsGeometryUpdate = true;
         _layoutCache = { headerHeight, bottomBarHeight, viewportHeight, dayHeaderHeight, availableHeight };
       }
@@ -2293,7 +2294,8 @@ showToast('✅ Данные загружены из облака. Уроков: 
           if (scroller.closest('.fc-timeGridWeek-view') || scroller.closest('.fc-timeGridDay-view')) {
             scroller.style.setProperty('max-height', (availableHeight - dayHeaderHeight - 5) + 'px', 'important');
           } else {
-            scroller.style.setProperty('max-height', availableHeight + 'px', 'important');
+            //scroller.style.setProperty('max-height', availableHeight + 'px', 'important');
+            scroller.style.setProperty('max-height', (availableHeight + 150) + 'px', 'important');
           }
           scroller.style.setProperty('overflow-y', 'auto', 'important');
           scroller.style.setProperty('overflow-x', 'hidden', 'important');
