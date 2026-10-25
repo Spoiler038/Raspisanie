@@ -3049,17 +3049,18 @@ async function confirmDeleteDevice() {
   btn.style.opacity = '0.7'
   try {
     const token = localStorage.getItem('teacher_jwt')
-    // ⭐ Передаём device_id (или endpoint как fallback)
-    await gasCall({
+    const { data, error } = await gasCall({
       action: 'delete_push_sub',
       token,
       device_id: _pendingDeleteDeviceId
     })
+    if (error) throw error
     closeDeleteDeviceModal()
     showToast('✅ Устройство удалено', true)
     await loadDevicesList()
   } catch(e) {
-    showToast('❌ Ошибка удаления', false)
+    console.error('Ошибка удаления устройства:', e)
+    showToast('❌ Ошибка: ' + e.message, false)
     btn.disabled = false
     btn.textContent = '🗑️ Удалить'
     btn.style.opacity = '1'
