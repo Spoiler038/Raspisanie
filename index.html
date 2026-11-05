@@ -2306,13 +2306,11 @@ cells.forEach(cell => {
     scroller.style.setProperty('overflow-x', 'hidden', 'important');
   });
 }
-      // ⭐ Динамический отступ снизу для месяца (чтобы последняя неделя не уходила под панель)
-  const monthBody = document.querySelector('.fc-dayGridMonth-view .fc-daygrid-body');
-  if (monthBody) {
-    // Отступ = высота нижней панели + небольшой запас (10px)
-    const bottomPad = bottomBarHeight + 5;
-    monthBody.style.setProperty('padding-bottom', bottomPad + 'px', 'important');
-  }
+      // ⭐ Динамический отступ снизу для месяца
+const monthBody = document.querySelector('.fc-dayGridMonth-view .fc-daygrid-body');
+if (monthBody) {
+  const bottomPad = bottomBarHeight + 5; // Высота панели + 5px запаса
+  monthBody.style.setProperty('padding-bottom', bottomPad + 'px', 'important');
 }
 
       if (viewType === 'dayGridMonth') {
