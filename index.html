@@ -101,6 +101,8 @@ body.light .fc-timeGridWeek-view .fc-col-header-cell {
     .fc-timegrid-allday, .fc-timegrid-all-day { display: none !important; }
     .fc-scroller, .fc-scroller-liquid, .fc-daygrid-body, .fc-timegrid-body, .fc-timegrid-cols { overflow-x: hidden !important; }
     .fc-timeGridWeek-view .fc-scroller, .fc-timeGridDay-view .fc-scroller, .fc-dayGridMonth-view .fc-scroller { overflow-y: auto !important; overflow-x: hidden !important; -webkit-overflow-scrolling: touch !important; max-height: none !important; }
+    /* ⭐ Отступ снизу ТОЛЬКО для режима Месяц, чтобы 6-я неделя не уходила под панель */
+    .fc-dayGridMonth-view .fc-scroller {padding-bottom: 80px !important;box-sizing: content-box !important;}
     .fc-timegrid-slots { height: auto !important; min-height: 100% !important; }
     .fc-timegrid-col-frame { height: auto !important; min-height: 100% !important; }
     .fc-timegrid-slot { height: 30px !important; min-height: 30px !important; max-height: 30px !important; }
