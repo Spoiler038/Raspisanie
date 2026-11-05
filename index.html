@@ -170,10 +170,7 @@ header button {
     .fc-timeGridDay-view .fc-timegrid-slots { min-height: 100% !important; }
     .fc-timeGridDay-view .fc-timegrid-slot { height: 30px !important; }
     .fc-dayGridMonth-view .fc-scroller { overflow-x: hidden !important; }
-    .fc-dayGridMonth-view .fc-daygrid-body { width: 100% !important; 
-    /* ⭐ ДОБАВИТЬ: отступ снизу, чтобы последняя неделя не пряталась под панелью */
-      padding-bottom: 40px !important; 
-      box-sizing: border-box !important;}
+    .fc-dayGridMonth-view .fc-daygrid-body { width: 100% !important; box-sizing: border-box !important;}
     @media (max-width: 480px) { .fc-dayGridMonth-view .fc-daygrid-day { min-height: 70px !important; } }
     .space-y-3>*+* { margin-top: 12px; }
     .space-y-4>*+* { margin-top: 16px; }
@@ -2308,6 +2305,14 @@ cells.forEach(cell => {
     scroller.style.setProperty('overflow-y', 'auto', 'important');
     scroller.style.setProperty('overflow-x', 'hidden', 'important');
   });
+}
+      // ⭐ Динамический отступ снизу для месяца (чтобы последняя неделя не уходила под панель)
+  const monthBody = document.querySelector('.fc-dayGridMonth-view .fc-daygrid-body');
+  if (monthBody) {
+    // Отступ = высота нижней панели + небольшой запас (10px)
+    const bottomPad = bottomBarHeight + 5;
+    monthBody.style.setProperty('padding-bottom', bottomPad + 'px', 'important');
+  }
 }
 
       if (viewType === 'dayGridMonth') {
