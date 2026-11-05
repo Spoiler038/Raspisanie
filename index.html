@@ -2316,7 +2316,7 @@ if (viewType === 'dayGridMonth') {
     const footer = document.createElement('div');
     footer.className = 'month-scroll-footer';
     // Высота футера = высота нижней панели + небольшой запас (10px)
-    footer.style.height = (bottomBarHeight + 10) + 'px';
+    footer.style.height = Math.floor(bottomBarHeight / 2) + 'px';
     footer.style.width = '100%';
     monthBody.appendChild(footer);
   }
