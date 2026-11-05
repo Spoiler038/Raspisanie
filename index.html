@@ -2298,26 +2298,24 @@ cells.forEach(cell => {
     if (scroller.closest('.fc-timeGridWeek-view') || scroller.closest('.fc-timeGridDay-view')) {
       scroller.style.setProperty('max-height', (availableHeight - dayHeaderHeight - 5) + 'px', 'important');
     } else {
-      // ⭐ Для месяца — max-height = availableHeight (не больше экрана), 
-      // скролл включён, если контент больше
       scroller.style.setProperty('max-height', availableHeight + 'px', 'important');
     }
     scroller.style.setProperty('overflow-y', 'auto', 'important');
     scroller.style.setProperty('overflow-x', 'hidden', 'important');
   });
 }
-      // ⭐ Динамический отступ снизу для месяца
-const monthBody = document.querySelector('.fc-dayGridMonth-view .fc-daygrid-body');
-if (monthBody) {
-  const bottomPad = bottomBarHeight + 5; // Высота панели + 5px запаса
-  monthBody.style.setProperty('padding-bottom', bottomPad + 'px', 'important');
+
+// ⭐ Отступ для месяца ВСЕГДА, вне проверки геометрии
+if (viewType === 'dayGridMonth') {
+  const monthScroller = document.querySelector('.fc-dayGridMonth-view .fc-scroller');
+  if (monthScroller) {
+    // Высота панели + 5px запаса
+    const bottomPad = bottomBarHeight + 5;
+    monthScroller.style.setProperty('padding-bottom', bottomPad + 'px', 'important');
+    monthScroller.style.setProperty('box-sizing', 'content-box', 'important');
+  }
+  normalizeMonthHeights();
 }
-
-      if (viewType === 'dayGridMonth') {
-        normalizeMonthHeights();
-      }
-    }
-
     
 
     const calendar = new FullCalendar.Calendar(document.getElementById('calendar'), {
