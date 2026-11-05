@@ -2319,14 +2319,18 @@ if (viewType === 'dayGridMonth') {
     const scroller = document.querySelector('.fc-dayGridMonth-view .fc-scroller');
     const monthBody = document.querySelector('.fc-dayGridMonth-view .fc-daygrid-body');
     
-    // Если скроллер есть и контент реально не помещается (высота контента больше доступной высоты)
-    if (scroller && monthBody && scroller.scrollHeight > scroller.clientHeight) {
-      const footer = document.createElement('div');
-      footer.className = 'month-scroll-footer';
-      // Высота футера = высота нижней панели + 30px запаса
-      footer.style.height = (bottomBarHeight + 70) + 'px';
-      footer.style.width = '100%';
-      monthBody.appendChild(footer);
+        if (scroller) {
+      // Сбрасываем предыдущие стили
+      scroller.style.paddingBottom = '';
+      
+      // Если календарь не помещается на экран, добавляем отступ САМОМУ СКРОЛЛЕРУ
+      if (scroller.scrollHeight > scroller.clientHeight) {
+        // Высота панели + 20px запаса
+        const bottomPad = bottomBarHeight + 20;
+        scroller.style.setProperty('padding-bottom', bottomPad + 'px', 'important');
+        // Важно: box-sizing должен быть border-box или content-box в зависимости от стилей FC
+        scroller.style.setProperty('box-sizing', 'border-box', 'important'); 
+      }
     }
   }, 50);
 }
