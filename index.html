@@ -2305,14 +2305,20 @@ cells.forEach(cell => {
   });
 }
 
-// ⭐ Отступ для месяца ВСЕГДА, вне проверки геометрии
+// ⭐ Отступ для месяца через футер (чтобы не ломать сетку)
 if (viewType === 'dayGridMonth') {
-  const monthScroller = document.querySelector('.fc-dayGridMonth-view .fc-scroller');
-  if (monthScroller) {
-    // Высота панели + 5px запаса
-    const bottomPad = bottomBarHeight + 5;
-    monthScroller.style.setProperty('padding-bottom', bottomPad + 'px', 'important');
-    monthScroller.style.setProperty('box-sizing', 'content-box', 'important');
+  // Удаляем старый футер, если он был
+  const oldFooter = document.querySelector('.month-scroll-footer');
+  if (oldFooter) oldFooter.remove();
+
+  const monthBody = document.querySelector('.fc-dayGridMonth-view .fc-daygrid-body');
+  if (monthBody) {
+    const footer = document.createElement('div');
+    footer.className = 'month-scroll-footer';
+    // Высота футера = высота нижней панели + небольшой запас (10px)
+    footer.style.height = (bottomBarHeight + 10) + 'px';
+    footer.style.width = '100%';
+    monthBody.appendChild(footer);
   }
   normalizeMonthHeights();
 }
