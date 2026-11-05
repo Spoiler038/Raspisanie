@@ -2305,22 +2305,30 @@ cells.forEach(cell => {
   });
 }
 
-// ⭐ Отступ для месяца через футер (чтобы не ломать сетку)
+// ⭐ Отступ для месяца через футер (только если календарь не влезает)
 if (viewType === 'dayGridMonth') {
-  // Удаляем старый футер, если он был
+  // 1. Удаляем старый футер, если он был
   const oldFooter = document.querySelector('.month-scroll-footer');
   if (oldFooter) oldFooter.remove();
 
-  const monthBody = document.querySelector('.fc-dayGridMonth-view .fc-daygrid-body');
-  if (monthBody) {
-    const footer = document.createElement('div');
-    footer.className = 'month-scroll-footer';
-    // Высота футера = высота нижней панели + небольшой запас (10px)
-    footer.style.height = Math.floor(bottomBarHeight / 2) + 'px';
-    footer.style.width = '100%';
-    monthBody.appendChild(footer);
-  }
-  normalizeMonthHeights();
+  // 2. Сначала даём FullCalendar отрендерить сетку в нормальном виде
+  normalizeMonthHeights(); 
+
+  // 3. Ждём долю секунды, чтобы браузер посчитал высоты
+  setTimeout(() => {
+    const scroller = document.querySelector('.fc-dayGridMonth-view .fc-scroller');
+    const monthBody = document.querySelector('.fc-dayGridMonth-view .fc-daygrid-body');
+    
+    // Если скроллер есть и контент реально не помещается (высота контента больше доступной высоты)
+    if (scroller && monthBody && scroller.scrollHeight > scroller.clientHeight) {
+      const footer = document.createElement('div');
+      footer.className = 'month-scroll-footer';
+      // Высота футера = высота нижней панели + 10px запаса
+      footer.style.height = (bottomBarHeight + 10) + 'px';
+      footer.style.width = '100%';
+      monthBody.appendChild(footer);
+    }
+  }, 50);
 }
     }
     
