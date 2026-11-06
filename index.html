@@ -2839,24 +2839,57 @@ function closeSheet() {
       }, 3000);
     }
 
-    function hasLessonConflict(newLesson, editMode = false) {
-      const lessonStart = new Date(`${newLesson.date}T${newLesson.time}`)
-      const lessonEnd = new Date(lessonStart.getTime() + newLesson.duration * 60000)
-      const workStart = new Date(`${newLesson.date}T${workHours.from}`)
-      const workEnd = new Date(`${newLesson.date}T${workHours.to}`)
-      
-      if (lessonStart < workStart) return { conflict: true, message: `⏰ Урок начинается до начала рабочего дня (${workHours.from})` }
-      if (lessonEnd > workEnd) return { conflict: true, message: `⏰ Урок заканчивается после окончания рабочего дня (${workHours.to})` }
-      
-      for (let lesson of lessons) {
-        if (editMode && lesson.id === newLesson.id) continue
-        const existingStart = new Date(`${lesson.date}T${lesson.time}`)
-        const existingEnd = new Date(existingStart.getTime() + lesson.duration * 60000)
-        if (lessonStart < existingEnd && lessonEnd > existingStart) return { conflict: true, message: `❌ Конфликт с уроком "${lesson.student}" в ${lesson.time}` }
-      }
-      return { conflict: false }
-    }
+    // ⭐ Добавляет минуты к строке "YYYY-MM-DDTHH:MM"
+function addMinutesToString(dateTimeStr, minutes) {
+  const [datePart, timePart] = dateTimeStr.split('T')
+  const [hours, mins] = timePart.split(':').map(Number)
+  const totalMins = hours * 60 + mins + minutes
+  const newHours = Math.floor(totalMins / 60)
+  const newMins = totalMins % 60
 
+  if (newHours >= 24) {
+    const d = new Date(datePart)
+    d.setDate(d.getDate() + 1)
+    const y = d.getFullYear()
+    const m = String(d.getMonth() + 1).padStart(2, '0')
+    const dd = String(d.getDate()).padStart(2, '0')
+    return `${y}-${m}-${dd}T${String(newHours % 24).padStart(2, '0')}:${String(newMins).padStart(2, '0')}`
+  }
+  return `${datePart}T${String(newHours).padStart(2, '0')}:${String(newMins).padStart(2, '0')}`
+}
+    
+    function hasLessonConflict(newLesson, editMode = false) {
+  const lessonStartStr = `${newLesson.date}T${newLesson.time}`
+  const lessonEndStr = addMinutesToString(lessonStartStr, newLesson.duration)
+
+  // ⭐ Обрабатываем "конец дня" (00:00 в настройках = 23:59)
+  let workToStr = workHours.to === '00:00' ? '23:59' : workHours.to
+  const workStartStr = `${newLesson.date}T${workHours.from}`
+  const workEndStr = `${newLesson.date}T${workToStr}`
+
+  if (lessonStartStr < workStartStr) {
+    return { conflict: true, message: `⏰ Урок начинается до начала рабочего дня (${workHours.from})` }
+  }
+
+  // ⭐ Строковое сравнение: урок 22:00–23:00 НЕ выйдет за 23:00
+  if (lessonEndStr > workEndStr) {
+    return { conflict: true, message: `⏰ Урок заканчивается после окончания рабочего дня (${workHours.to})` }
+  }
+
+  for (let lesson of lessons) {
+    if (editMode && lesson.id === newLesson.id) continue
+    if (lesson.date !== newLesson.date) continue
+
+    const existingStartStr = `${lesson.date}T${lesson.time}`
+    const existingEndStr = addMinutesToString(existingStartStr, lesson.duration)
+
+    // ⭐ Строковое сравнение: 10:00–11:00 и 11:00–12:00 НЕ конфликтуют
+    if (lessonStartStr < existingEndStr && lessonEndStr > existingStartStr) {
+      return { conflict: true, message: `❌ Конфликт с уроком "${lesson.student}" в ${lesson.time}` }
+    }
+  }
+  return { conflict: false }
+}
     async function saveLesson() {
   const dateInput = document.getElementById('dateInput')
   const timeInput = document.getElementById('timeInput')
