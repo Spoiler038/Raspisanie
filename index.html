@@ -2305,34 +2305,28 @@ cells.forEach(cell => {
   });
 }
 
-// ⭐ Отступ для месяца через футер (только если календарь не влезает)
+// ⭐ Отступ для месяца через JS (универсально)
 if (viewType === 'dayGridMonth') {
-  // 1. Удаляем старый футер, если он был
-  const oldFooter = document.querySelector('.month-scroll-footer');
-  if (oldFooter) oldFooter.remove();
-
-  // 2. Сначала даём FullCalendar отрендерить сетку в нормальном виде
-  normalizeMonthHeights(); 
-
-  // 3. Ждём долю секунды, чтобы браузер посчитал высоты
+  normalizeMonthHeights();
+  
+  // Ждем полной отрисовки и пересчитываем
   setTimeout(() => {
     const scroller = document.querySelector('.fc-dayGridMonth-view .fc-scroller');
-    const monthBody = document.querySelector('.fc-dayGridMonth-view .fc-daygrid-body');
-    
-        if (scroller) {
-      // Сбрасываем предыдущие стили
+    if (scroller) {
+      // Сбрасываем старые стили
       scroller.style.paddingBottom = '';
       
-      // Если календарь не помещается на экран, добавляем отступ САМОМУ СКРОЛЛЕРУ
-      if (scroller.scrollHeight > scroller.clientHeight) {
-        // Высота панели + 20px запаса
-        const bottomPad = bottomBarHeight + 20;
+      // Если календарь не помещается на экран (есть скролл)
+      if (scroller.scrollHeight > scroller.clientHeight + 10) {
+        // Добавляем отступ снизу, равный высоте панели + 10px запаса.
+        // Это поднимет последнюю неделю над панелью.
+        const bottomPad = bottomBarHeight + 15;
         scroller.style.setProperty('padding-bottom', bottomPad + 'px', 'important');
-        // Важно: box-sizing должен быть border-box или content-box в зависимости от стилей FC
-        scroller.style.setProperty('box-sizing', 'border-box', 'important'); 
+        // Обязательно content-box, чтобы отступ добавлялся к высоте контента
+        scroller.style.setProperty('box-sizing', 'content-box', 'important');
       }
     }
-  }, 50);
+  }, 100); // 100мс — чтобы FullCalendar точно закончил рендер
 }
     }
     
@@ -4081,33 +4075,41 @@ if (notificationSelect) {
     }
 
     async function confirmDeleteChecked() {
-      document.getElementById('deleteCheckedModal').style.display = 'none'
-      const ids = _pendingDeletes.map(r => r.id)
-      lessons = lessons.filter(l => !ids.includes(l.id))
-      if (currentUser) {
-  for (const item of _pendingDeletes) {
-    try {
-      const { error } = await gasCall({ action: 'delete_lesson', token: localStorage.getItem('teacher_jwt'), lesson_id: item.id })
-      if (error) throw error
-    } catch(e) {
-      console.error('Ошибка удаления:', e)
-      pendingChanges.push({
-        action: 'delete',
-        lesson_id: item.id,
-        timestamp: new Date().toISOString()
-      })
-      localStorage.setItem(STORAGE_KEYS.PENDING_CHANGES, JSON.stringify(pendingChanges))
+  document.getElementById('deleteCheckedModal').style.display = 'none'
+  
+  // ⭐ Показываем спиннер и блокируем экран
+  showSaveOverlay(true)
+  
+  try {
+    const ids = _pendingDeletes.map(r => r.id)
+    lessons = lessons.filter(l => !ids.includes(l.id))
+    if (currentUser) {
+      for (const item of _pendingDeletes) {
+        try {
+          const { error } = await gasCall({ action: 'delete_lesson', token: localStorage.getItem('teacher_jwt'), lesson_id: item.id })
+          if (error) throw error
+        } catch(e) {
+          console.error('Ошибка удаления:', e)
+          pendingChanges.push({
+            action: 'delete',
+            lesson_id: item.id,
+            timestamp: new Date().toISOString()
+          })
+          localStorage.setItem(STORAGE_KEYS.PENDING_CHANGES, JSON.stringify(pendingChanges))
+        }
+      }
     }
+    saveLessonsToStorage()
+    calendar.refetchEvents()
+    calculateScrollerHeight()
+    document.getElementById('sheet').classList.remove('active')
+    showToast(`✅ Удалено уроков: ${_pendingDeletes.length}`, true)
+    _pendingDeletes = []
+  } finally {
+    // ⭐ Всегда скрываем спиннер
+    showSaveOverlay(false)
   }
 }
-      saveLessonsToStorage()
-      calendar.refetchEvents()
-      calculateScrollerHeight()
-      document.getElementById('sheet').classList.remove('active')
-      showToast(`✅ Удалено уроков: ${_pendingDeletes.length}`, true)
-      _pendingDeletes = []
-    }
-
     // ===== ТУР ОБУЧЕНИЯ =====
     const TOUR_STEPS = [
       {
