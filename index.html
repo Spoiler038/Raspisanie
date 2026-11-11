@@ -100,7 +100,7 @@ body.light .fc-timeGridWeek-view .fc-col-header-cell {
     .fc-timeGridDay-view .fc-day-today, .fc-timeGridDay-view .fc-timegrid-col.fc-day-today { background: transparent !important; }
     .fc-timegrid-allday, .fc-timegrid-all-day { display: none !important; }
     .fc-scroller, .fc-scroller-liquid, .fc-daygrid-body, .fc-timegrid-body, .fc-timegrid-cols { overflow-x: hidden !important; }
-    .fc-timeGridWeek-view .fc-scroller, .fc-timeGridDay-view .fc-scroller, .fc-dayGridMonth-view .fc-scroller { overflow-y: auto !important; overflow-x: hidden !important; -webkit-overflow-scrolling: touch !important; max-height: none !important; }
+    .fc-timeGridWeek-view .fc-scroller, .fc-timeGridDay-view .fc-scroller, .fc-dayGridMonth-view .fc-scroller { overflow-y: auto !important; overflow-x: hidden !important; -webkit-overflow-scrolling: touch !important; }
     .fc-timegrid-slots { height: auto !important; min-height: 100% !important; }
     .fc-timegrid-col-frame { height: auto !important; min-height: 100% !important; }
     .fc-timegrid-slot { height: 30px !important; min-height: 30px !important; max-height: 30px !important; }
@@ -2284,6 +2284,9 @@ cells.forEach(cell => {
       const calendarEl = document.getElementById('calendar');
       if (!header || !bottomBar || !calendarEl) return;
 
+      const oldSpacer = document.querySelector('.fc-month-bottom-spacer');
+      if (oldSpacer && calendar.view.type !== 'dayGridMonth') oldSpacer.remove();
+
       const headerHeight = header.offsetHeight;
       const bottomBarHeight = bottomBar.offsetHeight;
       const viewportHeight = window.innerHeight;
@@ -2328,23 +2331,33 @@ cells.forEach(cell => {
 // ⭐ Отступ для месяца через невидимый футер (позволяет прокрутить дальше)
 if (viewType === 'dayGridMonth') {
   normalizeMonthHeights();
-  
+
   setTimeout(() => {
     const scroller = document.querySelector('.fc-dayGridMonth-view .fc-scroller');
-    const table = document.querySelector('.fc-dayGridMonth-view .fc-scrollgrid-sync-table');
-    
-    if (scroller && table) {
-      // Сбрасываем предыдущий отступ
-      table.style.marginBottom = '0px';
-      
-      // Если контент не помещается на экран (есть скролл)
-      if (scroller.scrollHeight > scroller.clientHeight) {
-        // ⭐ Добавляем невидимый отступ снизу для таблицы.
-        // Это заставит прокрутку работать дальше.
-        // Высота = высота панели + 30px запаса.
-        const bottomPad = bottomBarHeight + 30;
-        table.style.setProperty('margin-bottom', bottomPad + 'px', 'important');
-      }
+    const harness = document.querySelector('.fc-dayGridMonth-view .fc-scroller-harness');
+    if (!scroller) return;
+
+    // Удаляем предыдущий спейсер, если был
+    const oldSpacer = document.querySelector('.fc-month-bottom-spacer');
+    if (oldSpacer) oldSpacer.remove();
+
+    // Проверяем, нужен ли скролл вообще
+    if (scroller.scrollHeight > scroller.clientHeight) {
+      // ⭐ Создаём реальный элемент-спейсер ВНУТРИ скроллера
+      const spacer = document.createElement('div');
+      spacer.className = 'fc-month-bottom-spacer';
+      // Высота = высота нижней панели + запас, чтобы последняя строка
+      // могла прокрутиться выше неё
+      const spacerHeight = bottomBarHeight + 40;
+      spacer.style.cssText = `
+        height: ${spacerHeight}px;
+        width: 100%;
+        pointer-events: none;
+        flex-shrink: 0;
+      `;
+
+      // Вставляем после таблицы внутри скроллера
+      scroller.appendChild(spacer);
     }
   }, 100);
 }
