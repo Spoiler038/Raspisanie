@@ -3633,19 +3633,27 @@ function doDeleteProfile() {
   
     try {
         const savedSettings = localStorage.getItem('teacher_settings')
-    if (savedSettings) {
+    try {
+      const savedSettings = localStorage.getItem('teacher_settings')
+      if (savedSettings) {
         const settings = JSON.parse(savedSettings)
-        if (settings.workHours) {
-        if (validateWorkHours(settings.workHours.from, settings.workHours.to)) {
-          workHours = settings.workHours
-        }
-        calendar.setOption('slotMinTime', workHours.from)
-        calendar.setOption('slotMaxTime', workHours.to)
-        if (workFromEl) workFromEl.value = workHours.from
-        if (workToEl) workToEl.value = workHours.to
+        
+        // ⭐ Проверяем, что объект workHours существует и содержит нужные поля
+        if (settings.workHours && settings.workHours.from && settings.workHours.to) {
+          if (validateWorkHours(settings.workHours.from, settings.workHours.to)) {
+            workHours = settings.workHours
+          }
+          calendar.setOption('slotMinTime', workHours.from)
+          calendar.setOption('slotMaxTime', workHours.to)
+          
+          // ⭐ Объявляем переменные через document.getElementById
+          const workFromEl = document.getElementById('workFrom')
+          const workToEl = document.getElementById('workTo')
+          if (workFromEl) workFromEl.value = workHours.from
+          if (workToEl) workToEl.value = workHours.to
         }
       }
-    } catch (e) { console.log('Ошибка загрузки настроек работы') }
+    } catch (e) { console.log('Ошибка загрузки настроек работы', e) }
   
     try {
       const savedNotification = localStorage.getItem('teacher_notification') || 'Не оповещать'
