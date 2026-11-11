@@ -2325,31 +2325,25 @@ cells.forEach(cell => {
   });
 }
 
-// ⭐ Отступ для месяца через JS (универсально)
 // ⭐ Отступ для месяца через невидимый футер (позволяет прокрутить дальше)
 if (viewType === 'dayGridMonth') {
-  // 1. Удаляем старый футер, если он был
-  const oldFooter = document.querySelector('.month-scroll-footer');
-  if (oldFooter) oldFooter.remove();
-
-  // 2. Даём FullCalendar отрендерить сетку
-  normalizeMonthHeights(); 
-
-  // 3. Ждём полной отрисовки и добавляем футер в конец сетки
+  normalizeMonthHeights();
+  
   setTimeout(() => {
-    const monthBody = document.querySelector('.fc-dayGridMonth-view .fc-daygrid-body');
     const scroller = document.querySelector('.fc-dayGridMonth-view .fc-scroller');
+    const table = document.querySelector('.fc-dayGridMonth-view .fc-scrollgrid-sync-table');
     
-    if (monthBody && scroller) {
-      // Проверяем, есть ли скролл (не помещается на экран)
+    if (scroller && table) {
+      // Сбрасываем предыдущий отступ
+      table.style.marginBottom = '0px';
+      
+      // Если контент не помещается на экран (есть скролл)
       if (scroller.scrollHeight > scroller.clientHeight) {
-        const footer = document.createElement('div');
-        footer.className = 'month-scroll-footer';
-        // Высота футера = высота панели + запас
-        footer.style.height = (bottomBarHeight + 70) + 'px';
-        footer.style.width = '100%';
-        footer.style.pointerEvents = 'none'; // Чтобы не мешал нажимать
-        monthBody.appendChild(footer);
+        // ⭐ Добавляем невидимый отступ снизу для таблицы.
+        // Это заставит прокрутку работать дальше.
+        // Высота = высота панели + 30px запаса.
+        const bottomPad = bottomBarHeight + 30;
+        table.style.setProperty('margin-bottom', bottomPad + 'px', 'important');
       }
     }
   }, 100);
