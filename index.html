@@ -3632,8 +3632,6 @@ function doDeleteProfile() {
         } catch (e) { document.body.className = 'dark' }
   
     try {
-        const savedSettings = localStorage.getItem('teacher_settings')
-    try {
       const savedSettings = localStorage.getItem('teacher_settings')
       if (savedSettings) {
         const settings = JSON.parse(savedSettings)
