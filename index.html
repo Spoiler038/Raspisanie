@@ -2317,10 +2317,10 @@ if (viewType === 'dayGridMonth') {
       scroller.style.paddingBottom = '';
       
       // Если календарь не помещается на экран (есть скролл)
-      if (scroller.scrollHeight > scroller.clientHeight + 100) {
+      if (scroller.scrollHeight > scroller.clientHeight + 50) {
         // Добавляем отступ снизу, равный высоте панели + 10px запаса.
         // Это поднимет последнюю неделю над панелью.
-        const bottomPad = bottomBarHeight + 15;
+        const bottomPad = bottomBarHeight + 30;
         scroller.style.setProperty('padding-bottom', bottomPad + 'px', 'important');
         // Обязательно content-box, чтобы отступ добавлялся к высоте контента
         scroller.style.setProperty('box-sizing', 'content-box', 'important');
