@@ -2859,37 +2859,48 @@ function addMinutesToString(dateTimeStr, minutes) {
 }
     
     function hasLessonConflict(newLesson, editMode = false) {
-  const lessonStartStr = `${newLesson.date}T${newLesson.time}`
-  const lessonEndStr = addMinutesToString(lessonStartStr, newLesson.duration)
-
-  // ⭐ Обрабатываем "конец дня" (00:00 в настройках = 23:59)
+  const lessonStart = new Date(`${newLesson.date}T${newLesson.time}`)
+  const lessonEnd = new Date(lessonStart.getTime() + newLesson.duration * 60000)
+  
   let workToStr = workHours.to === '00:00' ? '23:59' : workHours.to
-  const workStartStr = `${newLesson.date}T${workHours.from}`
-  const workEndStr = `${newLesson.date}T${workToStr}`
-
-  if (lessonStartStr < workStartStr) {
-    return { conflict: true, message: `⏰ Урок начинается до начала рабочего дня (${workHours.from})` }
+  const workStart = new Date(`${newLesson.date}T${workHours.from}`)
+  const workEnd = new Date(`${newLesson.date}T${workToStr}`)
+  
+  if (lessonStart < workStart) return { conflict: true, message: `⏰ Урок начинается до начала рабочего дня (${workHours.from})` }
+  
+  // ⭐ Проверяем, не выходит ли урок за пределы текущих суток
+  const isNextDay = lessonEnd.getDate() !== lessonStart.getDate()
+  
+  if (isNextDay) {
+    // Если урок закончился ровно в 00:00
+    if (lessonEnd.getHours() === 0 && lessonEnd.getMinutes() === 0) {
+      // Меняем продолжительность прямо в форме, чтобы пользователь это видел
+      const durationInput = document.getElementById('durationInput')
+      if (durationInput) {
+        durationInput.value = newLesson.duration - 1
+        highlightInvalidField(durationInput) // Подсветим красным, чтобы привлечь внимание
+      }
+      return { 
+        conflict: true, 
+        message: `⏰ Урок заканчивался в 00:00. Продолжительность автоматически изменена на ${newLesson.duration - 1} мин.` 
+      }
+    }
+    
+    // Если урок выходит за полночь (например, 00:30)
+    return { conflict: true, message: `⏰ Урок выходит за пределы текущих суток (заканчивается в ${String(lessonEnd.getHours()).padStart(2, '0')}:${String(lessonEnd.getMinutes()).padStart(2, '0')})` }
   }
-
-  // ⭐ Строковое сравнение: урок 22:00–23:00 НЕ выйдет за 23:00
-  if (lessonEndStr > workEndStr) {
-    return { conflict: true, message: `⏰ Урок заканчивается после окончания рабочего дня (${workHours.to})` }
-  }
-
+  
+  if (lessonEnd > workEnd) return { conflict: true, message: `⏰ Урок заканчивается после окончания рабочего дня (${workHours.to})` }
+  
   for (let lesson of lessons) {
     if (editMode && lesson.id === newLesson.id) continue
-    if (lesson.date !== newLesson.date) continue
-
-    const existingStartStr = `${lesson.date}T${lesson.time}`
-    const existingEndStr = addMinutesToString(existingStartStr, lesson.duration)
-
-    // ⭐ Строковое сравнение: 10:00–11:00 и 11:00–12:00 НЕ конфликтуют
-    if (lessonStartStr < existingEndStr && lessonEndStr > existingStartStr) {
-      return { conflict: true, message: `❌ Конфликт с уроком "${lesson.student}" в ${lesson.time}` }
-    }
+    const existingStart = new Date(`${lesson.date}T${lesson.time}`)
+    const existingEnd = new Date(existingStart.getTime() + lesson.duration * 60000)
+    if (lessonStart < existingEnd && lessonEnd > existingStart) return { conflict: true, message: `❌ Конфликт с уроком "${lesson.student}" в ${lesson.time}` }
   }
   return { conflict: false }
 }
+    
     async function saveLesson() {
   const dateInput = document.getElementById('dateInput')
   const timeInput = document.getElementById('timeInput')
@@ -2900,8 +2911,20 @@ function addMinutesToString(dateTimeStr, minutes) {
   if (!dateInput.value || !timeInput.value || !studentInput.value.trim()) {
     showToast('Пожалуйста, заполните все обязательные поля'); return
   }
-  const duration = parseInt(durationInput.value)
+  
+  let duration = parseInt(durationInput.value)
   if (isNaN(duration) || duration < 30) { showToast('Длительность должна быть не менее 30 минут'); return }
+  
+  // ⭐ АВТОМАТИЧЕСКАЯ КОРРЕКЦИЯ ПЕРЕД СОХРАНЕНИЕМ
+  const start = new Date(`${dateInput.value}T${timeInput.value}`)
+  const end = new Date(start.getTime() + duration * 60000)
+  
+  // Если урок заканчивается ровно в 00:00 следующих суток
+  if (end.getDate() !== start.getDate() && end.getHours() === 0 && end.getMinutes() === 0) {
+    duration = duration - 1
+    durationInput.value = duration
+    showToast(`⏰ Урок заканчивался в 00:00. Время изменено на ${duration} мин.`, true, 4000)
+  }
   
   const lesson = {
     id: editingLessonId || generateId(),
