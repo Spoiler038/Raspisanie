@@ -2354,7 +2354,7 @@ cells.forEach(cell => {
       if (bodyScroller.scrollHeight > bodyScroller.clientHeight + 2) {
         const spacer = document.createElement('div');
         spacer.className = 'fc-month-bottom-spacer';
-        const spacerHeight = bottomBarHeight - 34;
+        const spacerHeight = Math.max(10, bottomBarHeight - 34);
         spacer.style.cssText =
           'height:' + spacerHeight + 'px;' +
           'width:100%;' +
