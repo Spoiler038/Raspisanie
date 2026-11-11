@@ -107,7 +107,27 @@ body.light .fc-timeGridWeek-view .fc-col-header-cell {
     input, select, textarea { width: 100%; border-radius: 12px; background: #ffffff; color: #020617 !important; border: 1px solid #cbd5e1; font-size: 16px; box-sizing: border-box; }
     input::placeholder, textarea::placeholder { color: #64748b }
     input::-webkit-calendar-picker-indicator { filter: none !important }
-    .toast { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); background: #dc2626; color: white; padding: 12px 24px; border-radius: 8px; font-weight: 500; z-index: 9999; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15); display: none; max-width: 90%; text-align: center; animation: fadeInOut 3s ease-in-out; }
+    .toast {
+  position: fixed;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #dc2626;
+  color: white;
+  padding: 12px 20px;
+  border-radius: 8px;
+  font-weight: 500;
+  z-index: 9999;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  display: none;
+  /* ⭐ Увеличиваем ширину, чтобы длинный текст не сжимался */
+  width: calc(100% - 32px);
+  max-width: 380px;
+  text-align: center;
+  animation: fadeInOut 3s ease-in-out;
+  word-break: break-word; /* Позволяет переносить длинные слова */
+  box-sizing: border-box;
+}
     .toast.success { background: #16a34a; }
     @keyframes fadeInOut { 0% { opacity: 0; top: 10px; } 15% { opacity: 1; top: 20px; } 85% { opacity: 1; top: 20px; } 100% { opacity: 0; top: 10px; } }
     /* FIX iPhone: нижняя панель выше + safe area */
@@ -2306,27 +2326,33 @@ cells.forEach(cell => {
 }
 
 // ⭐ Отступ для месяца через JS (универсально)
+// ⭐ Отступ для месяца через невидимый футер (позволяет прокрутить дальше)
 if (viewType === 'dayGridMonth') {
-  normalizeMonthHeights();
-  
-  // Ждем полной отрисовки и пересчитываем
+  // 1. Удаляем старый футер, если он был
+  const oldFooter = document.querySelector('.month-scroll-footer');
+  if (oldFooter) oldFooter.remove();
+
+  // 2. Даём FullCalendar отрендерить сетку
+  normalizeMonthHeights(); 
+
+  // 3. Ждём полной отрисовки и добавляем футер в конец сетки
   setTimeout(() => {
+    const monthBody = document.querySelector('.fc-dayGridMonth-view .fc-daygrid-body');
     const scroller = document.querySelector('.fc-dayGridMonth-view .fc-scroller');
-    if (scroller) {
-      // Сбрасываем старые стили
-      scroller.style.paddingBottom = '';
-      
-      // Если календарь не помещается на экран (есть скролл)
-      if (scroller.scrollHeight > scroller.clientHeight + 50) {
-        // Добавляем отступ снизу, равный высоте панели + 10px запаса.
-        // Это поднимет последнюю неделю над панелью.
-        const bottomPad = bottomBarHeight + 15;
-        scroller.style.setProperty('padding-bottom', bottomPad + 'px', 'important');
-        // Обязательно content-box, чтобы отступ добавлялся к высоте контента
-        scroller.style.setProperty('box-sizing', 'content-box', 'important');
+    
+    if (monthBody && scroller) {
+      // Проверяем, есть ли скролл (не помещается на экран)
+      if (scroller.scrollHeight > scroller.clientHeight) {
+        const footer = document.createElement('div');
+        footer.className = 'month-scroll-footer';
+        // Высота футера = высота панели + запас
+        footer.style.height = (bottomBarHeight + 20) + 'px';
+        footer.style.width = '100%';
+        footer.style.pointerEvents = 'none'; // Чтобы не мешал нажимать
+        monthBody.appendChild(footer);
       }
     }
-  }, 100); // 100мс — чтобы FullCalendar точно закончил рендер
+  }, 100);
 }
     }
     
