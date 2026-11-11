@@ -2322,7 +2322,7 @@ cells.forEach(cell => {
     );
     scrollers.forEach(scroller => {
       if (scroller.closest('.fc-timeGridWeek-view') || scroller.closest('.fc-timeGridDay-view')) {
-        scroller.style.setProperty('max-height', (availableHeight - dayHeaderHeight - 5) + 'px', 'important');
+        scroller.style.setProperty('max-height', (availableHeight - dayHeaderHeight) + 'px', 'important');
       } else {
         scroller.style.setProperty('max-height', availableHeight + 'px', 'important');
       }
@@ -2354,7 +2354,7 @@ cells.forEach(cell => {
       if (bodyScroller.scrollHeight > bodyScroller.clientHeight + 2) {
         const spacer = document.createElement('div');
         spacer.className = 'fc-month-bottom-spacer';
-        const spacerHeight = bottomBarHeight + 40;
+        const spacerHeight = bottomBarHeight + 10;
         spacer.style.cssText =
           'height:' + spacerHeight + 'px;' +
           'width:100%;' +
