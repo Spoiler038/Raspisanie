@@ -2279,89 +2279,93 @@ cells.forEach(cell => {
     }
 
     function calculateScrollerHeight(forceApplyScrollers = false) {
-      const header = document.querySelector('header');
-      const bottomBar = document.querySelector('.bottom-bar');
-      const calendarEl = document.getElementById('calendar');
-      if (!header || !bottomBar || !calendarEl) return;
+  const header = document.querySelector('header');
+  const bottomBar = document.querySelector('.bottom-bar');
+  const calendarEl = document.getElementById('calendar');
+  if (!header || !bottomBar || !calendarEl) return;
 
-      const oldSpacer = document.querySelector('.fc-month-bottom-spacer');
-      if (oldSpacer && calendar.view.type !== 'dayGridMonth') oldSpacer.remove();
+  const headerHeight = header.offsetHeight;
+  const bottomBarHeight = bottomBar.offsetHeight;
+  const viewportHeight = window.innerHeight;
+  const dayHeader = document.querySelector('.fc-col-header');
+  const dayHeaderHeight = dayHeader ? dayHeader.offsetHeight : 40;
+  const viewType = calendar.view.type;
 
-      const headerHeight = header.offsetHeight;
-      const bottomBarHeight = bottomBar.offsetHeight;
-      const viewportHeight = window.innerHeight;
-      const dayHeader = document.querySelector('.fc-col-header');
-      const dayHeaderHeight = dayHeader ? dayHeader.offsetHeight : 40;
-      const viewType = calendar.view.type;
+  // ⭐ Убираем спейсер месяца, если сейчас не режим месяца
+  if (viewType !== 'dayGridMonth') {
+    document.querySelectorAll('.fc-month-bottom-spacer').forEach(el => el.remove());
+  }
 
-      let availableHeight;
-      let needsGeometryUpdate = false;
+  let availableHeight;
+  let needsGeometryUpdate = false;
 
-      if (_layoutCache &&
-          _layoutCache.headerHeight === headerHeight &&
-          _layoutCache.bottomBarHeight === bottomBarHeight &&
-          _layoutCache.viewportHeight === viewportHeight &&
-          _layoutCache.dayHeaderHeight === dayHeaderHeight) {
-        availableHeight = _layoutCache.availableHeight;
+  if (_layoutCache &&
+      _layoutCache.headerHeight === headerHeight &&
+      _layoutCache.bottomBarHeight === bottomBarHeight &&
+      _layoutCache.viewportHeight === viewportHeight &&
+      _layoutCache.dayHeaderHeight === dayHeaderHeight) {
+    availableHeight = _layoutCache.availableHeight;
+  } else {
+    availableHeight = viewportHeight - headerHeight - bottomBarHeight;
+    needsGeometryUpdate = true;
+    _layoutCache = { headerHeight, bottomBarHeight, viewportHeight, dayHeaderHeight, availableHeight };
+  }
+
+  if (needsGeometryUpdate) {
+    calendarEl.style.setProperty('height', availableHeight + 'px', 'important');
+  }
+
+  // Скроллеры применяем при смене вида или при изменении геометрии
+  if (needsGeometryUpdate || forceApplyScrollers) {
+    const scrollers = document.querySelectorAll(
+      '.fc-timeGridWeek-view .fc-scroller, .fc-timeGridDay-view .fc-scroller, .fc-dayGridMonth-view .fc-scroller'
+    );
+    scrollers.forEach(scroller => {
+      if (scroller.closest('.fc-timeGridWeek-view') || scroller.closest('.fc-timeGridDay-view')) {
+        scroller.style.setProperty('max-height', (availableHeight - dayHeaderHeight - 5) + 'px', 'important');
       } else {
-        //availableHeight = viewportHeight - headerHeight - bottomBarHeight - 5;
-        availableHeight = viewportHeight - headerHeight - bottomBarHeight;
-        needsGeometryUpdate = true;
-        _layoutCache = { headerHeight, bottomBarHeight, viewportHeight, dayHeaderHeight, availableHeight };
+        scroller.style.setProperty('max-height', availableHeight + 'px', 'important');
       }
+      scroller.style.setProperty('overflow-y', 'auto', 'important');
+      scroller.style.setProperty('overflow-x', 'hidden', 'important');
+    });
+  }
 
-      if (needsGeometryUpdate) {
-        calendarEl.style.setProperty('height', availableHeight + 'px', 'important');
+  // ⭐ Режим месяца: спейсер внутри скроллера ТЕЛА, чтобы можно было
+  // доскроллить до конца последней недели над нижней панелью
+  if (viewType === 'dayGridMonth') {
+    normalizeMonthHeights();
+
+    setTimeout(() => {
+      // Ищем скроллер тела (тот, что содержит .fc-daygrid-body)
+      let bodyScroller = null;
+      document.querySelectorAll('.fc-dayGridMonth-view .fc-scroller').forEach(s => {
+        if (s.querySelector('.fc-daygrid-body, .fc-scrollgrid-sync-table')) {
+          bodyScroller = s;
+        }
+      });
+      if (!bodyScroller) return;
+
+      // Удаляем предыдущий спейсер (при повторном вызове)
+      const oldSpacer = bodyScroller.querySelector('.fc-month-bottom-spacer');
+      if (oldSpacer) oldSpacer.remove();
+
+      // Ставим спейсер только если реально есть скролл
+      if (bodyScroller.scrollHeight > bodyScroller.clientHeight + 2) {
+        const spacer = document.createElement('div');
+        spacer.className = 'fc-month-bottom-spacer';
+        const spacerHeight = bottomBarHeight + 40;
+        spacer.style.cssText =
+          'height:' + spacerHeight + 'px;' +
+          'width:100%;' +
+          'pointer-events:none;' +
+          'flex-shrink:0;';
+        bodyScroller.appendChild(spacer);
+        console.log('✅ Спейсер месяца: ' + spacerHeight + 'px');
       }
-
-      // Скроллеры применяем всегда при смене вида или при изменении геометрии
-      if (needsGeometryUpdate || forceApplyScrollers) {
-  const scrollers = document.querySelectorAll('.fc-timeGridWeek-view .fc-scroller, .fc-timeGridDay-view .fc-scroller, .fc-dayGridMonth-view .fc-scroller');
-  scrollers.forEach(scroller => {
-    if (scroller.closest('.fc-timeGridWeek-view') || scroller.closest('.fc-timeGridDay-view')) {
-      scroller.style.setProperty('max-height', (availableHeight - dayHeaderHeight - 5) + 'px', 'important');
-    } else {
-      scroller.style.setProperty('max-height', availableHeight + 'px', 'important');
-    }
-    scroller.style.setProperty('overflow-y', 'auto', 'important');
-    scroller.style.setProperty('overflow-x', 'hidden', 'important');
-  });
+    }, 100);
+  }
 }
-
-// ⭐ Отступ для месяца через невидимый футер (позволяет прокрутить дальше)
-if (viewType === 'dayGridMonth') {
-  normalizeMonthHeights();
-
-  setTimeout(() => {
-    const scroller = document.querySelector('.fc-dayGridMonth-view .fc-scroller');
-    const harness = document.querySelector('.fc-dayGridMonth-view .fc-scroller-harness');
-    if (!scroller) return;
-
-    // Удаляем предыдущий спейсер, если был
-    const oldSpacer = document.querySelector('.fc-month-bottom-spacer');
-    if (oldSpacer) oldSpacer.remove();
-
-    // Проверяем, нужен ли скролл вообще
-    if (scroller.scrollHeight > scroller.clientHeight) {
-      // ⭐ Создаём реальный элемент-спейсер ВНУТРИ скроллера
-      const spacer = document.createElement('div');
-      spacer.className = 'fc-month-bottom-spacer';
-      // Высота = высота нижней панели + запас, чтобы последняя строка
-      // могла прокрутиться выше неё
-      const spacerHeight = bottomBarHeight + 40;
-      spacer.style.cssText = `
-        height: ${spacerHeight}px;
-        width: 100%;
-        pointer-events: none;
-        flex-shrink: 0;
-      `;
-
-      // Вставляем после таблицы внутри скроллера
-      scroller.appendChild(spacer);
-    }
-  }, 100);
-}
-    }
     
 
     const calendar = new FullCalendar.Calendar(document.getElementById('calendar'), {
