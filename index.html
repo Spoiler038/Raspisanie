@@ -2320,7 +2320,7 @@ if (viewType === 'dayGridMonth') {
       if (scroller.scrollHeight > scroller.clientHeight + 50) {
         // Добавляем отступ снизу, равный высоте панели + 10px запаса.
         // Это поднимет последнюю неделю над панелью.
-        const bottomPad = bottomBarHeight + 30;
+        const bottomPad = bottomBarHeight + 15;
         scroller.style.setProperty('padding-bottom', bottomPad + 'px', 'important');
         // Обязательно content-box, чтобы отступ добавлялся к высоте контента
         scroller.style.setProperty('box-sizing', 'content-box', 'important');
